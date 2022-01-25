@@ -1,0 +1,237 @@
+---
+title: "PanArctic DSL - Analyses"
+author: "[Pierre Priou](mailto:pierre.priou@mi.mun.ca)"
+date: "`r format(Sys.time(), '%Y/%m/%d at %H:%M')`"
+output: github_document
+always_allow_html: true
+---
+
+# Package and data loading
+
+```{r package-loading, message=FALSE}
+# Load packages
+library(tidyverse)              # Tidy code
+library(lubridate)              # Deal with dates
+library(kableExtra)             # Pretty tables
+library(cowplot)                # Plots on a grid
+library(rgdal)                  # Read shapefiles
+library(rworldxtra)             # Higher resolution coastline data
+library(marmap)                 # Bathymetry data of the Arctic Ocean
+library(ggforce)                # Draw polygons
+library(cmocean)                # Pretty color palettes
+source("R/getNOAA.ice.bathy.R") # Load bathy data from NOAA
+# Custom figure theme
+theme_set(theme_bw())
+theme_update(axis.text = element_text(size = 9),
+             axis.title = element_text(size = 9),
+             strip.text.x = element_text(size = 9, face = "plain", hjust = 0.5),
+             strip.background = element_rect(colour = "transparent", fill = "transparent"),
+             legend.title = element_text(size = 9),
+             legend.margin = margin(0, 0, 0, 0),
+             legend.box.margin = margin(0, 0, -8, 0),
+             panel.grid = element_blank(), 
+             plot.margin = unit(c(0, 0, 0, 0), "in"))
+options(dplyr.summarise.inform = F) # Suppress summarise() warning
+```
+
+```{r data-loading, message=FALSE}
+# Geographical data
+coastlines_110m <- readOGR("data/bathy/ne_110m_land.shp", verbose = F) %>% 
+  fortify() %>%
+  rename(lon = long, region = id)
+coastlines_50m <- readOGR("data/bathy/ne_50m_land.shp", verbose = F) %>% 
+  fortify() %>%
+  rename(lon = long, region = id)
+coastlines_10m <- readOGR("data/bathy/ne_10m_land.shp", verbose = F) %>% 
+  fortify() %>%
+  rename(lon = long, region = id)
+# Bathy data
+bathy_df <- getNOAA.ice.bathy(lon1 = -180, lon2 = 180, lat1 = 50, lat2 = 90,
+                              resolution = 6, keep = T, path = "data/bathy/") %>%
+  fortify.bathy() %>%
+  rename(lon = x, lat = y, depth = z) %>%
+  mutate(depth_d=factor(case_when(between(depth, -50, Inf) ~ "0-50",
+                                  between(depth, -100, -50) ~ "50-100",
+                                  between(depth, -200, -100) ~ "100-200",
+                                  between(depth, -500, -200) ~ "200-500",
+                                  between(depth, -1000, -500) ~ "500-1000",
+                                  between(depth, -2000, -1000) ~ "1000-2000",
+                                  between(depth, -4000, -2000) ~ "2000-4000",
+                                  between(depth, -Inf, -4000) ~ "4000-8000"),
+                        levels=c(">0","0-50","50-100","100-200","200-500","500-1000","1000-2000","2000-4000","4000-8000")))
+# Bathy data
+bathyHD_df <- getNOAA.ice.bathy(lon1 = -180, lon2 = 180, lat1 = 50, lat2 = 90,
+                              resolution = 2, keep = T, path = "data/bathy/") %>%
+  fortify.bathy() %>%
+  rename(lon = x, lat = y, depth = z) %>%
+  mutate(depth_d=factor(case_when(between(depth, -50, Inf) ~ "0-50",
+                                  between(depth, -100, -50) ~ "50-100",
+                                  between(depth, -200, -100) ~ "100-200",
+                                  between(depth, -500, -200) ~ "200-500",
+                                  between(depth, -1000, -500) ~ "500-1000",
+                                  between(depth, -2000, -1000) ~ "1000-2000",
+                                  between(depth, -4000, -2000) ~ "2000-4000",
+                                  between(depth, -Inf, -4000) ~ "4000-8000"),
+                        levels=c(">0","0-50","50-100","100-200","200-500","500-1000","1000-2000","2000-4000","4000-8000")))
+# Areas of interest
+area_BF_CAA <- data.frame(x = c(-153, -141.5, -93, -94, -153), y = c(75, 69, 69, 78, 78))
+area_BB <- data.frame(x = c(-85, -65, -51.5, -51.5, -85), y = c(72, 66.3, 66.3, 82, 82))
+area_SV <- data.frame(x = c(40, 21, 0, 0, 40), y = c(80, 78, 77, 85, 85))
+area_BF_CAA_mercator <- data.frame(x = c(-153.5, -153.5, -90, -90), y = c(67, 78, 78, 67))
+area_BB_mercator <- data.frame(x = c(-86, -65, -50, -50, -86), y = c(72, 66, 66, 82.5, 82.5))
+area_SV_mercator <- data.frame(x = c(37, 37, 2, 2), y = c(75, 85, 85, 75))
+area_BF_CAA_2 <- data.frame(x = c(-158, -158, -93, -93, -158), y = c(79, 68.5, 68.5, 79, 79))
+area_BB_2 <- data.frame(x = c(-86, -65, -51.5, -51.5, -86), y = c(72, 65.5, 65.5, 83, 83))
+area_SV_2 <- data.frame(x = c(46, 46, 0, 0, 46), y = c(85, 76, 76, 85, 85))
+# Acoustic data
+load("data/acoustics/MVBS_2015_2017.RData")
+# CTD data
+load("data/CTD/CTD_2015_2019.RData")
+# Trawl data
+load("data/nets/trawl_mwt_2015_2017.RData")
+# Stats data
+# load("data/acoustics/kruskal_dunn_spatial_interannual.RData")
+# Primary production data
+load("data/remote_sensing/remote_sensing_chl.RData")
+```
+
+# Plots 
+
+## Figure 1. Bathy map with sampling locations
+
+Careful this map takes forever to compute (> 18 h) when bathy has to be drawn.
+
+```{r fig1-map-station, fig.align='center', fig.height=3.25, fig.width=6}
+trawl_loc <- trawl_station %>%
+  group_by(date) %>%
+  summarise(lat = mean(lat),
+            lon = mean(lon))
+MVBS %>%
+  mutate(lat = round(lat, 1),
+         lon = round(lon, 1)) %>%
+  group_by(lat,lon) %>%
+  summarise(lat = mean(lat), 
+            lon = mean(lon)) %>%
+  ungroup() %>%
+  ggplot(aes(x = lon, y = lat)) +
+  # Plot bathy
+  # geom_tile(data = bathyHD_df, aes(x = lon, y = lat, fill = depth_d)) +
+  # scale_fill_cmocean("Depth (m)", name = "deep", discrete = T, na.value = NA, alpha = 0.6) +
+  # Plot coastlines
+  geom_polygon(data = coastlines_10m, aes(x = lon, y = lat, group = group), fill = "grey70") +
+  # Arctic circle
+  geom_segment(aes(x = -180, xend = 0, y = 66.5, yend = 66.5), col = "grey40", lty = 2, size = 0.3) +
+  geom_segment(aes(x = 0, xend = 180, y = 66.5, yend = 66.5), col = "grey40", lty = 2, size = 0.3) +
+  # Areas of interest
+  geom_shape(data=area_BF_CAA_2, aes(x=x,y=y), fill=NA, col="black", lwd=0.2, lty=1) +
+  geom_shape(data=area_BB_2, aes(x=x,y=y), fill=NA, col="black", lwd=0.2, lty=1) +
+  geom_shape(data=area_SV_2, aes(x=x,y=y), fill=NA, col="black", lwd=0.2, lty=1) +
+  # Acoustic data
+  geom_point(size = 0.7, shape = 4, color = "black") +
+  # Trawl locations
+  geom_point(data = trawl_loc, aes(x = lon, y = lat), shape = 23, size = 1.4, color = "black", fill = "orange") +
+  # Change projection
+  coord_map("azequalarea", ylim = c(66, 90), xlim = c(-160, 70), orientation = c(90,0,-60)) +
+  guides(fill = guide_legend(keywidth = 0.2, keyheight = 0.2, default.unit = "in"), color = "none") +
+  theme(legend.position = "right", panel.border = element_rect(fill = NA), axis.text = element_blank(),
+        axis.ticks = element_blank(), axis.title = element_blank())
+```
+
+## Figure 2. Vertical S~V~ profiles
+
+Code that works and used for producing the plot in the manuscript from 2021_12_17
+
+```{r fig2-Sv-profile-area-year, echo=F, warning=F,fig.align='center', dpi=100, fig.width=6.5, fig.height=3}
+# Custom color palette
+col_pal <- c("#80CBB1", "#347BA5", "#302346")
+# Calculate mean and median vertical profile for each area
+Sv_raster %>%
+  # Calculate mean and median Sv profiles per area per year
+  group_by(depth, area, year) %>%
+  summarise(sv_lin_median_areayear=median(sv_lin_median),
+            sv_lin_q2.5_areayear=median(sv_lin_q2.5),
+            sv_lin_q97.5_areayear=median(sv_lin_q97.5)) %>%
+  mutate(Sv_median=10*log10(sv_lin_median_areayear), 
+         Sv_q2.5=10*log10(sv_lin_q2.5_areayear),
+         Sv_q97.5=10*log10(sv_lin_q97.5_areayear)) %>%
+  ungroup() %>%
+  # Plotting details
+  # Remove empty water column and very low backscatter
+  mutate(Sv_median_1=if_else(Sv_median < -200, NaN, Sv_median),
+         Sv_q2.5_1=if_else(Sv_q2.5 < -200, NaN, Sv_q2.5),
+         Sv_q97.5_1=if_else(Sv_q97.5 < -105, NaN, Sv_q97.5)) %>%
+  # Replace low values by min limit for plotting continuous ribbon
+  mutate(Sv_median_2=if_else(is.na(Sv_median_1)==F & Sv_median_1<=-105, -105, Sv_median_1),
+         Sv_q2.5_2=if_else(is.na(Sv_median_1)==F & is.na(Sv_q2.5_1)==T & is.na(Sv_q97.5_1)==F, -105,
+                     if_else(is.na(Sv_median_1)==T & is.na(Sv_q2.5_1)==T & is.na(Sv_q97.5_1)==F, -105, 
+                     if_else(is.na(Sv_q2.5_1)==F & Sv_q2.5_1 <=-105, -105, Sv_q2.5_1))),
+         Sv_q97.5_2=Sv_q97.5_1) %>%
+  mutate(Sv_median_3=if_else(Sv_median_2==-105 & Sv_q2.5_2==-105 & is.na(Sv_q97.5_2)==T, NaN, Sv_median_2),
+         Sv_q2.5_3=if_else(Sv_median_2==-105 & Sv_q2.5_2==-105 & is.na(Sv_q97.5_2)==T, NaN, Sv_median_3),
+         Sv_q97.5_3=Sv_q97.5_2) %>%
+  arrange(year, area, depth) %>%
+  mutate(area=factor(if_else(area=="BF_CAA", "Beaufort Sea &\nCan. Arctic Archipelago",
+                       if_else(area=="BB", "Baffin Bay",
+                       if_else(area=="SV", "Svalbard","Other"))),
+                       levels=c("Beaufort Sea &\nCan. Arctic Archipelago","Baffin Bay","Svalbard"))) %>%
+  # Plot
+  ggplot() +
+  geom_vline(xintercept=200, lty=2, col="grey20") +
+  geom_ribbon(aes(x=depth, ymin=Sv_q2.5_2, ymax=Sv_q97.5_2, fill=as.factor(year), group=year), alpha=0.2) +
+  geom_line(aes(x=depth, y=Sv_median_2, col=as.factor(year), group=year)) +
+  scale_x_reverse("Depth (m)", breaks=seq(0,1000,200)) +
+  geom_hline(yintercept=-105, col="white") +
+  scale_y_continuous(expression("S"[V]*" (dB re 1 m"^-1*")"), breaks=seq(-200,0,10), limits=c(-105,-65), expand=c(0,0)) +
+  scale_color_manual(values=col_pal) +
+  scale_fill_manual(values=col_pal) +
+  coord_flip() +
+  facet_grid(~area) +
+  theme(legend.title=element_blank(),
+        legend.position=c(0.94,0.275),
+        legend.background=element_blank(),
+        legend.key=element_blank(), 
+        panel.border=element_blank(),
+        axis.line=element_line())
+```
+
+# Supplementary data
+
+## Table S3. Acoustic settings
+
+```{r tableS3-acoustic-settings, echo=F, warning=F, message=F, fig.align='center'}
+summary_MVBS <- MVBS %>%
+  group_by(date,process_ID, filename, area, year) %>%
+  summarise() %>% # Remove depth component
+  ungroup() %>%
+  group_by(area,year) %>% # Summarise total amount of files and total number of hours of data
+  summarise(n_files=n(),
+            duration_min=n_files*10,
+            duration_h=round(duration_min/60))
+
+# Create data frame and table
+data.frame(year=c(rep(2015,3), rep(2016,3), rep(2017,3)),
+           Area=rep(c("Beaufort Sea","Baffin Bay","Svalbard"), 3),
+           area=rep(c("BF_CAA","BB","SV"),3),
+           Vessel=c("CCGV Amundsen","CCGV Amundsen","RV Polarstern", # 2015
+                    "CCGV Amundsen","CCGV Amundsen","RV Helmer Hanssen", # 2016
+                    "FV Frosti","CCGV Amundsen","RV Polarstern"), # 2017
+           Echosounder=c(rep("EK60",6), rep("EK80",1), rep("EK60",2)),
+           Transducer_depth=c(rep(7,2),11,rep(7,2),8,6,7,11),
+           Pulse_length=rep(1.024,9),
+           Power=c(rep(2000,2),1000,rep(2000,5),1000)) %>%
+  left_join(.,summary_MVBS, by=c("area", "year")) %>%
+  dplyr::select(year, Area, Vessel, Echosounder, Transducer_depth, Pulse_length,
+                Power, duration_h) %>%
+  rename("Year"=year,
+         "Transducers depth (m)"=Transducer_depth, 
+         "Pulse length (msec)"=Pulse_length,
+         "Power (W)"=Power,
+         "Acoustic data duration (h)"=duration_h) %>%
+  mutate(Year="" ) %>% # remove year values for a more readable table
+  kbl(align=c("l", "l", "l", "c", "c","c","c","c")) %>%
+  kable_classic(full_width=F, html_font="Arial") %>%
+  pack_rows("2015", 1, 3) %>%
+  pack_rows("2016", 4, 6) %>%
+  pack_rows("2017", 7, 9)
+```
+
