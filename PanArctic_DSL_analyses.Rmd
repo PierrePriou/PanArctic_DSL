@@ -325,26 +325,31 @@ map_sa_anomaly
 
 ## Figure 4. Environmental drivers of mesopelagic backscatter
 
-**STUCK HERE FOR NOW. NEED TO FIND A WAY TO JOIN THE DATA.**
+I selected acoustic data within 1 hour of a CTD cast and calculated the mean mesopelagic NASC (between 200 and 1000 m depth) and mean mesopelagic temperature and salinity.
 
 ```{r MVBS-CTD-data-manip, include=T}
-CTD_test <- CTD_2015_2019 %>%
-  filter(year == 2016) %>%
+# Prepare CTD data
+CTD <- CTD_2015_2019 %>% 
   filter(between(year, 2015, 2017) & CTD_depth_max > 350) %>%
-  filter(between(depth, 200, 1000)) %>%
+  filter(between(depth, 200, 1000)) %>% 
   dplyr::select(date, cast, lat, lon, CT, SA) %>%
   group_by(date, cast, lat, lon) %>%
-  mutate(date = floor_date(date, "10 min")) %>%
-  summarise(CT = mean(CT),
+  summarise(CT = mean(CT), # Calculate average temp and sal at mesopelagic depths
             SA = mean(SA)) %>%
+  mutate(date = floor_date(date, "10 min"),
+         date_CTD_cast = date) %>%
+  ungroup() %>%
   mutate(area = factor(case_when(lon > -155 & lon <= -95 & lat > 65 & lat <= 82 ~ "BF_CAA",
                                  lon > -95 & lon <= -50 & lat > 66 & lat <= 82 ~ "BB",
                                  lon >= -25 & lon <= 145 & lat > 77 & lat <= 90 ~ "SV"),
                        levels = c("BF_CAA", "BB", "SV")),
-         date_cast = date)
-
-MVBS_test <- MVBS %>%
-  filter(year == 2016) %>%
+         date_min = date - hours(1),
+         date_max = date + hours(1)) %>% 
+  group_by(cast, date_CTD_cast, date_min, date_max,  area, lat, lon, CT, SA) %>%
+  # Expand dataset to +- 1 h around each CTD cast with mean values of the cast. Used for combining with acoustic data
+  complete(date = seq(date_min, date_max, by = "10 min"))
+# Prepare acoustic data
+MVBS_CTD <- MVBS %>%
   filter(between(layer_depth_min, 200, 1000)) %>%
   dplyr::select(date, lat, lon, NASC) %>%
   group_by(date, lat, lon) %>%
@@ -352,16 +357,37 @@ MVBS_test <- MVBS %>%
   mutate(area = factor(case_when(lon > -155 & lon <= -95 & lat > 65 & lat <= 82 ~ "BF_CAA",
                                  lon > -95 & lon <= -50 & lat > 66 & lat <= 82 ~ "BB",
                                  lon >= -25 & lon <= 145 & lat > 77 & lat <= 90 ~ "SV"),
-                       levels = c("BF_CAA", "BB", "SV")))
-# Issue here
-join_test <- left_join(MVBS_test, CTD_test, by = c("date", "area"), suffix = c("_MVBS", "_CTD")) %>%
-  # mutate(lat_diff = lat_MVBS - lat_CTD,
-  #        lon_diff = lon_MVBS - lon_CTD) %>%
-  mutate(date_min = date_cast - hours(1),
-         date_max = date_cast + hours(1)) %>%
-  rowwise() %>%
-  mutate(cast_2 = if_else(date > date_min & date < date_max, T, F))
+                       levels = c("BF_CAA", "BB", "SV"))) %>%
+  left_join(., CTD, by = c("date", "area"), suffix = c("_MVBS", "_CTD")) %>% # Combine CTD and acoustic datasets
+  mutate(lat_diff = abs(lat_MVBS - lat_CTD),
+         lon_diff = abs(lon_MVBS - lon_CTD),
+         date_diff = abs(difftime(date, date_CTD_cast, tz = "UTC", units = "mins"))) %>%
+  filter(lat_diff < 0.1 & lon_diff < 0.1 & date_diff <= minutes(60)) %>% # Remove NASC cells too far in space or time to CTD casts
+  group_by(date_CTD_cast, cast, lat_CTD, lon_CTD, CT, SA) %>%
+  summarise(NASC_int = mean(NASC_int)) %>% # Calculate mean mesopelagic NASC for each CTD cast
+  ungroup() %>%
+  mutate(SA_int = 10 * log10(NASC_int))
 ```
+
+
+
+```{r SA-temp-sal, fig.align='center', fig.width=6, fig.height=3, dpi=600}
+temp_SA_int <- MVBS_CTD %>%
+  ggplot(aes(x = CT, y = SA_int)) +
+  geom_point(size = 1.2, alpha = 0.5) + 
+  geom_smooth(method = "lm") +
+  scale_x_continuous("Conservative temperature (°C)") +
+  scale_y_continuous(expression("S"[A]*" dB re 1 (m"^2*" nmi"^-2*")"))
+sal_SA_int <- MVBS_CTD %>% # Plot salinity 
+  ggplot(aes(x = SA, y = SA_int)) +
+  geom_point(size = 1.2, alpha = 0.5) + 
+  geom_smooth(method = "lm") +
+  scale_x_continuous(expression("Absolute salinity (g kg"^-1*")")) +
+  scale_y_continuous(expression("S"[A]*" dB re 1 (m"^2*" nmi"^-2*")"))
+plot_grid(temp_SA_int, sal_SA_int, axis = "tblr", align = "hv") # Combine plots
+```
+
+
 
 ## Table 1. Abundance mesopelagic fish
 
