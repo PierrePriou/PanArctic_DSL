@@ -101,7 +101,7 @@ load("data/remote_sensing/remote_sensing_chl.RData")
 
 Careful this map takes forever to compute (> 18 h) when bathy has to be drawn.
 
-```{r fig1-map-station, fig.align='center', fig.height=3.25, fig.width=6}
+```{r fig1-map-station, fig.align='center', fig.height=3.25, fig.width=6, dpi=600}
 trawl_loc <- trawl_station %>%
   group_by(date) %>%
   summarise(lat = mean(lat),
@@ -141,7 +141,7 @@ MVBS %>%
 
 Code that works and used for producing the plot in the manuscript from 2021_12_17
 
-```{r fig2-Sv-profile-area-year, echo=F, warning=F,fig.align='center', dpi=100, fig.width=6.5, fig.height=3}
+```{r fig2-Sv-profile-area-year, echo=F, warning=F,fig.align='center', dpi=100, fig.width=6.5, fig.height=3, dpi=600}
 # Custom color palette
 col_pal <- c("#80CBB1", "#347BA5", "#302346")
 # Calculate mean and median vertical profile for each area
@@ -197,9 +197,9 @@ Sv_raster %>%
 
 **WORK IN PROGRESS**
 
-I'm trying to streamline code.
+I'm trying to streamline the code.
 
-```{r Sv-profiles-area-year-in-progress, fig.align='center', fig.width=6.5, fig.height=3}
+```{r Sv-profiles-area-year-in-progress, eval=FALSE, fig.align='center', fig.width=6.5, fig.height=3, dpi=600}
 col_pal <- c("#80CBB1", "#347BA5", "#302346") # Custom colour palette
 Sv_area_year <- Sv_raster %>%
   group_by(depth, area, year) %>%
@@ -256,6 +256,71 @@ Sv_area_year <- Sv_raster %>%
   theme(legend.title = element_blank(), legend.position = c(0.94, 0.275), legend.background = element_blank(),
         legend.key = element_blank(),panel.border = element_blank(), axis.line = element_line())
 Sv_area_year
+```
+
+## Figure 3. Map of mesopelagic backscatter hotspots
+
+```{r fig3-map-sa-anomalies, fig.align='center', fig.height=3.25, fig.width=6, dpi=600}
+col_pal <- c("#80cdc1",  "#f5f5f5", "#dfc27d", "#a6611a")
+# Calculate mean sa anomaly over three years of data per area
+map_sa_anomaly <- SA_anomaly_2deg %>%
+  group_by(lat, lon, area, region) %>%
+  summarise(year_sampled = n(),
+            mean_ano_sa_int = mean(anomaly_NASC_int, na.rm = T)) %>%
+  ungroup() %>%
+  mutate(mean_ano_sa_int_d = factor(case_when(mean_ano_sa_int < -1 ~ "<-1",
+                                              mean_ano_sa_int >= -1 & mean_ano_sa_int < -0.5 ~ "[-1; -0.5[",
+                                              mean_ano_sa_int >= -0.5 & mean_ano_sa_int <= 0.5 ~ "[-0.5; 0.5]",
+                                              mean_ano_sa_int > 0.5 & mean_ano_sa_int <= 1 ~ "]0.5; 1]",
+                                              mean_ano_sa_int > 1 ~ ">1"),
+                                    levels = c("<-1", "[-1; -0.5[", "[-0.5; 0.5]", "]0.5; 1]", ">1"))) %>%
+  ggplot(aes(x = lon, y = lat)) +
+  # Longitude lines
+  geom_segment(aes(x = -180, xend = -180, y = 60, yend = 90), col = "grey90", size = 0.3) +
+  geom_segment(aes(x = -150, xend = -150, y = 60, yend = 90), col = "grey90", size = 0.3) +
+  geom_segment(aes(x = -120, xend = -120, y = 60, yend = 90), col = "grey90", size = 0.3) +
+  geom_segment(aes(x = -90, xend = -90, y = 60, yend = 90), col = "grey90", size = 0.3) +
+  geom_segment(aes(x = -60, xend = -60, y = 60, yend = 90), col = "grey90", size = 0.3) +
+  geom_segment(aes(x = -30, xend = -30, y = 60, yend = 90), col = "grey90", size = 0.3) +
+  geom_segment(aes(x = 0, xend = 0, y = 60, yend = 90), col = "grey90", size = 0.3) +
+  geom_segment(aes(x = 180, xend = 180, y = 60, yend = 90), col = "grey90", size = 0.3) +
+  geom_segment(aes(x = 150, xend = 150, y = 60, yend = 90), col = "grey90", size = 0.3) +
+  geom_segment(aes(x = 120, xend = 120, y = 60, yend = 90), col = "grey90", size = 0.3) +
+  geom_segment(aes(x = 90, xend = 90, y = 60, yend = 90), col = "grey90", size = 0.3) +
+  geom_segment(aes(x = 60, xend = 60, y = 60, yend = 90), col = "grey90", size = 0.3) +
+  geom_segment(aes(x = 30, xend = 30, y = 60, yend = 90), col = "grey90", size = 0.3) +
+  # Latitude lines
+  geom_segment(aes(x = -180, xend = 0, y = 60, yend = 60), col = "grey90", size = 0.3) +
+  geom_segment(aes(x = 0, xend = 180, y = 60, yend = 60), col = "grey90", size = 0.3) +
+  geom_segment(aes(x = -180, xend = 0, y = 70, yend = 70), col = "grey90", size = 0.3) +
+  geom_segment(aes(x = 0, xend = 180, y = 70, yend = 70), col = "grey90", size = 0.3) +
+  geom_segment(aes(x = -180, xend = 0, y = 80, yend = 80), col = "grey90", size = 0.3) +
+  geom_segment(aes(x = 0, xend = 180, y = 80, yend = 80), col = "grey90", size = 0.3) +
+  # Plot 500m isobath
+  geom_contour(data = bathy_df, aes(x = lon, y = lat, z = depth), breaks = -500, size = 0.25, colour = "black", lty = 3) +
+  # Plot coastlines
+  geom_polygon(data = coastlines_10m, aes(x = lon, y = lat, group = group), fill = "grey70") +
+  # Areas of interest
+  geom_shape(data = area_BF_CAA_2, aes(x = x,y = y), fill = NA, col = "black", lwd = 0.2, lty = 1) +
+  geom_shape(data = area_BB_2, aes(x = x,y = y), fill = NA, col = "black", lwd = 0.2, lty = 1) +
+  geom_shape(data = area_SV_2, aes(x = x,y = y), fill = NA, col = "black", lwd = 0.2, lty = 1) +
+  # Arctic circle
+  geom_segment(aes(x = -180, xend = 100, y = 66.5, yend = 66.5), col = "#666766", lty = 2, size = 0.3) +
+  # Plot data
+  geom_tile(aes(fill = mean_ano_sa_int_d), color = "grey30", alpha = 0.8, size = 0.15) +
+  scale_fill_manual("2015-2017\nAverage\nbackscatter\nanomaly", values = col_pal) +
+  coord_map("azequalarea", ylim = c(66, 90), xlim = c(-160, 30), orientation = c(90, 0, -60)) +
+  # Theme
+  guides(fill = guide_legend(keywidth = 0.2, keyheight = 0.2, default.unit = "in"), color = "none") +
+  theme(legend.position = "right", 
+        legend.title = element_text(hjust = 0.5),
+        panel.border = element_rect(fill = NA),
+        strip.text.x = element_blank(), 
+        strip.background = element_blank(), 
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        axis.title = element_blank())
+map_sa_anomaly
 ```
 
 
