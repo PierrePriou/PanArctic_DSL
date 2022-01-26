@@ -323,6 +323,70 @@ map_sa_anomaly <- SA_anomaly_2deg %>%
 map_sa_anomaly
 ```
 
+## Table 1. Abundance mesopelagic fish
+
+```{r table1-heatmap-abundance, fig.align='center', fig.width=4.5, fig.height=3.25, dpi=600}
+relative_abundance_area <- trawl_station %>%
+  group_by(area) %>%
+  summarise(total_fish = sum(number_fish)) %>% # Calculate total number of fish caught per area
+  ungroup() %>%
+  right_join(., trawl_area, by = c("area")) %>% # Join with relative abundance dataset
+  mutate(area = factor(case_when(area == "BF_CAA" ~ "Beaufort Sea &\nCan. Arct. Archipelago",
+                                 area == "BB" ~ "Baffin Bay",
+                                 area == "SV" ~ "Svalbard"),
+                       levels = c("Beaufort Sea &\nCan. Arct. Archipelago", "Baffin Bay", "Svalbard"))) %>%
+  unite(area_label, area, total_fish, sep = "\nn = ", remove = F) %>% # Create labels for x axis
+  # Format species name appropriately
+  mutate(fish_species = str_replace(fish_species, pattern = "_", replacement = " "),
+         fish_species = str_replace(fish_species, pattern = " sp", replacement = " sp."),
+         fish_species = str_to_sentence(fish_species),
+         fish_species = if_else(fish_species == "Notolepis rissoi", "Arctozenus risso", fish_species),
+         fish_species = factor(fish_species, levels = c("Icelus bicornis",
+                                                        "Anarhichas lupus",
+                                                        "Reinhardtius hippoglossoides",
+                                                        "Arctozenus risso",
+                                                        "Melanogrammus aeglefinus",
+                                                        "Gadus morhua",
+                                                        "Leptoclinus maculatus",
+                                                        "Sebastes sp.",
+                                                        "Myctophidae",
+                                                        "Liparidae",
+                                                        "Boreogadus saida")),
+         color_text = if_else(RA_area >= 40, "white", "black"),
+         RA_area_round = 10 * floor(RA_area / 10),
+         area_label = factor(area_label, levels = c("Beaufort Sea &\nCan. Arct. Archipelago\nn = 923", 
+                                                    "Baffin Bay\nn = 232",
+                                                    "Svalbard\nn = 464"))) %>%  
+  # Plot
+  ggplot() +
+  geom_tile(aes(x = area_label, y = fish_species, fill = RA_area_round), color = "white", lwd = 0.6) +
+  geom_text(aes(x = area_label, y = fish_species, label = sprintf("%0.1f", round(RA_area, 1)), color = color_text), size = 3) +
+  scale_x_discrete(expand = c(0, 0)) +
+  scale_y_discrete(labels = c("Twohorn sculpin",
+                              "Atlantic wolffish",
+                              "Greenland halibut",
+                              "Spotted barracudina",
+                              "Haddock", 
+                              "Atlantic cod",
+                              "Daubed shanny",
+                              "Redfish",
+                              "Lanternfish",
+                              "Snailfish",
+                              "Polar cod"), 
+                   expand = c(0, 0)) +
+  scale_colour_identity() +
+  scale_fill_viridis_c("Relative\nabundance (%)  ", option = "mako", breaks = seq(0, 100, 20), limits = c(0, 100), direction = -1) +
+  guides(fill = guide_colorbar(label.position = "top")) +
+  theme(axis.title = element_blank(), 
+        legend.position = "top", 
+        legend.title = element_text(vjust = 0), 
+        legend.title.align = 0.5, 
+        legend.key.height = unit(0.1, "in"), 
+        legend.key.width = unit(0.3, "in"),
+        legend.box.margin = margin(0,0,-5,0))
+relative_abundance_area
+```
+
 
 # Supplementary data
 
