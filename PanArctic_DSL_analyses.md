@@ -1,7 +1,7 @@
 PanArctic DSL - Analyses
 ================
 [Pierre Priou](mailto:pierre.priou@mi.mun.ca)
-2022/01/25 at 20:14
+2022/01/26 at 17:33
 
 # Package and data loading
 
@@ -143,6 +143,242 @@ Code that works and used for producing the plot in the manuscript from
 2021_12_17
 
 <img src="PanArctic_DSL_analyses_files/figure-gfm/fig2-Sv-profile-area-year-1.png" style="display: block; margin: auto;" />
+
+**WORK IN PROGRESS**
+
+I’m trying to streamline the code.
+
+``` r
+col_pal <- c("#80CBB1", "#347BA5", "#302346") # Custom colour palette
+Sv_area_year <- Sv_raster %>%
+  group_by(depth, area, year) %>%
+  # Calculate mean and median Sv profiles per area per year
+  summarise(sv_lin_median_areayear = median(sv_lin_median),
+            sv_lin_q2.5_areayear = median(sv_lin_q2.5),
+            sv_lin_q97.5_areayear = median(sv_lin_q97.5)) %>%
+  # Transform into volume backscattering strength (dB)
+  mutate(Sv_median = 10 * log10(sv_lin_median_areayear), 
+         Sv_q2.5 = 10 * log10(sv_lin_q2.5_areayear),
+         Sv_q97.5 = 10 * log10(sv_lin_q97.5_areayear)) %>%
+  ungroup() %>%
+  # Plotting details
+  # # # Remove empty water column and very low backscatter
+  # mutate(Sv_median_1 = if_else(Sv_median < -200, NaN, Sv_median),
+  #        Sv_q2.5_1 = if_else(Sv_q2.5 < -200, NaN, Sv_q2.5),
+  #        Sv_q97.5_1 = if_else(Sv_q97.5 < -105, NaN, Sv_q97.5)) %>%
+  # Remove empty water column and very low backscatter
+  mutate(Sv_q97.5_1 = if_else(Sv_q97.5 < -105, NaN, Sv_q97.5),
+         Sv_q2.5_1 = case_when(Sv_q97.5 < -105 ~ NaN,
+                               Sv_q2.5 < -105 ~ NaN,
+                               Sv_q2.5 >= -105 ~ Sv_q2.5)) %>%
+  # Replace low values by min limit for plotting continuous ribbon
+  mutate(Sv_q2.5_2 = if_else(is.na(Sv_q2.5_1) == T & is.na(Sv_q97.5_1) == F, -105,
+                             if_else(is.na(Sv_q2.5_1) == T & is.na(Sv_q97.5_1) == F, -105, 
+                                     if_else(is.na(Sv_q2.5_1) == F & Sv_q2.5_1 <= -105, -105, Sv_q2.5_1))),
+         Sv_q97.5_2 = Sv_q97.5_1) %>%
+  # mutate(Sv_median_2 = if_else(is.na(Sv_median_1) == F & Sv_median_1 <= -105, -105, Sv_median_1),
+  #        Sv_q2.5_2 = if_else(is.na(Sv_median_1) == F & is.na(Sv_q2.5_1) == T & is.na(Sv_q97.5_1) == F, -105,
+  #                    if_else(is.na(Sv_median_1) == T & is.na(Sv_q2.5_1) == T & is.na(Sv_q97.5_1) == F, -105, 
+  #                    if_else(is.na(Sv_q2.5_1) == F & Sv_q2.5_1 <= -105, -105, Sv_q2.5_1))),
+  #        Sv_q97.5_2 = Sv_q97.5_1) %>%
+  arrange(year, area, depth) %>%
+  # filter(area == "BF_CAA") %>%
+  # mutate(area=factor(case_when(area == "BF_CAA" ~ "Beaufort Sea &\nCan. Arctic Archipelago",
+  #                              area == "BB" ~ "Baffin Bay",
+  #                              area == "SV" ~ "Svalbard"),
+  #                    levels = c("Beaufort Sea &\nCan. Arctic Archipelago", "Baffin Bay", "Svalbard"))) %>%
+  # Plot
+  ggplot() +
+  geom_vline(xintercept = 200, lty = 2, col = "grey20") +
+  # geom_ribbon(aes(x = depth, ymin = Sv_q2.5_2, ymax = Sv_q97.5_2, fill = as.factor(year), group = year), alpha = 0.2) +
+  # geom_line(aes(x = depth, y = Sv_median_2, col = as.factor(year), group = year)) +
+  geom_ribbon(aes(x = depth, ymin = Sv_q2.5, ymax = Sv_q97.5, fill = as.factor(year), group = year), alpha = 0.2, na.rm=T) +
+  geom_line(aes(x = depth, y = Sv_median, col = as.factor(year), group = year)) +
+  scale_x_reverse("Depth (m)", breaks = seq(0, 1000, 200)) +
+  # geom_hline(yintercept = -105, col = "white") +
+  # coord_cartesian(ylim = c(-105, -65)) +
+  # scale_y_continuous(expression("S"[V]*" (dB re 1 m"^-1*")"), breaks = seq(-200, 0, 10), limits = c(-105, -65), expand = c(0, 0)) +
+  scale_color_manual(values = col_pal) +
+  scale_fill_manual(values = col_pal) +
+  coord_flip(ylim = c(-100, -65)) +
+  facet_grid( ~ area) +
+  theme(legend.title = element_blank(), legend.position = c(0.94, 0.275), legend.background = element_blank(),
+        legend.key = element_blank(),panel.border = element_blank(), axis.line = element_line())
+Sv_area_year
+```
+
+## Figure 3. Map of mesopelagic backscatter hotspots
+
+``` r
+col_pal <- c("#80cdc1",  "#f5f5f5", "#dfc27d", "#a6611a")
+# Calculate mean sa anomaly over three years of data per area
+map_sa_anomaly <- SA_anomaly_2deg %>%
+  group_by(lat, lon, area, region) %>%
+  summarise(year_sampled = n(),
+            mean_ano_sa_int = mean(anomaly_NASC_int, na.rm = T)) %>%
+  ungroup() %>%
+  mutate(mean_ano_sa_int_d = factor(case_when(mean_ano_sa_int < -1 ~ "<-1",
+                                              mean_ano_sa_int >= -1 & mean_ano_sa_int < -0.5 ~ "[-1; -0.5[",
+                                              mean_ano_sa_int >= -0.5 & mean_ano_sa_int <= 0.5 ~ "[-0.5; 0.5]",
+                                              mean_ano_sa_int > 0.5 & mean_ano_sa_int <= 1 ~ "]0.5; 1]",
+                                              mean_ano_sa_int > 1 ~ ">1"),
+                                    levels = c("<-1", "[-1; -0.5[", "[-0.5; 0.5]", "]0.5; 1]", ">1"))) %>%
+  ggplot(aes(x = lon, y = lat)) +
+  # Longitude lines
+  geom_segment(aes(x = -180, xend = -180, y = 60, yend = 90), col = "grey90", size = 0.3) +
+  geom_segment(aes(x = -150, xend = -150, y = 60, yend = 90), col = "grey90", size = 0.3) +
+  geom_segment(aes(x = -120, xend = -120, y = 60, yend = 90), col = "grey90", size = 0.3) +
+  geom_segment(aes(x = -90, xend = -90, y = 60, yend = 90), col = "grey90", size = 0.3) +
+  geom_segment(aes(x = -60, xend = -60, y = 60, yend = 90), col = "grey90", size = 0.3) +
+  geom_segment(aes(x = -30, xend = -30, y = 60, yend = 90), col = "grey90", size = 0.3) +
+  geom_segment(aes(x = 0, xend = 0, y = 60, yend = 90), col = "grey90", size = 0.3) +
+  geom_segment(aes(x = 180, xend = 180, y = 60, yend = 90), col = "grey90", size = 0.3) +
+  geom_segment(aes(x = 150, xend = 150, y = 60, yend = 90), col = "grey90", size = 0.3) +
+  geom_segment(aes(x = 120, xend = 120, y = 60, yend = 90), col = "grey90", size = 0.3) +
+  geom_segment(aes(x = 90, xend = 90, y = 60, yend = 90), col = "grey90", size = 0.3) +
+  geom_segment(aes(x = 60, xend = 60, y = 60, yend = 90), col = "grey90", size = 0.3) +
+  geom_segment(aes(x = 30, xend = 30, y = 60, yend = 90), col = "grey90", size = 0.3) +
+  # Latitude lines
+  geom_segment(aes(x = -180, xend = 0, y = 60, yend = 60), col = "grey90", size = 0.3) +
+  geom_segment(aes(x = 0, xend = 180, y = 60, yend = 60), col = "grey90", size = 0.3) +
+  geom_segment(aes(x = -180, xend = 0, y = 70, yend = 70), col = "grey90", size = 0.3) +
+  geom_segment(aes(x = 0, xend = 180, y = 70, yend = 70), col = "grey90", size = 0.3) +
+  geom_segment(aes(x = -180, xend = 0, y = 80, yend = 80), col = "grey90", size = 0.3) +
+  geom_segment(aes(x = 0, xend = 180, y = 80, yend = 80), col = "grey90", size = 0.3) +
+  # Plot 500m isobath
+  geom_contour(data = bathy_df, aes(x = lon, y = lat, z = depth), breaks = -500, size = 0.25, colour = "black", lty = 3) +
+  # Plot coastlines
+  geom_polygon(data = coastlines_10m, aes(x = lon, y = lat, group = group), fill = "grey70") +
+  # Areas of interest
+  geom_shape(data = area_BF_CAA_2, aes(x = x,y = y), fill = NA, col = "black", lwd = 0.2, lty = 1) +
+  geom_shape(data = area_BB_2, aes(x = x,y = y), fill = NA, col = "black", lwd = 0.2, lty = 1) +
+  geom_shape(data = area_SV_2, aes(x = x,y = y), fill = NA, col = "black", lwd = 0.2, lty = 1) +
+  # Arctic circle
+  geom_segment(aes(x = -180, xend = 100, y = 66.5, yend = 66.5), col = "#666766", lty = 2, size = 0.3) +
+  # Plot data
+  geom_tile(aes(fill = mean_ano_sa_int_d), color = "grey30", alpha = 0.8, size = 0.15) +
+  scale_fill_manual("2015-2017\nAverage\nbackscatter\nanomaly", values = col_pal) +
+  coord_map("azequalarea", ylim = c(66, 90), xlim = c(-160, 30), orientation = c(90, 0, -60)) +
+  # Theme
+  guides(fill = guide_legend(keywidth = 0.2, keyheight = 0.2, default.unit = "in"), color = "none") +
+  theme(legend.position = "right", 
+        legend.title = element_text(hjust = 0.5),
+        panel.border = element_rect(fill = NA),
+        strip.text.x = element_blank(), 
+        strip.background = element_blank(), 
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        axis.title = element_blank())
+map_sa_anomaly
+```
+
+<img src="PanArctic_DSL_analyses_files/figure-gfm/fig3-map-sa-anomalies-1.png" style="display: block; margin: auto;" />
+
+## Figure 4. Environmental drivers of mesopelagic backscatter
+
+**STUCK HERE FOR NOW. NEED TO FIND A WAY TO JOIN THE DATA.**
+
+``` r
+CTD_test <- CTD_2015_2019 %>%
+  filter(year == 2016) %>%
+  filter(between(year, 2015, 2017) & CTD_depth_max > 350) %>%
+  filter(between(depth, 200, 1000)) %>%
+  dplyr::select(date, cast, lat, lon, CT, SA) %>%
+  group_by(date, cast, lat, lon) %>%
+  mutate(date = floor_date(date, "10 min")) %>%
+  summarise(CT = mean(CT),
+            SA = mean(SA)) %>%
+  mutate(area = factor(case_when(lon > -155 & lon <= -95 & lat > 65 & lat <= 82 ~ "BF_CAA",
+                                 lon > -95 & lon <= -50 & lat > 66 & lat <= 82 ~ "BB",
+                                 lon >= -25 & lon <= 145 & lat > 77 & lat <= 90 ~ "SV"),
+                       levels = c("BF_CAA", "BB", "SV")),
+         date_cast = date)
+
+MVBS_test <- MVBS %>%
+  filter(year == 2016) %>%
+  filter(between(layer_depth_min, 200, 1000)) %>%
+  dplyr::select(date, lat, lon, NASC) %>%
+  group_by(date, lat, lon) %>%
+  summarise(NASC_int = sum(NASC)) %>%
+  mutate(area = factor(case_when(lon > -155 & lon <= -95 & lat > 65 & lat <= 82 ~ "BF_CAA",
+                                 lon > -95 & lon <= -50 & lat > 66 & lat <= 82 ~ "BB",
+                                 lon >= -25 & lon <= 145 & lat > 77 & lat <= 90 ~ "SV"),
+                       levels = c("BF_CAA", "BB", "SV")))
+# Issue here
+join_test <- left_join(MVBS_test, CTD_test, by = c("date", "area"), suffix = c("_MVBS", "_CTD")) %>%
+  # mutate(lat_diff = lat_MVBS - lat_CTD,
+  #        lon_diff = lon_MVBS - lon_CTD) %>%
+  mutate(date_min = date_cast - hours(1),
+         date_max = date_cast + hours(1)) %>%
+  rowwise() %>%
+  mutate(cast_2 = if_else(date > date_min & date < date_max, T, F))
+```
+
+## Table 1. Abundance mesopelagic fish
+
+``` r
+relative_abundance_area <- trawl_station %>%
+  group_by(area) %>%
+  summarise(total_fish = sum(number_fish)) %>% # Calculate total number of fish caught per area
+  ungroup() %>%
+  right_join(., trawl_area, by = c("area")) %>% # Join with relative abundance dataset
+  mutate(area = factor(case_when(area == "BF_CAA" ~ "Beaufort Sea &\nCan. Arct. Archipelago",
+                                 area == "BB" ~ "Baffin Bay",
+                                 area == "SV" ~ "Svalbard"),
+                       levels = c("Beaufort Sea &\nCan. Arct. Archipelago", "Baffin Bay", "Svalbard"))) %>%
+  unite(area_label, area, total_fish, sep = "\nn = ", remove = F) %>% # Create labels for x axis
+  # Format species name appropriately
+  mutate(fish_species = str_replace(fish_species, pattern = "_", replacement = " "),
+         fish_species = str_replace(fish_species, pattern = " sp", replacement = " sp."),
+         fish_species = str_to_sentence(fish_species),
+         fish_species = if_else(fish_species == "Notolepis rissoi", "Arctozenus risso", fish_species),
+         fish_species = factor(fish_species, levels = c("Icelus bicornis",
+                                                        "Anarhichas lupus",
+                                                        "Reinhardtius hippoglossoides",
+                                                        "Arctozenus risso",
+                                                        "Melanogrammus aeglefinus",
+                                                        "Gadus morhua",
+                                                        "Leptoclinus maculatus",
+                                                        "Sebastes sp.",
+                                                        "Myctophidae",
+                                                        "Liparidae",
+                                                        "Boreogadus saida")),
+         color_text = if_else(RA_area >= 40, "white", "black"),
+         RA_area_round = 10 * floor(RA_area / 10),
+         area_label = factor(area_label, levels = c("Beaufort Sea &\nCan. Arct. Archipelago\nn = 923",
+                                                    "Baffin Bay\nn = 232",
+                                                    "Svalbard\nn = 464"))) %>%
+  # Plot
+  ggplot() +
+  geom_tile(aes(x = area_label, y = fish_species, fill = RA_area_round), color = "white", lwd = 0.6) +
+  geom_text(aes(x = area_label, y = fish_species, label = sprintf("%0.1f", round(RA_area, 1)), color = color_text), size = 3) +
+  scale_x_discrete(expand = c(0, 0)) +
+  scale_y_discrete(labels = c("Twohorn sculpin",
+                              "Atlantic wolffish",
+                              "Greenland halibut",
+                              "Spotted barracudina",
+                              "Haddock",
+                              "Atlantic cod",
+                              "Daubed shanny",
+                              "Redfish",
+                              "Lanternfish",
+                              "Snailfish",
+                              "Polar cod"),
+                   expand = c(0, 0)) +
+  scale_colour_identity() +
+  scale_fill_viridis_c("Relative\nabundance (%)  ", option = "mako", breaks = seq(0, 100, 20), limits = c(0, 100), direction = -1) +
+  guides(fill = guide_colorbar(label.position = "top")) +
+  theme(axis.title = element_blank(),
+        legend.position = "top",
+        legend.title = element_text(vjust = 0),
+        legend.title.align = 0.5,
+        legend.key.height = unit(0.1, "in"),
+        legend.key.width = unit(0.3, "in"),
+        legend.box.margin = margin(0,0,-5,0))
+relative_abundance_area
+```
+
+<img src="PanArctic_DSL_analyses_files/figure-gfm/table1-heatmap-abundance-1.png" style="display: block; margin: auto;" />
 
 # Supplementary data
 

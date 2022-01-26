@@ -323,6 +323,46 @@ map_sa_anomaly <- SA_anomaly_2deg %>%
 map_sa_anomaly
 ```
 
+## Figure 4. Environmental drivers of mesopelagic backscatter
+
+**STUCK HERE FOR NOW. NEED TO FIND A WAY TO JOIN THE DATA.**
+
+```{r MVBS-CTD-data-manip, include=T}
+CTD_test <- CTD_2015_2019 %>%
+  filter(year == 2016) %>%
+  filter(between(year, 2015, 2017) & CTD_depth_max > 350) %>%
+  filter(between(depth, 200, 1000)) %>%
+  dplyr::select(date, cast, lat, lon, CT, SA) %>%
+  group_by(date, cast, lat, lon) %>%
+  mutate(date = floor_date(date, "10 min")) %>%
+  summarise(CT = mean(CT),
+            SA = mean(SA)) %>%
+  mutate(area = factor(case_when(lon > -155 & lon <= -95 & lat > 65 & lat <= 82 ~ "BF_CAA",
+                                 lon > -95 & lon <= -50 & lat > 66 & lat <= 82 ~ "BB",
+                                 lon >= -25 & lon <= 145 & lat > 77 & lat <= 90 ~ "SV"),
+                       levels = c("BF_CAA", "BB", "SV")),
+         date_cast = date)
+
+MVBS_test <- MVBS %>%
+  filter(year == 2016) %>%
+  filter(between(layer_depth_min, 200, 1000)) %>%
+  dplyr::select(date, lat, lon, NASC) %>%
+  group_by(date, lat, lon) %>%
+  summarise(NASC_int = sum(NASC)) %>%
+  mutate(area = factor(case_when(lon > -155 & lon <= -95 & lat > 65 & lat <= 82 ~ "BF_CAA",
+                                 lon > -95 & lon <= -50 & lat > 66 & lat <= 82 ~ "BB",
+                                 lon >= -25 & lon <= 145 & lat > 77 & lat <= 90 ~ "SV"),
+                       levels = c("BF_CAA", "BB", "SV")))
+# Issue here
+join_test <- left_join(MVBS_test, CTD_test, by = c("date", "area"), suffix = c("_MVBS", "_CTD")) %>%
+  # mutate(lat_diff = lat_MVBS - lat_CTD,
+  #        lon_diff = lon_MVBS - lon_CTD) %>%
+  mutate(date_min = date_cast - hours(1),
+         date_max = date_cast + hours(1)) %>%
+  rowwise() %>%
+  mutate(cast_2 = if_else(date > date_min & date < date_max, T, F))
+```
+
 ## Table 1. Abundance mesopelagic fish
 
 ```{r table1-heatmap-abundance, fig.align='center', fig.width=4.5, fig.height=3.25, dpi=600}
@@ -354,9 +394,9 @@ relative_abundance_area <- trawl_station %>%
                                                         "Boreogadus saida")),
          color_text = if_else(RA_area >= 40, "white", "black"),
          RA_area_round = 10 * floor(RA_area / 10),
-         area_label = factor(area_label, levels = c("Beaufort Sea &\nCan. Arct. Archipelago\nn = 923", 
+         area_label = factor(area_label, levels = c("Beaufort Sea &\nCan. Arct. Archipelago\nn = 923",
                                                     "Baffin Bay\nn = 232",
-                                                    "Svalbard\nn = 464"))) %>%  
+                                                    "Svalbard\nn = 464"))) %>%
   # Plot
   ggplot() +
   geom_tile(aes(x = area_label, y = fish_species, fill = RA_area_round), color = "white", lwd = 0.6) +
@@ -366,32 +406,31 @@ relative_abundance_area <- trawl_station %>%
                               "Atlantic wolffish",
                               "Greenland halibut",
                               "Spotted barracudina",
-                              "Haddock", 
+                              "Haddock",
                               "Atlantic cod",
                               "Daubed shanny",
                               "Redfish",
                               "Lanternfish",
                               "Snailfish",
-                              "Polar cod"), 
+                              "Polar cod"),
                    expand = c(0, 0)) +
   scale_colour_identity() +
   scale_fill_viridis_c("Relative\nabundance (%)  ", option = "mako", breaks = seq(0, 100, 20), limits = c(0, 100), direction = -1) +
   guides(fill = guide_colorbar(label.position = "top")) +
-  theme(axis.title = element_blank(), 
-        legend.position = "top", 
-        legend.title = element_text(vjust = 0), 
-        legend.title.align = 0.5, 
-        legend.key.height = unit(0.1, "in"), 
+  theme(axis.title = element_blank(),
+        legend.position = "top",
+        legend.title = element_text(vjust = 0),
+        legend.title.align = 0.5,
+        legend.key.height = unit(0.1, "in"),
         legend.key.width = unit(0.3, "in"),
         legend.box.margin = margin(0,0,-5,0))
 relative_abundance_area
 ```
 
-
 # Supplementary data
 
 ## Table S3. Acoustic settings
-
+ 
 ```{r tableS3-acoustic-settings, echo=F, warning=F, message=F, fig.align='center'}
 summary_MVBS <- MVBS %>%
   group_by(date,process_ID, filename, area, year) %>%
@@ -417,7 +456,7 @@ data.frame(year=c(rep(2015,3), rep(2016,3), rep(2017,3)),
   dplyr::select(year, Area, Vessel, Echosounder, Transducer_depth, Pulse_length,
                 Power, duration_h) %>%
   rename("Year"=year,
-         "Transducers depth (m)"=Transducer_depth, 
+         "Transducers depth (m)"=Transducer_depth,
          "Pulse length (msec)"=Pulse_length,
          "Power (W)"=Power,
          "Acoustic data duration (h)"=duration_h) %>%
@@ -428,4 +467,3 @@ data.frame(year=c(rep(2015,3), rep(2016,3), rep(2017,3)),
   pack_rows("2016", 4, 6) %>%
   pack_rows("2017", 7, 9)
 ```
-
