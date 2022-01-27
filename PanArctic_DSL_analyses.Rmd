@@ -364,7 +364,7 @@ MVBS_CTD <- MVBS %>%
          lon_diff = abs(lon_MVBS - lon_CTD),
          date_diff = abs(difftime(date, date_CTD_cast, tz = "UTC", units = "mins"))) %>%
   filter(lat_diff < 0.1 & lon_diff < 0.1 & date_diff <= minutes(60)) %>% # Remove NASC cells too far in space or time to CTD casts
-  group_by(date_CTD_cast, cast, lat_CTD, lon_CTD, CT, SA) %>%
+  group_by(date_CTD_cast, area, cast, lat_CTD, lon_CTD, CT, SA) %>%
   summarise(NASC_int = mean(NASC_int)) %>% # Calculate mean mesopelagic NASC for each CTD cast
   ungroup() %>%
   mutate(SA_int = 10 * log10(NASC_int))
