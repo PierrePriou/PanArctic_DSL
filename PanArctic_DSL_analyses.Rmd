@@ -19,6 +19,7 @@ library(rworldxtra)             # Higher resolution coastline data
 library(marmap)                 # Bathymetry data of the Arctic Ocean
 library(ggforce)                # Draw polygons
 library(cmocean)                # Pretty color palettes
+library(ggpubr)                 # Display stats with ggplot
 source("R/getNOAA.ice.bathy.R") # Load bathy data from NOAA
 # Custom figure theme
 theme_set(theme_bw())
@@ -141,7 +142,7 @@ MVBS %>%
 
 Code that works and used for producing the plot in the manuscript from 2021_12_17
 
-```{r fig2-Sv-profile-area-year, echo=F, warning=F,fig.align='center', dpi=100, fig.width=6.5, fig.height=3, dpi=600}
+```{r fig2-Sv-profile-area-year, fig.align='center', dpi=100, fig.width=6.5, fig.height=3, dpi=600}
 # Custom color palette
 col_pal <- c("#80CBB1", "#347BA5", "#302346")
 # Calculate mean and median vertical profile for each area
@@ -369,25 +370,25 @@ MVBS_CTD <- MVBS %>%
   mutate(SA_int = 10 * log10(NASC_int))
 ```
 
-
-
 ```{r SA-temp-sal, fig.align='center', fig.width=6, fig.height=3, dpi=600}
 temp_SA_int <- MVBS_CTD %>%
   ggplot(aes(x = CT, y = SA_int)) +
   geom_point(size = 1.2, alpha = 0.5) + 
   geom_smooth(method = "lm") +
+  stat_cor(label.x = 1, label.y = 50) +
+  stat_regline_equation(label.x = 1, label.y = 45) +
   scale_x_continuous("Conservative temperature (°C)") +
   scale_y_continuous(expression("S"[A]*" dB re 1 (m"^2*" nmi"^-2*")"))
 sal_SA_int <- MVBS_CTD %>% # Plot salinity 
   ggplot(aes(x = SA, y = SA_int)) +
   geom_point(size = 1.2, alpha = 0.5) + 
   geom_smooth(method = "lm") +
+  stat_cor(label.x = 34, label.y = 50) +
+  stat_regline_equation(label.x = 34, label.y = 45) +
   scale_x_continuous(expression("Absolute salinity (g kg"^-1*")")) +
   scale_y_continuous(expression("S"[A]*" dB re 1 (m"^2*" nmi"^-2*")"))
 plot_grid(temp_SA_int, sal_SA_int, axis = "tblr", align = "hv") # Combine plots
 ```
-
-
 
 ## Table 1. Abundance mesopelagic fish
 

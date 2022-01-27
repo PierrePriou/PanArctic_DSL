@@ -1,7 +1,7 @@
 PanArctic DSL - Analyses
 ================
 [Pierre Priou](mailto:pierre.priou@mi.mun.ca)
-2022/01/26 at 17:33
+2022/01/26 at 21:20
 
 # Package and data loading
 
@@ -16,6 +16,7 @@ library(rworldxtra)             # Higher resolution coastline data
 library(marmap)                 # Bathymetry data of the Arctic Ocean
 library(ggforce)                # Draw polygons
 library(cmocean)                # Pretty color palettes
+library(ggpubr)                 # Display stats with ggplot
 source("R/getNOAA.ice.bathy.R") # Load bathy data from NOAA
 # Custom figure theme
 theme_set(theme_bw())
@@ -141,6 +142,61 @@ MVBS %>%
 
 Code that works and used for producing the plot in the manuscript from
 2021_12_17
+
+``` r
+# Custom color palette
+col_pal <- c("#80CBB1", "#347BA5", "#302346")
+# Calculate mean and median vertical profile for each area
+Sv_raster %>%
+  # Calculate mean and median Sv profiles per area per year
+  group_by(depth, area, year) %>%
+  summarise(sv_lin_median_areayear=median(sv_lin_median),
+            sv_lin_q2.5_areayear=median(sv_lin_q2.5),
+            sv_lin_q97.5_areayear=median(sv_lin_q97.5)) %>%
+  mutate(Sv_median=10*log10(sv_lin_median_areayear), 
+         Sv_q2.5=10*log10(sv_lin_q2.5_areayear),
+         Sv_q97.5=10*log10(sv_lin_q97.5_areayear)) %>%
+  ungroup() %>%
+  # Plotting details
+  # Remove empty water column and very low backscatter
+  mutate(Sv_median_1=if_else(Sv_median < -200, NaN, Sv_median),
+         Sv_q2.5_1=if_else(Sv_q2.5 < -200, NaN, Sv_q2.5),
+         Sv_q97.5_1=if_else(Sv_q97.5 < -105, NaN, Sv_q97.5)) %>%
+  # Replace low values by min limit for plotting continuous ribbon
+  mutate(Sv_median_2=if_else(is.na(Sv_median_1)==F & Sv_median_1<=-105, -105, Sv_median_1),
+         Sv_q2.5_2=if_else(is.na(Sv_median_1)==F & is.na(Sv_q2.5_1)==T & is.na(Sv_q97.5_1)==F, -105,
+                     if_else(is.na(Sv_median_1)==T & is.na(Sv_q2.5_1)==T & is.na(Sv_q97.5_1)==F, -105, 
+                     if_else(is.na(Sv_q2.5_1)==F & Sv_q2.5_1 <=-105, -105, Sv_q2.5_1))),
+         Sv_q97.5_2=Sv_q97.5_1) %>%
+  mutate(Sv_median_3=if_else(Sv_median_2==-105 & Sv_q2.5_2==-105 & is.na(Sv_q97.5_2)==T, NaN, Sv_median_2),
+         Sv_q2.5_3=if_else(Sv_median_2==-105 & Sv_q2.5_2==-105 & is.na(Sv_q97.5_2)==T, NaN, Sv_median_3),
+         Sv_q97.5_3=Sv_q97.5_2) %>%
+  arrange(year, area, depth) %>%
+  mutate(area=factor(if_else(area=="BF_CAA", "Beaufort Sea &\nCan. Arctic Archipelago",
+                       if_else(area=="BB", "Baffin Bay",
+                       if_else(area=="SV", "Svalbard","Other"))),
+                       levels=c("Beaufort Sea &\nCan. Arctic Archipelago","Baffin Bay","Svalbard"))) %>%
+  # Plot
+  ggplot() +
+  geom_vline(xintercept=200, lty=2, col="grey20") +
+  geom_ribbon(aes(x=depth, ymin=Sv_q2.5_2, ymax=Sv_q97.5_2, fill=as.factor(year), group=year), alpha=0.2) +
+  geom_line(aes(x=depth, y=Sv_median_2, col=as.factor(year), group=year)) +
+  scale_x_reverse("Depth (m)", breaks=seq(0,1000,200)) +
+  geom_hline(yintercept=-105, col="white") +
+  scale_y_continuous(expression("S"[V]*" (dB re 1 m"^-1*")"), breaks=seq(-200,0,10), limits=c(-105,-65), expand=c(0,0)) +
+  scale_color_manual(values=col_pal) +
+  scale_fill_manual(values=col_pal) +
+  coord_flip() +
+  facet_grid(~area) +
+  theme(legend.title=element_blank(),
+        legend.position=c(0.94,0.275),
+        legend.background=element_blank(),
+        legend.key=element_blank(), 
+        panel.border=element_blank(),
+        axis.line=element_line())
+```
+
+    ## Warning: Removed 22 row(s) containing missing values (geom_path).
 
 <img src="PanArctic_DSL_analyses_files/figure-gfm/fig2-Sv-profile-area-year-1.png" style="display: block; margin: auto;" />
 
@@ -276,26 +332,33 @@ map_sa_anomaly
 
 ## Figure 4. Environmental drivers of mesopelagic backscatter
 
-**STUCK HERE FOR NOW. NEED TO FIND A WAY TO JOIN THE DATA.**
+I selected acoustic data within 1 hour of a CTD cast and calculated the
+mean mesopelagic NASC (between 200 and 1000 m depth) and mean
+mesopelagic temperature and salinity.
 
 ``` r
-CTD_test <- CTD_2015_2019 %>%
-  filter(year == 2016) %>%
+# Prepare CTD data
+CTD <- CTD_2015_2019 %>% 
   filter(between(year, 2015, 2017) & CTD_depth_max > 350) %>%
-  filter(between(depth, 200, 1000)) %>%
+  filter(between(depth, 200, 1000)) %>% 
   dplyr::select(date, cast, lat, lon, CT, SA) %>%
   group_by(date, cast, lat, lon) %>%
-  mutate(date = floor_date(date, "10 min")) %>%
-  summarise(CT = mean(CT),
+  summarise(CT = mean(CT), # Calculate average temp and sal at mesopelagic depths
             SA = mean(SA)) %>%
+  mutate(date = floor_date(date, "10 min"),
+         date_CTD_cast = date) %>%
+  ungroup() %>%
   mutate(area = factor(case_when(lon > -155 & lon <= -95 & lat > 65 & lat <= 82 ~ "BF_CAA",
                                  lon > -95 & lon <= -50 & lat > 66 & lat <= 82 ~ "BB",
                                  lon >= -25 & lon <= 145 & lat > 77 & lat <= 90 ~ "SV"),
                        levels = c("BF_CAA", "BB", "SV")),
-         date_cast = date)
-
-MVBS_test <- MVBS %>%
-  filter(year == 2016) %>%
+         date_min = date - hours(1),
+         date_max = date + hours(1)) %>% 
+  group_by(cast, date_CTD_cast, date_min, date_max,  area, lat, lon, CT, SA) %>%
+  # Expand dataset to +- 1 h around each CTD cast with mean values of the cast. Used for combining with acoustic data
+  complete(date = seq(date_min, date_max, by = "10 min"))
+# Prepare acoustic data
+MVBS_CTD <- MVBS %>%
   filter(between(layer_depth_min, 200, 1000)) %>%
   dplyr::select(date, lat, lon, NASC) %>%
   group_by(date, lat, lon) %>%
@@ -303,16 +366,42 @@ MVBS_test <- MVBS %>%
   mutate(area = factor(case_when(lon > -155 & lon <= -95 & lat > 65 & lat <= 82 ~ "BF_CAA",
                                  lon > -95 & lon <= -50 & lat > 66 & lat <= 82 ~ "BB",
                                  lon >= -25 & lon <= 145 & lat > 77 & lat <= 90 ~ "SV"),
-                       levels = c("BF_CAA", "BB", "SV")))
-# Issue here
-join_test <- left_join(MVBS_test, CTD_test, by = c("date", "area"), suffix = c("_MVBS", "_CTD")) %>%
-  # mutate(lat_diff = lat_MVBS - lat_CTD,
-  #        lon_diff = lon_MVBS - lon_CTD) %>%
-  mutate(date_min = date_cast - hours(1),
-         date_max = date_cast + hours(1)) %>%
-  rowwise() %>%
-  mutate(cast_2 = if_else(date > date_min & date < date_max, T, F))
+                       levels = c("BF_CAA", "BB", "SV"))) %>%
+  left_join(., CTD, by = c("date", "area"), suffix = c("_MVBS", "_CTD")) %>% # Combine CTD and acoustic datasets
+  mutate(lat_diff = abs(lat_MVBS - lat_CTD),
+         lon_diff = abs(lon_MVBS - lon_CTD),
+         date_diff = abs(difftime(date, date_CTD_cast, tz = "UTC", units = "mins"))) %>%
+  filter(lat_diff < 0.1 & lon_diff < 0.1 & date_diff <= minutes(60)) %>% # Remove NASC cells too far in space or time to CTD casts
+  group_by(date_CTD_cast, cast, lat_CTD, lon_CTD, CT, SA) %>%
+  summarise(NASC_int = mean(NASC_int)) %>% # Calculate mean mesopelagic NASC for each CTD cast
+  ungroup() %>%
+  mutate(SA_int = 10 * log10(NASC_int))
 ```
+
+``` r
+temp_SA_int <- MVBS_CTD %>%
+  ggplot(aes(x = CT, y = SA_int)) +
+  geom_point(size = 1.2, alpha = 0.5) + 
+  geom_smooth(method = "lm") +
+  stat_cor(label.x = 1, label.y = 50) +
+  stat_regline_equation(label.x = 1, label.y = 45) +
+  scale_x_continuous("Conservative temperature (°C)") +
+  scale_y_continuous(expression("S"[A]*" dB re 1 (m"^2*" nmi"^-2*")"))
+sal_SA_int <- MVBS_CTD %>% # Plot salinity 
+  ggplot(aes(x = SA, y = SA_int)) +
+  geom_point(size = 1.2, alpha = 0.5) + 
+  geom_smooth(method = "lm") +
+  stat_cor(label.x = 34, label.y = 50) +
+  stat_regline_equation(label.x = 34, label.y = 45) +
+  scale_x_continuous(expression("Absolute salinity (g kg"^-1*")")) +
+  scale_y_continuous(expression("S"[A]*" dB re 1 (m"^2*" nmi"^-2*")"))
+plot_grid(temp_SA_int, sal_SA_int, axis = "tblr", align = "hv") # Combine plots
+```
+
+    ## `geom_smooth()` using formula 'y ~ x'
+    ## `geom_smooth()` using formula 'y ~ x'
+
+<img src="PanArctic_DSL_analyses_files/figure-gfm/SA-temp-sal-1.png" style="display: block; margin: auto;" />
 
 ## Table 1. Abundance mesopelagic fish
 
