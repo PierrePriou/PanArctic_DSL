@@ -89,7 +89,7 @@ rm(request, tmp_raw, tmp_coord, tmp_seaice, tmp) # Remove unused variables
 
 ## ICDR data 2016-01-01 - 2017-12-31
 
-```{r download-and-reproject-seaice-CDR, message=FALSE}
+```{r download-and-reproject-seaice-ICDR, message=FALSE}
 # Define projections: latlon (acoustic and CTD data), and laea (sea ice data)
 arctic_latlon <- raster(extent(-180,180,0,90), crs = "+init=epsg:4326", res = c(2, 1))
 arctic_laea <- raster(extent(-5400,5400,-5400,5400), crs = "+init=epsg:6931", res = c(25, 25))
