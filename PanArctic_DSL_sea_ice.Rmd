@@ -55,7 +55,7 @@ for (d in dates) {
                         transfer = T, 
                         verbose = F,
                         path = "data/remote_sensing/sea_ice/tmp") %>%
-    unzip(exdir = "data/remote_sensing/sea ice concentration/tmp") %>%  # Unzip file
+    unzip(exdir = "data/remote_sensing/sea_ice/tmp") %>%  # Unzip file
     tidync() # Read sea ice data
   # tmp_raw <- tidync("data/remote_sensing/ice_conc_nh_ease2-250_icdr-v2p0_201703091200.nc")
   tmp_coord <- tmp_raw %>% # Extract latlon and laea coordinates
@@ -122,7 +122,7 @@ for (d in dates) {
                         transfer = T, 
                         verbose = F,
                         path = "data/remote_sensing/sea_ice/tmp") %>%
-    unzip(exdir = "data/remote_sensing/sea ice concentration/tmp") %>%  # Unzip file
+    unzip(exdir = "data/remote_sensing/sea_ice/tmp") %>%  # Unzip file
     tidync() # Read sea ice data
   # tmp_raw <- tidync("data/remote_sensing/ice_conc_nh_ease2-250_icdr-v2p0_201703091200.nc")
   tmp_coord <- tmp_raw %>% # Extract latlon and laea coordinates
