@@ -1,14 +1,11 @@
----
-title: "PanArctic DSL - Remote sensing"
-author: "[Pierre Priou](mailto:pierre.priou@mi.mun.ca)"
-date: "`r format(Sys.time(), '%Y/%m/%d at %H:%M')`"
-output: github_document
-always_allow_html: true
----
+PanArctic DSL - Remote sensing
+================
+[Pierre Priou](mailto:pierre.priou@mi.mun.ca)
+2022/02/01 at 12:17
 
 # Package loading
 
-```{r package-loading, message=FALSE}
+``` r
 library(tidyverse)  # Tidy code
 library(lubridate)  # Deal with dates
 library(tidync)     # Read NetCDF
@@ -18,11 +15,18 @@ library(ecmwfr)     # Download Copernicus data
 
 # Sea ice data
 
-Code that downloads sea ice data from the [Copernicus website]( https://cds.climate.copernicus.eu/cdsapp#!/dataset/satellite-sea-ice-concentration?tab=overview). We use the daily sea ice concentration derived from satellite observations from ECMWF. Data is downloaded in two batches because ECMWF changed their Climate Data Record (CDR) on 2016-01-01. I changed the sea ice data projection from Lambert Azimuthal Equal Area (EPSG:6931) to WGS84 (EPSG:4326) and match the resolution to that of backscatter anomalies (2 deg longitude * 1 deg latitude).
+Code that downloads sea ice data from the [Copernicus
+website](https://cds.climate.copernicus.eu/cdsapp#!/dataset/satellite-sea-ice-concentration?tab=overview).
+We use the daily sea ice concentration derived from satellite
+observations from ECMWF. Data is downloaded in two batches because ECMWF
+changed their Climate Data Record (CDR) on 2016-01-01. I changed the sea
+ice data projection from Lambert Azimuthal Equal Area (EPSG:6931) to
+WGS84 (EPSG:4326) and match the resolution to that of backscatter
+anomalies (2 deg longitude \* 1 deg latitude).
 
 ## CDR data 2014-01-01 - 2015-12-31
 
-```{r download-and-reproject-seaice-CDR, eval=FALSE, message=FALSE}
+``` r
 # Define projections: latlon (acoustic and CTD data), and laea (sea ice data)
 arctic_latlon <- raster(extent(-180,180,0,90), crs = "+init=epsg:4326", res = c(2, 1))
 arctic_laea <- raster(extent(-5400,5400,-5400,5400), crs = "+init=epsg:6931", res = c(25, 25))
@@ -89,7 +93,7 @@ rm(request, tmp_raw, tmp_coord, tmp_seaice, tmp) # Remove unused variables
 
 ## ICDR data 2016-01-01 - 2017-12-31
 
-```{r download-and-reproject-seaice-ICDR, eval=FALSE, message=FALSE}
+``` r
 # Define projections: latlon (acoustic and CTD data), and laea (sea ice data)
 arctic_latlon <- raster(extent(-180,180,0,90), crs = "+init=epsg:4326", res = c(2, 1))
 arctic_laea <- raster(extent(-5400,5400,-5400,5400), crs = "+init=epsg:6931", res = c(25, 25))
@@ -156,7 +160,7 @@ rm(request, tmp_raw, tmp_coord, tmp_seaice, tmp) # Remove unused variables
 
 Plot data to see if reprojection worked.
 
-```{r plot-seaice-latlon-cdr, message=FALSE, fig.align='center', fig.height=3.25, fig.width=6, dpi=600}
+``` r
 read_csv("data/remote_sensing/sea_ice/20150212_ice_conc.csv") %>%
   ggplot(aes(x = lon, y = lat, fill = ice_conc)) + 
   geom_tile() + 
@@ -164,7 +168,9 @@ read_csv("data/remote_sensing/sea_ice/20150212_ice_conc.csv") %>%
   ggtitle("2015-02-12 Ice concentration (%) CDR")
 ```
 
-```{r plot-seaice-latlon-icdr, message=FALSE, fig.align='center', fig.height=3.25, fig.width=6, dpi=600}
+<img src="PanArctic_DSL_sea_ice_files/figure-gfm/plot-seaice-latlon-cdr-1.png" style="display: block; margin: auto;" />
+
+``` r
 read_csv("data/remote_sensing/sea_ice/20170212_ice_conc.csv") %>%
   ggplot(aes(x = lon, y = lat, fill = ice_conc)) + 
   geom_tile() + 
@@ -172,11 +178,17 @@ read_csv("data/remote_sensing/sea_ice/20170212_ice_conc.csv") %>%
   ggtitle("2017-02-12 Ice concentration (%) ICDR")
 ```
 
+<img src="PanArctic_DSL_sea_ice_files/figure-gfm/plot-seaice-latlon-icdr-1.png" style="display: block; margin: auto;" />
+
 ## Tidy sea ice data
 
-I calculate the day of ice break-up, sea ice and open-water duration, and mean sea ice concentration for each cell. I calculate open-water duration from one sea ice minimum extent to the next. I retrieved the dates of the sea ice minimum extent from [NSIDC](http://nsidc.org/arcticseaicenews/2021/09/arctic-sea-ice-at-highest-minimum-since-2014/).
+I calculate the day of ice break-up, sea ice and open-water duration,
+and mean sea ice concentration for each cell. I calculate open-water
+duration from one sea ice minimum extent to the next. I retrieved the
+dates of the sea ice minimum extent from
+[NSIDC](http://nsidc.org/arcticseaicenews/2021/09/arctic-sea-ice-at-highest-minimum-since-2014/).
 
-```{r seaice-tidying, message=FALSE}
+``` r
 date_min_seaice <- c(as.POSIXct("2014-09-17", tz = "UTC"), # Define dates of minimum sea ice extent
                      as.POSIXct("2015-09-09", tz = "UTC"),
                      as.POSIXct("2016-09-10", tz = "UTC"),
@@ -199,4 +211,3 @@ seaice <- list.files("data/remote_sensing/sea_ice", pattern = "*_ice_conc.csv", 
                        levels = c("BF_CAA", "BB", "SV", "Other")))
 save(seaice, file="data/remote_sensing/remote_sensing_seaice.RData") # Save data
 ```
-
