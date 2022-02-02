@@ -1,7 +1,7 @@
 PanArctic DSL - Remote sensing
 ================
 [Pierre Priou](mailto:pierre.priou@mi.mun.ca)
-2022/02/01 at 14:57
+2022/02/02 at 13:46
 
 # Package loading
 
@@ -169,7 +169,7 @@ read_csv("data/remote_sensing/sea_ice/20150212_ice_conc.csv") %>%
   coord_cartesian(expand = c(0, 0))
 ```
 
-<img src="PanArctic_DSL_sea_ice_files/figure-gfm/plot-seaice-latlon-cdr-1.png" style="display: block; margin: auto;" />
+<img src="PanArctic_DSL_remote_sensing_files/figure-gfm/plot-seaice-latlon-cdr-1.png" style="display: block; margin: auto;" />
 
 ``` r
 read_csv("data/remote_sensing/sea_ice/20170212_ice_conc.csv") %>%
@@ -180,7 +180,7 @@ read_csv("data/remote_sensing/sea_ice/20170212_ice_conc.csv") %>%
   coord_cartesian(expand = c(0, 0))
 ```
 
-<img src="PanArctic_DSL_sea_ice_files/figure-gfm/plot-seaice-latlon-icdr-1.png" style="display: block; margin: auto;" />
+<img src="PanArctic_DSL_remote_sensing_files/figure-gfm/plot-seaice-latlon-icdr-1.png" style="display: block; margin: auto;" />
 
 ## Tidy sea ice data
 
@@ -198,7 +198,7 @@ date_min_seaice <- c(as.POSIXct("2014-09-17", tz = "UTC"), # Define dates of min
                      as.POSIXct("2015-09-09", tz = "UTC"),
                      as.POSIXct("2016-09-10", tz = "UTC"),
                      as.POSIXct("2017-09-13", tz = "UTC"))
-seaice <- list.files("data/remote_sensing/sea_ice", pattern = "*_ice_conc.csv", full.names = T) %>% # List files in folder
+seaice_2deg <- list.files("data/remote_sensing/sea_ice", pattern = "*_ice_conc.csv", full.names = T) %>% # List files in folder
   map_dfr(.f = ~ read_csv(., col_types = list("n", "n", "D", "n", "n", "n", "n"))) %>% # Read sea ice files
   mutate(date = ymd(date),
          season = case_when(date >= date_min_seaice[1] & date <= date_min_seaice[2] ~ 2015,
@@ -209,7 +209,7 @@ seaice <- list.files("data/remote_sensing/sea_ice", pattern = "*_ice_conc.csv", 
                                  lon > -95 & lon <= -50 & lat > 66 & lat <= 82 ~ "BB",
                                  lon >= -25 & lon <= 145 & lat > 77 & lat <= 90 ~ "SV"),
                        levels = c("BF_CAA", "BB", "SV", "Other")))
-seaice_season <- seaice %>% # Calculate metrics for each season
+seaice_2deg_season <- seaice_2deg %>% # Calculate metrics for each season
   filter(is.na(season) == F) %>% # Remove data outside of seasons (early 2014 and late 2017)
   mutate(ice_covered_day = if_else(ice_conc > 15, 1, 0)) %>%
   group_by(season, lat, lon) %>%
@@ -218,7 +218,7 @@ seaice_season <- seaice %>% # Calculate metrics for each season
             seaice_duration = sum(ice_covered_day),
             openwater_duration = total_day - seaice_duration,
             mean_ice_conc = round(mean(ice_conc, na.rm = T), 2))
-seaice_year <- seaice %>% # Calculate metrics for each season
+seaice_2deg_year <- seaice_2deg %>% # Calculate metrics for each season
   filter(year >= 2015) %>% # Remove data from 2014
   mutate(ice_covered_day = if_else(ice_conc > 15, 1, 0)) %>%
   group_by(year, lat, lon) %>%
@@ -227,13 +227,13 @@ seaice_year <- seaice %>% # Calculate metrics for each season
             seaice_duration = sum(ice_covered_day),
             openwater_duration = total_day - seaice_duration,
             mean_ice_conc = round(mean(ice_conc, na.rm = T), 2))
-save(seaice, seaice_season, seaice_year, file = "data/remote_sensing/remote_sensing_seaice.RData") # Save data
+save(seaice_2deg, seaice_2deg_season, seaice_2deg_year, file = "data/remote_sensing/remote_sensing_seaice_2deg.RData") # Save data
 ```
 
 Plot data to see if calculations worked.
 
 ``` r
-seaice_year %>%
+seaice_2deg_year %>%
   ggplot(aes(x = lon, y = lat, fill = openwater_duration)) +
   geom_tile() + 
   scale_fill_viridis_c("Open water\nduration (days)", option = "inferno", direction = -1) +
@@ -241,10 +241,10 @@ seaice_year %>%
   coord_cartesian(expand = c(0, 0))
 ```
 
-<img src="PanArctic_DSL_sea_ice_files/figure-gfm/map-openwater-duration-1.png" style="display: block; margin: auto;" />
+<img src="PanArctic_DSL_remote_sensing_files/figure-gfm/map-openwater-duration-1.png" style="display: block; margin: auto;" />
 
 ``` r
-seaice_year %>%
+seaice_2deg_year %>%
   ggplot(aes(x = lon, y = lat, fill = mean_ice_conc)) +
   geom_tile() + 
   scale_fill_viridis_c("Mean ice\nconcentration (%)", option = "viridis") +
@@ -252,4 +252,4 @@ seaice_year %>%
   coord_cartesian(expand = c(0, 0))
 ```
 
-<img src="PanArctic_DSL_sea_ice_files/figure-gfm/map-mean-ice-concentration-1.png" style="display: block; margin: auto;" />
+<img src="PanArctic_DSL_remote_sensing_files/figure-gfm/map-mean-ice-concentration-1.png" style="display: block; margin: auto;" />
