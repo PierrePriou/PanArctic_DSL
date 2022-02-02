@@ -1,7 +1,7 @@
 PanArctic DSL - Remote sensing
 ================
 [Pierre Priou](mailto:pierre.priou@mi.mun.ca)
-2022/02/02 at 13:46
+2022/02/02 at 18:38
 
 # Package loading
 
@@ -28,8 +28,8 @@ anomalies (2 deg longitude \* 1 deg latitude).
 
 ``` r
 # Define projections: latlon (acoustic and CTD data), and laea (sea ice data)
-arctic_latlon <- raster(extent(-180,180,0,90), crs = "+init=epsg:4326", res = c(2, 1))
-arctic_laea <- raster(extent(-5400,5400,-5400,5400), crs = "+init=epsg:6931", res = c(25, 25))
+arctic_latlon <- raster(extent(-155, 35, 66, 85), crs = "+init=epsg:4326", res = c(2, 1))
+arctic_laea <- raster(extent(-5400, 5400, -5400, 5400), crs = "+init=epsg:6931", res = c(25, 25))
 # Date range of interest
 dates <- seq(ymd("2014-01-01"), ymd("2015-12-31"), 1)
 # Download data
@@ -60,8 +60,7 @@ for (d in dates) {
                         verbose = F,
                         path = "data/remote_sensing/sea_ice/tmp") %>%
     unzip(exdir = "data/remote_sensing/sea_ice/tmp") %>%  # Unzip file
-    tidync() # Read sea ice data
-  # tmp_raw <- tidync("data/remote_sensing/ice_conc_nh_ease2-250_icdr-v2p0_201703091200.nc")
+    tidync() 
   tmp_coord <- tmp_raw %>% # Extract latlon and laea coordinates
     activate("D2,D3") %>%
     hyper_tibble()
@@ -80,7 +79,6 @@ for (d in dates) {
                                            algorithm_se = tmp_seaice$algorithm_standard_error)) %>%
     rasterize(., arctic_latlon, fun = mean, na.rm = T) %>% # Rasterize data in latlon
     dropLayer(1) %>% # Remove ID layer
-    crop(., y = extent(-155, 35, 66, 85)) %>% # Crop raster to areas of interest
     rasterToPoints() %>% # Convert raster to data frame
     as.data.frame() %>%
     rename(lon = x, lat = y) %>% # Rename variables
@@ -95,8 +93,8 @@ rm(request, tmp_raw, tmp_coord, tmp_seaice, tmp) # Remove unused variables
 
 ``` r
 # Define projections: latlon (acoustic and CTD data), and laea (sea ice data)
-arctic_latlon <- raster(extent(-180,180,0,90), crs = "+init=epsg:4326", res = c(2, 1))
-arctic_laea <- raster(extent(-5400,5400,-5400,5400), crs = "+init=epsg:6931", res = c(25, 25))
+arctic_latlon <- raster(extent(-155, 35, 66, 85), crs = "+init=epsg:4326", res = c(2, 1))
+arctic_laea <- raster(extent(-5400, 5400, -5400, 5400), crs = "+init=epsg:6931", res = c(25, 25))
 # Date range of interest
 dates <- seq(ymd("2016-01-01"), ymd("2017-12-31"), 1)
 # Download data
@@ -128,7 +126,6 @@ for (d in dates) {
                         path = "data/remote_sensing/sea_ice/tmp") %>%
     unzip(exdir = "data/remote_sensing/sea_ice/tmp") %>%  # Unzip file
     tidync() # Read sea ice data
-  # tmp_raw <- tidync("data/remote_sensing/ice_conc_nh_ease2-250_icdr-v2p0_201703091200.nc")
   tmp_coord <- tmp_raw %>% # Extract latlon and laea coordinates
     activate("D2,D3") %>%
     hyper_tibble()
