@@ -1,0 +1,116 @@
+---
+title: "PanArctic DSL - Statistics"
+author: "[Pierre Priou](mailto:pierre.priou@mi.mun.ca)"
+date: "`r format(Sys.time(), '%Y/%m/%d at %H:%M')`"
+output: github_document
+always_allow_html: true
+---
+
+# Package loading
+
+```{r package-loading, message=FALSE}
+# Load packages
+library(tidyverse)  # Tidy code
+library(cowplot)    # Plots on a grid
+library(rgdal)      # Read shapefiles
+library(ggpubr)     # Deal with stats
+library(ggfortify)  # Plotting glm
+# Custom figure theme
+theme_set(theme_bw())
+theme_update(axis.text = element_text(size = 9),
+             axis.title = element_text(size = 9),
+             strip.text.x = element_text(size = 9, face = "plain", hjust = 0.5),
+             strip.background = element_rect(colour = "transparent", fill = "transparent"),
+             legend.title = element_text(size = 9),
+             legend.margin = margin(0, 0, 0, 0),
+             legend.box.margin = margin(0, 0, -8, 0),
+             panel.grid = element_blank(), 
+             plot.margin = unit(c(0.1, 0.1, 0.1, 0.1), "in"))
+options(dplyr.summarise.inform = F) # Suppress summarise() warning
+```
+
+# Preparing data
+
+I want to test whether temperature and salinity at mesopelagic depth, sea-ice concentration, open-water duration (a proxy for productivity) have an effect on the backscatter anomalies observed per year. I therefore combined gridded acoustic data—integrated mesopelagic NASC—with gridded CTD, and remote sensing data.
+
+```{r data-loading, message=FALSE}
+coastlines_10m <- readOGR("data/bathy/ne_10m_land.shp", verbose = F) %>%  # Coastlines
+  fortify() %>%
+  rename(lon = long, region = id)
+load("data/acoustics/MVBS_2015_2017.RData") # Acoustic data
+load("data/CTD/CTD_grid_2deg_2015_2017.RData") # CTD data
+load("data/remote_sensing/remote_sensing_seaice_2deg.RData") # Remote sensing sea ice data
+```
+
+```{r combine-data}
+SA_join <- SA_anomaly_2deg %>%  # Tidy anomaly dataset for joining
+  dplyr::select(year, area, lat, lon, anomaly_NASC_int)
+CTD_join <- CTD_2deg %>% # Tidy CTD dataset for joining
+  dplyr::select(year, area, lat, lon, cons_temp, abs_sal)
+seaice_join <- seaice_2deg_year %>% # Tidy sea ice dataset for joining
+  dplyr::select(year, lat, lon, mean_ice_conc, openwater_duration, seaice_duration)
+
+SA_CTD_seaice <- left_join(SA_join, seaice_join, by = c("year", "lon", "lat")) %>% # Join data
+  left_join(., CTD_join, by = c("year", "area", "lon", "lat")) %>%
+  mutate(anomaly_NASC_int = round(anomaly_NASC_int, 3))
+
+summary(SA_CTD_seaice)
+```
+
+**PROBLEM: Some cells do not have temperature and salinity data (red tiles). This needs to be fixed before modeling.**
+
+```{r map-missing-temp-sal, fig.align='center', fig.height=6, fig.width=6, warning=FALSE}
+SA_CTD_seaice %>%
+  ggplot(aes(x = lon,  y = lat)) +
+  geom_polygon(data = coastlines_10m, aes(x = lon, y = lat, group = group), fill = "grey70") +
+  geom_tile(aes(fill = cons_temp), color = "grey30") + 
+  scale_fill_viridis_c(na.value = "red") +
+  facet_wrap(~ year, ncol = 1) +
+  coord_cartesian(ylim = c(65, 84.5), xlim = c(-155, 37), expand = c(0, 0)) 
+```
+
+```{r scatterplots, message=FALSE, warning=FALSE, fig.align='center'}
+plot_grid(SA_CTD_seaice %>%
+            ggplot() +
+            geom_point(aes(x = cons_temp, y = anomaly_NASC_int, col = area)) +
+            scale_x_continuous("Temperature (°C)") +
+            scale_y_continuous("Sa anomaly") +
+            theme(plot.margin = margin(0.1, 0.1, 0.1, 0.1, unit = "in")),
+          SA_CTD_seaice %>%
+            ggplot() +
+            geom_point(aes(x = abs_sal, y = anomaly_NASC_int, col = area)) +
+            scale_x_continuous("Salinity (g/kg)") +
+            scale_y_continuous("Sa anomaly") +
+            theme(plot.margin = margin(0.1, 0.1, 0.1, 0.1, unit = "in")),
+          SA_CTD_seaice %>%
+            ggplot() +
+            geom_point(aes(x = mean_ice_conc, y = anomaly_NASC_int, col = area)) +
+            scale_x_continuous("Mean ice conc (%)") +
+            scale_y_continuous("Sa anomaly") +
+            theme(plot.margin = margin(0.1, 0.1, 0.1, 0.1, unit = "in")),
+          SA_CTD_seaice %>%
+            ggplot() +
+            geom_point(aes(x = openwater_duration, y = anomaly_NASC_int, col = area)) +
+            scale_x_continuous("Open water (days)") +
+            scale_y_continuous("Sa anomaly") +
+            theme(plot.margin = margin(0.1, 0.1, 0.1, 0.1, unit = "in")),
+          ncol = 2, align = "hv", axis = "tblr")
+```
+
+```{r data-distribution, fig.align='center', fig.height=2, fig.width=4}
+SA_CTD_seaice %>%
+  ggplot() + 
+  geom_histogram(aes(x = anomaly_NASC_int), binwidth = 0.1)
+```
+
+Data does not look very normal. The mean and variance of normalized backscatter anomalies are `r c(round(mean(SA_anomaly_2deg$anomaly_NASC_int), 3), round(var(SA_anomaly_2deg$anomaly_NASC_int), 3))`, respectively.
+
+```{r gaussian-lm, fig.align='center'}
+# Gaussian linear model
+lm_gaussian <- glm(anomaly_NASC_int ~ cons_temp + abs_sal + mean_ice_conc + openwater_duration, 
+                   data = SA_CTD_seaice,
+                   family = gaussian(link = "identity"))
+summary(lm_gaussian)
+autoplot(lm_gaussian) 
+```
+
