@@ -1,7 +1,7 @@
 PanArctic DSL - CTD
 ================
 [Pierre Priou](mailto:pierre.priou@mi.mun.ca)
-2022/02/04 at 14:02
+2022/02/04 at 16:12
 
 # Package loading
 
@@ -35,10 +35,7 @@ as the acoustic data. I tried two different grids; the WGS84 projection
 (EPSG:4326) with grid cells of 2°lon \* 1°lat, and the EASE-Grid 2.0
 North (EPSG:6931) which is the default grid for sea-ice data. For each
 cell I calculated the mean conservative temperature and absolute
-salinity between 200 and 1000 m depth, and the mean conservative
-temperature and absolute salinity at the depth of the centre of mass of
-the DSL. When cells were lacking CTD data, I used the mean of the
-nearest neighbouring cells.
+salinity between 200 and 1000 m depth.
 
 ``` r
 load("data/CTD/CTD_2015_2019.RData") # CTD data
@@ -63,7 +60,7 @@ for (i in seq(2015, 2017, 1)) { # Data gridding
     ungroup()
   # Rasterize data in latlon
   CTD_tmp_latlon <- SpatialPointsDataFrame(SpatialPoints(cbind(CTD_tmp$lon, CTD_tmp$lat), 
-                                                          proj4string = CRS("+init=epsg:4326")),
+                                                         proj4string = CRS("EPSG:4326")),
                                             data.frame(lat_mean = CTD_tmp$lat,
                                                        lon_mean = CTD_tmp$lon,
                                                        mean_cons_temp = CTD_tmp$mean_cons_temp,
@@ -142,7 +139,7 @@ for (i in seq(2015, 2017, 1)) { # Data gridding
     ungroup()
   # Rasterize data in latlon
   CTD_tmp_laea <- SpatialPointsDataFrame(SpatialPoints(cbind(CTD_tmp$lon, CTD_tmp$lat), 
-                                                          proj4string = CRS("+init=epsg:4326")),
+                                                       proj4string = CRS("EPSG:4326")),
                                             data.frame(lat = CTD_tmp$lat,
                                                        lon = CTD_tmp$lon,
                                                        mean_cons_temp = CTD_tmp$mean_cons_temp,
@@ -195,3 +192,9 @@ plot_grid(CTD_grid_laea %>% # Map conservative temperature
 ```
 
 ![](PanArctic_DSL_CTD_files/figure-gfm/EPSG-6931-map-CTD-1.png)<!-- -->
+
+# Save data
+
+``` r
+save(CTD_grid_laea, CTD_grid_latlon, file = "data/CTD/CTD_grids.RData") # Save data
+```
