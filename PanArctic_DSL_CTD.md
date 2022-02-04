@@ -1,7 +1,7 @@
 PanArctic DSL - CTD
 ================
 [Pierre Priou](mailto:pierre.priou@mi.mun.ca)
-2022/02/04 at 16:12
+2022/02/04 at 18:11
 
 # Package loading
 
@@ -33,9 +33,10 @@ CTD data were collected regularly during each of the survey. To match
 CTD records with acoustic data, I rasterized CTD data on the same grid
 as the acoustic data. I tried two different grids; the WGS84 projection
 (EPSG:4326) with grid cells of 2°lon \* 1°lat, and the EASE-Grid 2.0
-North (EPSG:6931) which is the default grid for sea-ice data. For each
-cell I calculated the mean conservative temperature and absolute
-salinity between 200 and 1000 m depth.
+North (EPSG:6931) with grid cells of 100 km \* 100 km which is the
+default grid for sea-ice data. For each cell I calculated the mean
+conservative temperature and absolute salinity between 200 and 1000 m
+depth.
 
 ``` r
 load("data/CTD/CTD_2015_2019.RData") # CTD data
@@ -147,6 +148,7 @@ for (i in seq(2015, 2017, 1)) { # Data gridding
     rasterize(., arctic_latlon, fun = mean, na.rm = T) %>% # Rasterize data in latlon
     dropLayer(1) %>% # Remove ID layer
     projectRaster(., crs = crs(arctic_laea)) %>% # Re-project data to laea
+    resample(., arctic_laea, "bilinear") %>% # Matches raster grid and cell sizes
     rasterToPoints() %>% # Convert raster to data frame
     as.data.frame() %>%
     rename(xc = x, yc = y) %>% # Rename variables
