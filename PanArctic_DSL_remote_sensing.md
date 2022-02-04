@@ -1,37 +1,54 @@
 PanArctic DSL - Remote sensing
 ================
 [Pierre Priou](mailto:pierre.priou@mi.mun.ca)
-2022/02/02 at 18:38
+2022/02/04 at 18:18
 
 # Package loading
 
 ``` r
+# Load packages
 library(tidyverse)  # Tidy code
 library(lubridate)  # Deal with dates
 library(tidync)     # Read NetCDF
 library(raster)     # Rasterize data
+library(rgdal)      # Read shapefiles
 library(ecmwfr)     # Download Copernicus data
+library(cowplot)    # Plots on a grid
+library(cmocean)    # Oceanographic colour palettes
+# Custom figure theme
+theme_set(theme_bw())
+theme_update(axis.text = element_text(size = 9),
+             axis.title = element_text(size = 9),
+             strip.text.x = element_text(size = 9, face = "plain", hjust = 0.5),
+             strip.background = element_rect(colour = "transparent", fill = "transparent"),
+             legend.title = element_text(size = 9, vjust = 1),
+             legend.margin = margin(0, 0, 0, 0),
+             legend.box.margin = margin(0, 0, -8, 0),
+             panel.grid = element_blank(), 
+             plot.margin = unit(c(0.02, 0.02, 0.02, 0.02), "in"),
+             plot.title = element_text(size = 9, face = "bold"))
+options(dplyr.summarise.inform = F) # Suppress summarise() warning
 ```
 
-# Sea ice data
+# Download sea ice data
 
 Code that downloads sea ice data from the [Copernicus
 website](https://cds.climate.copernicus.eu/cdsapp#!/dataset/satellite-sea-ice-concentration?tab=overview).
 We use the daily sea ice concentration derived from satellite
 observations from ECMWF. Data is downloaded in two batches because ECMWF
 changed their Climate Data Record (CDR) on 2016-01-01. I changed the sea
-ice data projection from Lambert Azimuthal Equal Area (EPSG:6931) to
+ice data projection from Lambert’s azimuthal Equal Area (EPSG:6931) to
 WGS84 (EPSG:4326) and match the resolution to that of backscatter
 anomalies (2 deg longitude \* 1 deg latitude).
 
-## CDR data 2014-01-01 - 2015-12-31
+## CDR data 2015-01-01 - 2015-12-31
+
+Download “raw” data that I only crop to match the area of interest to
+reduce the file size.
 
 ``` r
-# Define projections: latlon (acoustic and CTD data), and laea (sea ice data)
-arctic_latlon <- raster(extent(-155, 35, 66, 85), crs = "+init=epsg:4326", res = c(2, 1))
-arctic_laea <- raster(extent(-5400, 5400, -5400, 5400), crs = "+init=epsg:6931", res = c(25, 25))
 # Date range of interest
-dates <- seq(ymd("2014-01-01"), ymd("2015-12-31"), 1)
+dates <- seq(ymd("2015-01-01"), ymd("2015-12-31"), 1)
 # Download data
 for (d in dates) {
   # Format years, month, and day to be correctly read in the request
@@ -53,14 +70,16 @@ for (d in dates) {
                   day = day,
                   dataset_short_name = "satellite-sea-ice-concentration",
                   target = "download.zip")
-  print(paste0("Downloading and tidying ", request$dataset_short_name, " from ", year, "-", month, "-", day))
+  print(paste0("Downloading ", request$dataset_short_name, " from ", year, "-", month, "-", day))
   tmp_raw <- wf_request(user = "113650", # Download requested file
                         request = request, 
                         transfer = T, 
                         verbose = F,
                         path = "data/remote_sensing/sea_ice/tmp") %>%
     unzip(exdir = "data/remote_sensing/sea_ice/tmp") %>%  # Unzip file
-    tidync() 
+    tidync() %>% 
+    activate("D2,D3") %>%
+    hyper_filter(xc = xc >= -2700 & xc <= 2700, yc = yc >= -2700 & yc <= 2700) # Crop data to fit area of interest
   tmp_coord <- tmp_raw %>% # Extract latlon and laea coordinates
     activate("D2,D3") %>%
     hyper_tibble()
@@ -68,35 +87,18 @@ for (d in dates) {
     activate("D2,D3,D0") %>%
     hyper_tibble() %>%
     left_join(., tmp_coord, by = c("xc", "yc")) %>% # Join latlon coordinates to sea ice data
-    mutate(date = ymd(format(as_datetime(time, origin = "1978-01-01", tz = "UTC"), format = "%Y%m%d"))) %>%
-    filter(status_flag != c(1, 2, 16)) # Remove data from land (1), lakes (2), and possible dalse ice (16)
-  tmp <- SpatialPointsDataFrame(SpatialPoints(cbind(tmp_seaice$lon, tmp_seaice$lat), # transform in spatial point data frame
-                                              proj4string = CRS("+init=epsg:4326")),
-                                data.frame(date = as.numeric(tmp_seaice$date), 
-                                           ice_conc = tmp_seaice$ice_conc, 
-                                           total_se = tmp_seaice$total_standard_error,
-                                           smearing_se = tmp_seaice$smearing_standard_error,
-                                           algorithm_se = tmp_seaice$algorithm_standard_error)) %>%
-    rasterize(., arctic_latlon, fun = mean, na.rm = T) %>% # Rasterize data in latlon
-    dropLayer(1) %>% # Remove ID layer
-    rasterToPoints() %>% # Convert raster to data frame
-    as.data.frame() %>%
-    rename(lon = x, lat = y) %>% # Rename variables
-    mutate(date = as_date(date)) # Reformat date 
-  write_csv(tmp, file = paste0("data/remote_sensing/sea_ice/", year, month, day, "_ice_conc.csv")) # Save data as a csv file
+    mutate(date = ymd(format(as_datetime(time, origin = "1978-01-01", tz = "UTC"), format = "%Y%m%d"))) 
+  write_csv(tmp_seaice, file = paste0("data/remote_sensing/sea_ice/", year, month, day, "_laea_ice_conc.csv")) # Save as a csv file
   file.remove(list.files("data/remote_sensing/sea_ice/tmp", full.names = T)) # Delete temporary netcdf and zip files
 }
-rm(request, tmp_raw, tmp_coord, tmp_seaice, tmp) # Remove unused variables
+rm(request, tmp_raw, tmp_coord, tmp_seaice) # Remove unused variables
 ```
 
 ## ICDR data 2016-01-01 - 2017-12-31
 
 ``` r
-# Define projections: latlon (acoustic and CTD data), and laea (sea ice data)
-arctic_latlon <- raster(extent(-155, 35, 66, 85), crs = "+init=epsg:4326", res = c(2, 1))
-arctic_laea <- raster(extent(-5400, 5400, -5400, 5400), crs = "+init=epsg:6931", res = c(25, 25))
 # Date range of interest
-dates <- seq(ymd("2016-01-01"), ymd("2017-12-31"), 1)
+dates <- seq(ymd("2016-01-10"), ymd("2017-12-31"), 1)
 # Download data
 for (d in dates) {
   # Format years, month, and day to be correctly read in the request
@@ -118,14 +120,16 @@ for (d in dates) {
                   day = day,
                   dataset_short_name = "satellite-sea-ice-concentration",
                   target = "download.zip")
-  print(paste0("Downloading and tidying ", request$dataset_short_name, " from ", year, "-", month, "-", day))
+  print(paste0("Downloading ", request$dataset_short_name, " from ", year, "-", month, "-", day))
   tmp_raw <- wf_request(user = "113650", # Download requested file
                         request = request, 
                         transfer = T, 
                         verbose = F,
                         path = "data/remote_sensing/sea_ice/tmp") %>%
     unzip(exdir = "data/remote_sensing/sea_ice/tmp") %>%  # Unzip file
-    tidync() # Read sea ice data
+    tidync() %>% 
+    activate("D2,D3") %>%
+    hyper_filter(xc = xc >= -2700 & xc <= 2700, yc = yc >= -2700 & yc <= 2700) # Crop data to fit area of interest
   tmp_coord <- tmp_raw %>% # Extract latlon and laea coordinates
     activate("D2,D3") %>%
     hyper_tibble()
@@ -133,120 +137,218 @@ for (d in dates) {
     activate("D2,D3,D0") %>%
     hyper_tibble() %>%
     left_join(., tmp_coord, by = c("xc", "yc")) %>% # Join latlon coordinates to sea ice data
-    mutate(date = ymd(format(as_datetime(time, origin = "1978-01-01", tz = "UTC"), format = "%Y%m%d"))) %>%
-    filter(status_flag != c(1, 2, 16)) # Remove data from land (1), lakes (2), and possible dalse ice (16)
-  tmp <- SpatialPointsDataFrame(SpatialPoints(cbind(tmp_seaice$lon, tmp_seaice$lat), # transform in spatial point data frame
-                                              proj4string = CRS("+init=epsg:4326")),
-                                data.frame(date = as.numeric(tmp_seaice$date), 
-                                           ice_conc = tmp_seaice$ice_conc, 
-                                           total_se = tmp_seaice$total_standard_error,
-                                           smearing_se = tmp_seaice$smearing_standard_error,
-                                           algorithm_se = tmp_seaice$algorithm_standard_error)) %>%
-    rasterize(., arctic_latlon, fun = mean, na.rm = T) %>% # Rasterize data in latlon
-    dropLayer(1) %>% # Remove ID layer
-    crop(., y = extent(-155, 35, 66, 85)) %>% # Crop raster to areas of interest
-    rasterToPoints() %>% # Convert raster to data frame
-    as.data.frame() %>%
-    rename(lon = x, lat = y) %>% # Rename variables
-    mutate(date = as_date(date)) # Reformat date 
-  write_csv(tmp, file = paste0("data/remote_sensing/sea_ice/", year, month, day, "_ice_conc.csv")) # Save data as a csv file
+    mutate(date = ymd(format(as_datetime(time, origin = "1978-01-01", tz = "UTC"), format = "%Y%m%d"))) 
+  write_csv(tmp_seaice, file = paste0("data/remote_sensing/sea_ice/", year, month, day, "_laea_ice_conc.csv")) # Save as a csv file
   file.remove(list.files("data/remote_sensing/sea_ice/tmp", full.names = T)) # Delete temporary netcdf and zip files
 }
-rm(request, tmp_raw, tmp_coord, tmp_seaice, tmp) # Remove unused variables
+rm(request, tmp_raw, tmp_coord, tmp_seaice) # Remove unused variables
 ```
 
-Plot data to see if reprojection worked.
+# Data tidying and gridding
+
+First, I plot data to see if download worked.
 
 ``` r
-read_csv("data/remote_sensing/sea_ice/20150212_ice_conc.csv") %>%
-  ggplot(aes(x = lon, y = lat, fill = ice_conc)) + 
-  geom_tile() + 
-  scale_fill_viridis_c("Ice concentration (%)") +
-  ggtitle("2015-02-12 - CDR") + 
-  coord_cartesian(expand = c(0, 0))
+plot_grid(read_csv("data/remote_sensing/sea_ice/20151231_laea_ice_conc.csv") %>%
+            ggplot(aes(x = xc, y = yc, fill = ice_conc)) + 
+            geom_tile() + 
+            scale_fill_cmocean("Ice concentration (%)", name = "ice") +
+            ggtitle("2015-02-12 - CDR") + 
+            coord_fixed(expand = c(0, 0)) +
+            theme(legend.position = "top", legend.key.height = unit(0.1, "in"), legend.key.width = unit(0.3, "in")),
+          read_csv("data/remote_sensing/sea_ice/20170212_laea_ice_conc.csv") %>%
+            ggplot(aes(x = xc, y = yc, fill = ice_conc)) + 
+            geom_tile() + 
+            scale_fill_cmocean("Ice concentration (%)", name = "ice") +
+            ggtitle("2017-02-12 - ICDR") + 
+            coord_fixed(expand = c(0, 0)) +
+            theme(legend.position = "top", legend.key.height = unit(0.1, "in"), legend.key.width = unit(0.3, "in")),
+          ncol = 2, align = "hv", axis = "tblr")
 ```
 
-<img src="PanArctic_DSL_remote_sensing_files/figure-gfm/plot-seaice-latlon-cdr-1.png" style="display: block; margin: auto;" />
+![](PanArctic_DSL_remote_sensing_files/figure-gfm/plot-seaice-latlon-cdr-1.png)<!-- -->
 
-``` r
-read_csv("data/remote_sensing/sea_ice/20170212_ice_conc.csv") %>%
-  ggplot(aes(x = lon, y = lat, fill = ice_conc)) + 
-  geom_tile() + 
-  scale_fill_viridis_c("Ice concentration (%)") +
-  ggtitle("2017-02-12 - ICDR") + 
-  coord_cartesian(expand = c(0, 0))
-```
-
-<img src="PanArctic_DSL_remote_sensing_files/figure-gfm/plot-seaice-latlon-icdr-1.png" style="display: block; margin: auto;" />
-
-## Tidy sea ice data
-
-I calculate the day of ice break-up, sea ice and open-water duration,
-and mean sea ice concentration for each cell. I calculate open-water
-duration from one sea ice minimum extent to the next. I retrieved the
-dates of the sea ice minimum extent from
-[NSIDC](http://nsidc.org/arcticseaicenews/2021/09/arctic-sea-ice-at-highest-minimum-since-2014/).
-We define a cell being ice-covered when the mean sea ice concentration
-is above 15 % [(as per NSIDC Sea Ice
+I calculate sea ice and open-water duration, and mean sea ice
+concentration for each cell per year. We define a cell being ice-covered
+when the mean sea ice concentration is above 15 % [(as per NSIDC Sea Ice
 Index)](https://nsidc.org/cryosphere/glossary/term/ice-extent).
 
 ``` r
-date_min_seaice <- c(as.POSIXct("2014-09-17", tz = "UTC"), # Define dates of minimum sea ice extent
-                     as.POSIXct("2015-09-09", tz = "UTC"),
-                     as.POSIXct("2016-09-10", tz = "UTC"),
-                     as.POSIXct("2017-09-13", tz = "UTC"))
-seaice_2deg <- list.files("data/remote_sensing/sea_ice", pattern = "*_ice_conc.csv", full.names = T) %>% # List files in folder
-  map_dfr(.f = ~ read_csv(., col_types = list("n", "n", "D", "n", "n", "n", "n"))) %>% # Read sea ice files
-  mutate(date = ymd(date),
-         season = case_when(date >= date_min_seaice[1] & date <= date_min_seaice[2] ~ 2015,
-                            date >= date_min_seaice[2] & date <= date_min_seaice[3] ~ 2016,
-                            date >= date_min_seaice[3] & date <= date_min_seaice[4] ~ 2017),
-         year = year(date),
-         area = factor(case_when(lon > -155 & lon <= -95 & lat > 65 & lat <= 82 ~ "BF_CAA",
-                                 lon > -95 & lon <= -50 & lat > 66 & lat <= 82 ~ "BB",
-                                 lon >= -25 & lon <= 145 & lat > 77 & lat <= 90 ~ "SV"),
-                       levels = c("BF_CAA", "BB", "SV", "Other")))
-seaice_2deg_season <- seaice_2deg %>% # Calculate metrics for each season
-  filter(is.na(season) == F) %>% # Remove data outside of seasons (early 2014 and late 2017)
-  mutate(ice_covered_day = if_else(ice_conc > 15, 1, 0)) %>%
-  group_by(season, lat, lon) %>%
-  mutate(ice_breakup = case_when(ice_conc < 15 ~ max(date))) %>% # Define open water as ice_conc < 15 %
-  summarise(total_day = n(),
-            seaice_duration = sum(ice_covered_day),
-            openwater_duration = total_day - seaice_duration,
-            mean_ice_conc = round(mean(ice_conc, na.rm = T), 2))
-seaice_2deg_year <- seaice_2deg %>% # Calculate metrics for each season
-  filter(year >= 2015) %>% # Remove data from 2014
-  mutate(ice_covered_day = if_else(ice_conc > 15, 1, 0)) %>%
-  group_by(year, lat, lon) %>%
-  mutate(ice_breakup = case_when(ice_conc < 15 ~ max(date))) %>% # Define open water as ice_conc < 15 %
-  summarise(total_day = n(),
-            seaice_duration = sum(ice_covered_day),
-            openwater_duration = total_day - seaice_duration,
-            mean_ice_conc = round(mean(ice_conc, na.rm = T), 2))
-save(seaice_2deg, seaice_2deg_season, seaice_2deg_year, file = "data/remote_sensing/remote_sensing_seaice_2deg.RData") # Save data
+seaice_year <- data.frame() # Empty dataframe that will be filled with gridded sea ice data
+
+for (i in seq(2015, 2017, 1)) { # Loop through data per year
+  seaice_tmp <- list.files("data/remote_sensing/sea_ice", # List files in folder
+                            pattern = paste0(i),
+                            full.names = T) %>%
+    map_dfr(.f = ~ read_csv(.)) %>% # Read sea ice files
+    mutate(date = ymd(date),
+           year = year(date),
+           ice_covered_day = if_else(ice_conc > 15, 1, 0)) %>% #  > 15% ice cover = ice covered day
+    filter(status_flag != c(1, 2, 16)) %>% # Remove data from land (1), lakes (2), and possible false ice (16)
+    group_by(year, xc, yc, lat, lon) %>% # Calculate metrics for each cell per year
+    summarise(total_day_year = n(), # Total days per year (2016 was a leap year)
+              seaice_duration = sum(ice_covered_day), # Duration of sea ice cover
+              openwater_duration = total_day_year - seaice_duration, # Duration of open water
+              mean_ice_conc = round(mean(ice_conc, na.rm = T), 2)) %>% # Mean ice concentration
+    ungroup()
+  seaice_year <- bind_rows(seaice_year, seaice_tmp)
+}
+rm(seaice_tmp, i) # Remove temporary data
+save(seaice_year, file = "data/remote_sensing/remote_sensing_seaice_year.RData") # Save data
 ```
 
-Plot data to see if calculations worked.
+To match sea ice records with acoustic data, I rasterized sea ice data
+on the same grid as the acoustic data. I tried two different grids; the
+WGS84 projection (EPSG:4326) with grid cells of 2°lon \* 1°lat, and the
+EASE-Grid 2.0 North (EPSG:6931) which is the default grid for sea-ice
+data. For each cell I calculated the mean ice concentration, open water
+and sea ice duration.
+
+## EPSG:6931 - EASE-Grid 2.0 North (Lambert’s equal-area, azimuthal)
+
+More info on this projection can be found on the [NSIDC
+website](https://nsidc.org/data/ease/). Because “raw” sea ice data has a
+25 km \* 25 km resolution, I match that resolution to the final
+projection (100 km \* 100 km).
 
 ``` r
-seaice_2deg_year %>%
-  ggplot(aes(x = lon, y = lat, fill = openwater_duration)) +
-  geom_tile() + 
-  scale_fill_viridis_c("Open water\nduration (days)", option = "inferno", direction = -1) +
-  facet_wrap(~ year, ncol = 1) + 
-  coord_cartesian(expand = c(0, 0))
+cell_res <- 100 # Cell resolution in km
+arctic_laea <- raster(extent(-2700, 2700, -2700, 2700), crs = "EPSG:6931") # Seaice projection
+projection(arctic_laea) <- gsub("units=m", "units=km", projection(arctic_laea)) # Convert proj unit from m to km
+res(arctic_laea) <- c(cell_res, cell_res) # Define the 100 km cell resolution
+
+seaice_grid_laea <- data.frame() # Empty dataframe that will be filled with gridded CTD data
+
+for (i in seq(2015, 2017, 1)) { # Data gridding
+  seaice_tmp <- seaice_year %>%
+    filter(year == i) 
+  # Rasterize data in latlon
+  seaice_tmp_laea <- SpatialPointsDataFrame(SpatialPoints(cbind(seaice_tmp$xc, seaice_tmp$yc), 
+                                                          proj4string = CRS("EPSG:6931")),
+                                            data.frame(lat = seaice_tmp$lat,
+                                                       lon = seaice_tmp$lon,
+                                                       seaice_duration = seaice_tmp$seaice_duration,
+                                                       openwater_duration = seaice_tmp$openwater_duration,
+                                                       mean_ice_conc = seaice_tmp$mean_ice_conc)) %>%
+    rasterize(., arctic_laea, fun = mean, na.rm = T) %>% # Rasterize data in laea
+    dropLayer(1) %>% # Remove ID layer
+    rasterToPoints() %>% # Convert raster to data frame
+    as.data.frame() %>%
+    rename(xc = x, yc = y) %>% # Rename variables
+    mutate(year = i, 
+           area = factor(case_when(lon > -155 & lon <= -95 & lat > 65 & lat <= 82 ~ "BF_CAA",
+                                   lon > -95 & lon <= -50 & lat > 66 & lat <= 82 ~ "BB",
+                                   lon >= -25 & lon <= 145 & lat > 77 & lat <= 90 ~ "SV"),
+                         levels = c("BF_CAA", "BB", "SV"))) %>%
+    dplyr::select(year, area, lat, lon, xc, yc, seaice_duration, openwater_duration, mean_ice_conc)
+  seaice_grid_laea <- bind_rows(seaice_grid_laea, seaice_tmp_laea)
+}
+rm(seaice_tmp, seaice_tmp_laea, i, cell_res) # Remove temporary data
 ```
 
-<img src="PanArctic_DSL_remote_sensing_files/figure-gfm/map-openwater-duration-1.png" style="display: block; margin: auto;" />
+Plot mean ice concentration and open water duration per year with the
+EASE-Grid 2.0 - North projection.
 
 ``` r
-seaice_2deg_year %>%
-  ggplot(aes(x = lon, y = lat, fill = mean_ice_conc)) +
-  geom_tile() + 
-  scale_fill_viridis_c("Mean ice\nconcentration (%)", option = "viridis") +
-  facet_wrap(~ year, ncol = 1)+ 
-  coord_cartesian(expand = c(0, 0))
+coast_10m_laea <- readOGR("data/bathy/ne_10m_land.shp", verbose = F) %>% # Coastline in laea
+  spTransform(CRSobj = crs("EPSG:4326")) %>% # Make sure that the shapefile is in the right projection
+  crop(extent(-180, 180, 0, 90)) %>% # Crop shapefile
+  spTransform(CRSobj = crs(arctic_laea)) %>% # Project shapefile in laea
+  fortify() %>% # Convert to a dataframe for ggplot
+  rename(xc = long, yc = lat)
+
+plot_grid(seaice_grid_laea %>% # Map mean ice concentration
+            filter(is.na(mean_ice_conc) == F) %>% # Remove land
+            ggplot() +
+            geom_tile(aes(x = xc, y = yc, fill = mean_ice_conc)) +
+            scale_fill_cmocean("EPSG:6931 - Mean ice concentration (%)", name = "ice") +
+            geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), fill = "grey80") +
+            facet_wrap(~ year, ncol = 3) +
+            coord_fixed(xlim = c(-2700, 1300), ylim = c(-1900, 2000), expand = c(0, 0)) +
+            theme(legend.position = "top", legend.key.height = unit(0.1, "in"), legend.key.width = unit(0.3, "in")),
+          seaice_grid_laea %>% # Map openwater duration
+            filter(is.na(mean_ice_conc) == F) %>% # Remove land
+            ggplot() +
+            geom_tile(aes(x = xc, y = yc, fill = openwater_duration)) +
+            scale_fill_viridis_c("EPSG:6931 - Open water duration (days)") +
+            geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), fill = "grey80") +
+            facet_wrap(~ year, ncol = 3) +
+            coord_fixed(xlim = c(-2700, 1300), ylim = c(-1900, 2000), expand = c(0, 0)) +
+            theme(legend.position = "top", legend.key.height = unit(0.1, "in"), legend.key.width = unit(0.3, "in")),
+          ncol = 1, align = "hv", axis = "tblr")
 ```
 
-<img src="PanArctic_DSL_remote_sensing_files/figure-gfm/map-mean-ice-concentration-1.png" style="display: block; margin: auto;" />
+![](PanArctic_DSL_remote_sensing_files/figure-gfm/EPSG-6931-map-CTD-1.png)<!-- -->
+
+## EPSG:4326 - WGS84 projection
+
+``` r
+arctic_latlon <- raster(extent(-155, 35, 66, 85), # Base projection for acoustic and CTD data
+                        crs = "EPSG:4326", 
+                        res = c(2, 1)) # cells of 2 degree longitude per 1 degree latitude
+
+seaice_grid_latlon <- data.frame() # Empty dataframe that will be filled with gridded CTD data
+
+for (i in seq(2015, 2017, 1)) { # Data gridding
+  seaice_tmp <- seaice_year %>%
+    filter(year == i) 
+  # Rasterize data in latlon
+  seaice_tmp_latlon <- SpatialPointsDataFrame(SpatialPoints(cbind(seaice_tmp$lon, seaice_tmp$lat), 
+                                                            proj4string = CRS("EPSG:4326")),
+                                            data.frame(seaice_duration = seaice_tmp$seaice_duration,
+                                                       openwater_duration = seaice_tmp$openwater_duration,
+                                                       mean_ice_conc = seaice_tmp$mean_ice_conc)) %>%
+    rasterize(., arctic_latlon, fun = mean, na.rm = T) %>% # Rasterize data in latlon
+    dropLayer(1) %>% # Remove ID layer
+    rasterToPoints() %>% # Convert raster to data frame
+    as.data.frame() %>%
+    rename(lon = x, lat = y) %>% # Rename variables
+    mutate(year = i, 
+           area = factor(case_when(lon > -155 & lon <= -95 & lat > 65 & lat <= 82 ~ "BF_CAA",
+                                   lon > -95 & lon <= -50 & lat > 66 & lat <= 82 ~ "BB",
+                                   lon >= -25 & lon <= 145 & lat > 77 & lat <= 90 ~ "SV"),
+                         levels = c("BF_CAA", "BB", "SV"))) %>%
+    dplyr::select(year, area, lat, lon, seaice_duration, openwater_duration, mean_ice_conc)
+  seaice_grid_latlon <- bind_rows(seaice_grid_latlon, seaice_tmp_latlon)
+}
+rm(seaice_tmp, seaice_tmp_latlon, i) # Remove temporary data
+```
+
+Plot mean ice concentration and open water duration per year with the
+WGS84 projection.
+
+``` r
+coast_10m_latlon <- readOGR("data/bathy/ne_10m_land.shp", verbose = F) %>% # Coastline in latlon
+  spTransform(CRSobj = crs(arctic_latlon)) %>% # Make sure that the shapefile is in the right projection
+  crop(extent(-180, 180, 0, 90)) %>% # Crop shapefile
+  fortify() %>% # Convert to a dataframe for ggplot
+  rename(lon = long)
+
+plot_grid(seaice_grid_latlon %>% # Map mean ice concentration
+            filter(is.na(mean_ice_conc) == F) %>% # Remove land
+            ggplot() +
+            geom_tile(aes(x = lon, y = lat, fill = mean_ice_conc)) +
+            scale_fill_cmocean("EPSG:4326 - Mean ice concentration (%)", name = "ice") +
+            geom_polygon(data = coast_10m_latlon, aes(x = lon, y = lat, group = group), fill = "grey80") +
+            facet_wrap(~ year, ncol = 1) +
+            coord_cartesian(xlim = c(-155, 40), ylim = c(65, 85), expand = c(0, 0))  +
+            theme(legend.position = "top", legend.key.height = unit(0.1, "in"), legend.key.width = unit(0.3, "in")),
+          seaice_grid_latlon %>% # Map absolute salinity
+            filter(is.na(mean_ice_conc) == F) %>% # Remove land
+            ggplot() +
+            geom_tile(aes(x = lon, y = lat, fill = openwater_duration)) +
+            scale_fill_viridis_c("EPSG:4326 - Open water duration (days)") +
+            geom_polygon(data = coast_10m_latlon, aes(x = lon, y = lat, group = group), fill = "grey80") +
+            facet_wrap(~ year, ncol = 1) +
+            coord_cartesian(xlim = c(-155, 40), ylim = c(65, 85), expand = c(0, 0))  +
+            theme(legend.position = "top", legend.key.height = unit(0.1, "in"), legend.key.width = unit(0.3, "in")),
+          ncol = 2, align = "hv", axis = "tblr")
+```
+
+![](PanArctic_DSL_remote_sensing_files/figure-gfm/EPSG-4326-map-seaice-1.png)<!-- -->
+
+# Save data
+
+``` r
+save(seaice_grid_laea, seaice_grid_latlon, file = "data/remote_sensing/seaice_grids.RData") # Save data
+```
