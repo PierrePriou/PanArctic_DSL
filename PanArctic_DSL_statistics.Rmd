@@ -34,12 +34,21 @@ options(dplyr.summarise.inform = F) # Suppress summarise() warning
 I want to test whether temperature and salinity at mesopelagic depth, sea-ice concentration, open-water duration (a proxy for productivity) have an effect on the backscatter anomalies observed per year. I therefore combined gridded acoustic data—integrated mesopelagic NASC—with gridded CTD, and remote sensing data.
 
 ```{r data-loading, message=FALSE}
-coastlines_10m <- readOGR("data/bathy/ne_10m_land.shp", verbose = F) %>%  # Coastlines
-  fortify() %>%
-  rename(lon = long, region = id)
-load("data/acoustics/MVBS_2015_2017.RData") # Acoustic data
-load("data/CTD/CTD_grid_2deg_2015_2017.RData") # CTD data
-load("data/remote_sensing/remote_sensing_seaice_2deg.RData") # Remote sensing sea ice data
+coast_10m_latlon <- readOGR("data/bathy/ne_10m_land.shp", verbose = F) %>% # Coastline in latlon
+  spTransform(CRSobj = crs("EPSG:4326")) %>% # Make sure that the shapefile is in the right projection
+  crop(extent(-180, 180, 0, 90)) %>% # Crop shapefile
+  fortify() %>% # Convert to a dataframe for ggplot
+  rename(lon = long)
+coast_10m_laea <- readOGR("data/bathy/ne_10m_land.shp", verbose = F) %>% # Coastline in laea
+  spTransform(CRSobj = crs("EPSG:4326")) %>% # Make sure that the shapefile is in the right projection
+  crop(extent(-180, 180, 0, 90)) %>% # Crop shapefile
+  spTransform(CRSobj = crs("EPSG:6931")) %>% # Project shapefile in laea
+  fortify() %>% # Convert to a dataframe for ggplot
+  rename(xc = long, yc = lat)
+
+load("data/acoustics/SA_grids.RData") # Acoustic data
+load("data/CTD/CTD_grids.RData") # CTD data
+load("data/remote_sensing/seaice_grids.RData") # Remote sensing sea ice data
 ```
 
 ```{r combine-data}
