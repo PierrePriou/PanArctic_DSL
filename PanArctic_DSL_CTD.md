@@ -1,7 +1,7 @@
 PanArctic DSL - CTD
 ================
 [Pierre Priou](mailto:pierre.priou@mi.mun.ca)
-2022/02/04 at 18:11
+2022/02/07 at 13:56
 
 # Package loading
 
@@ -121,9 +121,6 @@ website](https://nsidc.org/data/ease/).
 
 ``` r
 cell_res <- 100 # Cell resolution in km
-arctic_latlon <- raster(extent(-155, 35, 66, 85), # Base projection for acoustic and CTD data
-                        crs = "EPSG:4326", 
-                        res = c((cell_res/1.852)/60, (cell_res/1.852)/60)) # ~ 0.9 degrees == 23.99 nmi == 100 km
 arctic_laea <- raster(extent(-2700, 2700, -2700, 2700), crs = "EPSG:6931") # Seaice projection
 projection(arctic_laea) <- gsub("units=m", "units=km", projection(arctic_laea)) # Convert proj unit from m to km
 res(arctic_laea) <- c(cell_res, cell_res) # Define the 100 km cell resolution
@@ -145,10 +142,9 @@ for (i in seq(2015, 2017, 1)) { # Data gridding
                                                        lon = CTD_tmp$lon,
                                                        mean_cons_temp = CTD_tmp$mean_cons_temp,
                                                        mean_abs_sal = CTD_tmp$mean_abs_sal)) %>%
-    rasterize(., arctic_latlon, fun = mean, na.rm = T) %>% # Rasterize data in latlon
+    spTransform(., CRSobj = crs(arctic_laea)) %>% # Change projection to EPSG:6931
+    rasterize(., arctic_laea, fun = mean, na.rm = T) %>% # Rasterize data in latlon
     dropLayer(1) %>% # Remove ID layer
-    projectRaster(., crs = crs(arctic_laea)) %>% # Re-project data to laea
-    resample(., arctic_laea, "bilinear") %>% # Matches raster grid and cell sizes
     rasterToPoints() %>% # Convert raster to data frame
     as.data.frame() %>%
     rename(xc = x, yc = y) %>% # Rename variables

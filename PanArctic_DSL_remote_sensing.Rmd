@@ -315,7 +315,7 @@ plot_grid(seaice_grid_latlon %>% # Map mean ice concentration
             filter(is.na(mean_ice_conc) == F) %>% # Remove land
             ggplot() +
             geom_tile(aes(x = lon, y = lat, fill = openwater_duration)) +
-            scale_fill_viridis_c("EPSG:4326 - Open water duration (days)") +
+            scale_fill_viridis_c("EPSG:4326 - Open water duration (days)", direction = -1) +
             geom_polygon(data = coast_10m_latlon, aes(x = lon, y = lat, group = group), fill = "grey80") +
             facet_wrap(~ year, ncol = 1) +
             coord_cartesian(xlim = c(-155, 40), ylim = c(65, 85), expand = c(0, 0))  +
