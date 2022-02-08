@@ -52,16 +52,16 @@ for (i in seq(2015, 2017, 1)) { # Data gridding
     filter(year == i & between(depth, 200, 1000) & CTD_depth_max > 200) %>%
     dplyr::select(date, cast, lat, lon, depth, CT, SA) %>%
     group_by(date, cast, lat, lon) %>%
-    summarise(mean_cons_temp = mean(CT), # Calculate average temp and sal at mesopelagic depths
-              mean_abs_sal = mean(SA)) %>%
+    summarise(cons_temp = mean(CT), # Calculate average temp and sal at mesopelagic depths
+              abs_sal = mean(SA)) %>%
     ungroup()
   # Rasterize data in latlon
   CTD_tmp_latlon <- SpatialPointsDataFrame(SpatialPoints(cbind(CTD_tmp$lon, CTD_tmp$lat), 
                                                          proj4string = CRS("EPSG:4326")),
                                             data.frame(lat_mean = CTD_tmp$lat,
                                                        lon_mean = CTD_tmp$lon,
-                                                       mean_cons_temp = CTD_tmp$mean_cons_temp,
-                                                       mean_abs_sal = CTD_tmp$mean_abs_sal)) %>%
+                                                       cons_temp = CTD_tmp$cons_temp,
+                                                       abs_sal = CTD_tmp$abs_sal)) %>%
     rasterize(., arctic_latlon, fun = mean, na.rm = T) %>% # Rasterize data in latlon
     dropLayer(1) %>% # Remove ID layer
     rasterToPoints() %>% # Convert raster to data frame
@@ -73,7 +73,7 @@ for (i in seq(2015, 2017, 1)) { # Data gridding
                                    lon >= -25 & lon <= 145 & lat > 77 & lat <= 90 ~ "SV"),
                          levels = c("BF_CAA", "BB", "SV"))) %>%
     filter(abs(lon - lon_mean) < 2 & abs(lat - lat_mean) < 1) %>% # Quality check
-    dplyr::select(year, area, lat, lon, mean_cons_temp, mean_abs_sal)
+    dplyr::select(year, area, lat, lon, cons_temp, abs_sal)
   CTD_grid_latlon <- bind_rows(CTD_grid_latlon, CTD_tmp_latlon)
 }
 rm(CTD_tmp, CTD_tmp_latlon, i) # Remove temporary data
@@ -91,7 +91,7 @@ coast_10m_latlon <- readOGR("data/bathy/ne_10m_land.shp", verbose = F) %>% # Coa
 plot_grid(CTD_grid_latlon %>% # Map conservative temperature
             ggplot() +
             geom_polygon(data = coast_10m_latlon, aes(x = lon, y = lat, group = group), fill = "grey80") +
-            geom_tile(aes(x = lon, y = lat, fill = mean_cons_temp)) +
+            geom_tile(aes(x = lon, y = lat, fill = cons_temp)) +
             scale_fill_cmocean("EPSG:4326 - Mesopelagic cons. temp. (°C)", name = "thermal") +
             facet_wrap(~ year, ncol = 1) +
             coord_cartesian(xlim = c(-155, 40), ylim = c(65, 85), expand = c(0, 0))  +
@@ -99,7 +99,7 @@ plot_grid(CTD_grid_latlon %>% # Map conservative temperature
           CTD_grid_latlon %>% # Map absolute salinity
             ggplot() +
             geom_polygon(data = coast_10m_latlon, aes(x = lon, y = lat, group = group), fill = "grey80") +
-            geom_tile(aes(x = lon, y = lat, fill = mean_abs_sal)) +
+            geom_tile(aes(x = lon, y = lat, fill = abs_sal)) +
             scale_fill_cmocean("EPSG:4326 - Mesopelagic abs. sal. (g/kg)", name = "haline") +
             facet_wrap(~ year, ncol = 1) +
             coord_cartesian(xlim = c(-155, 40), ylim = c(65, 85), expand = c(0, 0))  +
@@ -124,16 +124,16 @@ for (i in seq(2015, 2017, 1)) { # Data gridding
     filter(year == i & between(depth, 200, 1000) & CTD_depth_max > 200) %>%
     dplyr::select(date, cast, lat, lon, depth, CT, SA) %>%
     group_by(date, cast, lat, lon) %>%
-    summarise(mean_cons_temp = mean(CT), # Calculate average temp and sal at mesopelagic depths
-              mean_abs_sal = mean(SA)) %>%
+    summarise(cons_temp = mean(CT), # Calculate average temp and sal at mesopelagic depths
+              abs_sal = mean(SA)) %>%
     ungroup()
   # Rasterize data in latlon
   CTD_tmp_laea <- SpatialPointsDataFrame(SpatialPoints(cbind(CTD_tmp$lon, CTD_tmp$lat), 
                                                        proj4string = CRS("EPSG:4326")),
                                             data.frame(lat = CTD_tmp$lat,
                                                        lon = CTD_tmp$lon,
-                                                       mean_cons_temp = CTD_tmp$mean_cons_temp,
-                                                       mean_abs_sal = CTD_tmp$mean_abs_sal)) %>%
+                                                       cons_temp = CTD_tmp$cons_temp,
+                                                       abs_sal = CTD_tmp$abs_sal)) %>%
     spTransform(., CRSobj = crs(arctic_laea)) %>% # Change projection to EPSG:6931
     rasterize(., arctic_laea, fun = mean, na.rm = T) %>% # Rasterize data in latlon
     dropLayer(1) %>% # Remove ID layer
@@ -145,7 +145,7 @@ for (i in seq(2015, 2017, 1)) { # Data gridding
                                    lon > -95 & lon <= -50 & lat > 66 & lat <= 82 ~ "BB",
                                    lon >= -25 & lon <= 145 & lat > 77 & lat <= 90 ~ "SV"),
                          levels = c("BF_CAA", "BB", "SV"))) %>%
-    dplyr::select(year, area, lat, lon, xc, yc, mean_cons_temp, mean_abs_sal)
+    dplyr::select(year, area, lat, lon, xc, yc, cons_temp, abs_sal)
   CTD_grid_laea <- bind_rows(CTD_grid_laea, CTD_tmp_laea)
 }
 rm(CTD_tmp, CTD_tmp_laea, i, cell_res) # Remove temporary data
@@ -164,7 +164,7 @@ coast_10m_laea <- readOGR("data/bathy/ne_10m_land.shp", verbose = F) %>% # Coast
 plot_grid(CTD_grid_laea %>% # Map conservative temperature
             ggplot() +
             geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), fill = "grey80") +
-            geom_tile(aes(x = xc, y = yc, fill = mean_cons_temp)) +
+            geom_tile(aes(x = xc, y = yc, fill = cons_temp)) +
             scale_fill_cmocean("EPSG:6931 - Mesopelagic cons. temp. (°C)", name = "thermal") +
             facet_wrap(~ year, ncol = 3) +
             coord_fixed(xlim = c(-2700, 1300), ylim = c(-1900, 2000), expand = c(0, 0)) +
@@ -172,7 +172,7 @@ plot_grid(CTD_grid_laea %>% # Map conservative temperature
           CTD_grid_laea %>% # Map absolute salinity
             ggplot() +
             geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), fill = "grey80") +
-            geom_tile(aes(x = xc, y = yc, fill = mean_abs_sal)) +
+            geom_tile(aes(x = xc, y = yc, fill = abs_sal)) +
             scale_fill_cmocean("EPSG:6931 - Mesopelagic abs. sal. (g/kg)", name = "haline") +
             facet_wrap(~ year, ncol = 3) +
             coord_fixed(xlim = c(-2700, 1300), ylim = c(-1900, 2000), expand = c(0, 0)) +
