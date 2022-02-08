@@ -1,17 +1,20 @@
 PanArctic DSL - Statistics
 ================
 [Pierre Priou](mailto:pierre.priou@mi.mun.ca)
-2022/02/02 at 19:42
+2022/02/08 at 18:00
 
 # Package loading
 
 ``` r
 # Load packages
-library(tidyverse)  # Tidy code
-library(cowplot)    # Plots on a grid
-library(rgdal)      # Read shapefiles
-library(ggpubr)     # Deal with stats
-library(ggfortify)  # Plotting glm
+library(tidyverse)    # Tidy code
+library(cowplot)      # Plots on a grid
+library(raster)       # Data gridding
+library(rgdal)        # Read shapefiles
+library(ggpubr)       # Deal with stats
+library(ggfortify)    # Plotting glm
+library(RColorBrewer) # Diverging colour palettes
+library(cmocean)      # Oceanographic colour palettes
 # Custom figure theme
 theme_set(theme_bw())
 theme_update(axis.text = element_text(size = 9),
@@ -26,158 +29,294 @@ theme_update(axis.text = element_text(size = 9),
 options(dplyr.summarise.inform = F) # Suppress summarise() warning
 ```
 
-# Preparing data
-
 I want to test whether temperature and salinity at mesopelagic depth,
 sea-ice concentration, open-water duration (a proxy for productivity)
 have an effect on the backscatter anomalies observed per year. I
 therefore combined gridded acoustic data—integrated mesopelagic
-NASC—with gridded CTD, and remote sensing data.
+NASC—with gridded CTD, and remote sensing data projected on either the
+WGS84 or the EASE-Grid 2.0 North.
 
 ``` r
-coastlines_10m <- readOGR("data/bathy/ne_10m_land.shp", verbose = F) %>%  # Coastlines
-  fortify() %>%
-  rename(lon = long, region = id)
-load("data/acoustics/MVBS_2015_2017.RData") # Acoustic data
-load("data/CTD/CTD_grid_2deg_2015_2017.RData") # CTD data
-load("data/remote_sensing/remote_sensing_seaice_2deg.RData") # Remote sensing sea ice data
+# Map projections
+cell_res <- 100 # Cell resolution in km
+arctic_laea <- raster(extent(-2700, 2700, -2700, 2700), crs = "EPSG:6931") # Seaice projection
+projection(arctic_laea) <- gsub("units=m", "units=km", projection(arctic_laea)) # Convert proj unit from m to km
+res(arctic_laea) <- c(cell_res, cell_res) # Define the 100 km cell resolution
+
+arctic_latlon <- raster(extent(-155, 35, 66, 85), # Base projection for acoustic and CTD data
+                        crs = "EPSG:4326", 
+                        res = c(2, 1)) # cells of 2 degree longitude per 1 degree latitude
+
+# Coastline shapefiles
+coast_10m_latlon <- readOGR("data/bathy/ne_10m_land.shp", verbose = F) %>% # Coastline in latlon
+  spTransform(CRSobj = crs(arctic_latlon)) %>% # Make sure that the shapefile is in the right projection
+  crop(extent(-180, 180, 0, 90)) %>% # Crop shapefile
+  fortify() %>% # Convert to a dataframe for ggplot
+  rename(lon = long)
+coast_10m_laea <- readOGR("data/bathy/ne_10m_land.shp", verbose = F) %>% # Coastline in laea
+  spTransform(CRSobj = crs(arctic_latlon)) %>% # Make sure that the shapefile is in the right projection
+  crop(extent(-180, 180, 0, 90)) %>% # Crop shapefile
+  spTransform(CRSobj = crs(arctic_laea)) %>% # Project shapefile in laea
+  fortify() %>% # Convert to a dataframe for ggplot
+  rename(xc = long, yc = lat)
+
+# Gridded acoustic, CTD, and sea ice data
+load("data/acoustics/SA_grids.RData") # Acoustic data
+load("data/CTD/CTD_grids.RData") # CTD data
+load("data/remote_sensing/seaice_grids.RData") # Remote sensing sea ice data
 ```
 
+# EPSG:6931 - EASE-Grid 2.0 North
+
+## Data preparation
+
+First I combine data using the EASE-Grid 2.0 North (EPSG:6931).
+
 ``` r
-SA_join <- SA_anomaly_2deg %>%  # Tidy anomaly dataset for joining
-  dplyr::select(year, area, lat, lon, anomaly_NASC_int)
-CTD_join <- CTD_2deg %>% # Tidy CTD dataset for joining
-  dplyr::select(year, area, lat, lon, cons_temp, abs_sal)
-seaice_join <- seaice_2deg_year %>% # Tidy sea ice dataset for joining
-  dplyr::select(year, lat, lon, mean_ice_conc, openwater_duration, seaice_duration)
+SA_laea <- SA_grid_laea %>%  # Tidy anomaly dataset for joining
+  dplyr::select(-lat, -lon)
+CTD_laea <- CTD_grid_laea %>% # Tidy CTD dataset for joining
+  dplyr::select(-lat, -lon)
+seaice_laea <- seaice_grid_laea %>% # Tidy sea ice dataset for joining
+  dplyr::select(-lat, -lon)
 
-SA_CTD_seaice <- left_join(SA_join, seaice_join, by = c("year", "lon", "lat")) %>% # Join data
-  left_join(., CTD_join, by = c("year", "area", "lon", "lat")) %>%
-  mutate(anomaly_NASC_int = round(anomaly_NASC_int, 3))
-
-summary(SA_CTD_seaice)
+stat_laea <- left_join(SA_laea, seaice_laea, by = c("year", "area", "xc", "yc")) %>% # Join acoustic and seaice
+  rowwise() %>%
+  # Replace missing values of seaice by the mean of cells within a 1 cell radius
+  mutate(xc_na = if_else(is.na(mean_ice_conc) == T, xc, NaN),
+         yc_na = if_else(is.na(mean_ice_conc) == T, yc, NaN),
+         year_na = if_else(is.na(mean_ice_conc) == T, year, NaN), 
+         mean_ice_conc = if_else(is.na(mean_ice_conc) == T, 
+                                 mean(pull(subset(seaice_grid_laea,
+                                                  xc >= xc_na - 100 & xc <= xc_na + 100 & 
+                                                    yc >= yc_na - 100 &  yc <= yc_na + 100 & 
+                                                    year == year_na,
+                                                  select = mean_ice_conc),
+                                           mean_ice_conc),
+                                      na.rm = T),
+                                 mean_ice_conc),
+         openwater_duration = if_else(is.na(openwater_duration) == T, 
+                                      mean(pull(subset(seaice_grid_laea,
+                                                       xc >= xc_na - 100 & xc <= xc_na + 100 & 
+                                                         yc >= yc_na - 100 &  yc <= yc_na + 100 & 
+                                                         year == year_na,
+                                                       select = openwater_duration),
+                                                openwater_duration),
+                                           na.rm = T),
+                                      openwater_duration),
+         seaice_duration = if_else(is.na(seaice_duration) == T, 
+                                   mean(pull(subset(seaice_grid_laea,
+                                                    xc >= xc_na - 100 & xc <= xc_na + 100 & 
+                                                      yc >= yc_na - 100 &  yc <= yc_na + 100 & 
+                                                      year == year_na,
+                                                    select = seaice_duration),
+                                             seaice_duration),
+                                        na.rm = T),
+                                   seaice_duration)) %>%
+  left_join(., CTD_laea, by = c("year", "area", "xc", "yc")) %>% # Join CTD data
+  dplyr::select(-xc_na, -yc_na, -year_na) %>%
+  # Replace missing values of temperature and salinity by the mean of cells within a 1 cell radius
+  mutate(xc_na = if_else(is.na(cons_temp) == T, xc, NaN),
+         yc_na = if_else(is.na(cons_temp) == T, yc, NaN),
+         year_na = if_else(is.na(cons_temp) == T, year, NaN), 
+         cons_temp = if_else(is.na(cons_temp) == T, 
+                             mean(pull(subset(CTD_grid_laea,
+                                              xc >= xc_na - 100 & xc <= xc_na + 100 & 
+                                                yc >= yc_na - 100 &  yc <= yc_na + 100 & 
+                                                year == year_na,
+                                              select = cons_temp),
+                                       cons_temp),
+                                  na.rm = T),
+                             cons_temp),
+         abs_sal = if_else(is.na(abs_sal) == T, 
+                           mean(pull(subset(CTD_grid_laea,
+                                            xc >= xc_na - 100 & xc <= xc_na + 100 & 
+                                              yc >= yc_na - 100 &  yc <= yc_na + 100 & 
+                                              year == year_na,
+                                            select = abs_sal),
+                                     abs_sal),
+                                na.rm = T),
+                           abs_sal)) %>%
+  dplyr::select(-xc_na, -yc_na, -year_na) %>%
+  # There's still a missing value in 2017 in the CAA; I replace that value by the mean of cells within a 2 cell radius
+  mutate(xc_na = if_else(is.na(cons_temp) == T, xc, NaN),
+         yc_na = if_else(is.na(cons_temp) == T, yc, NaN),
+         year_na = if_else(is.na(cons_temp) == T, year, NaN), 
+         cons_temp = if_else(is.na(cons_temp) == T, 
+                             mean(pull(subset(CTD_grid_laea,
+                                              xc >= xc_na - 200 & xc <= xc_na + 200 & 
+                                                yc >= yc_na - 200 &  yc <= yc_na + 200 & 
+                                                year == year_na,
+                                              select = cons_temp),
+                                       cons_temp),
+                                  na.rm = T),
+                             cons_temp),
+         abs_sal = if_else(is.na(abs_sal) == T, 
+                           mean(pull(subset(CTD_grid_laea,
+                                            xc >= xc_na - 200 & xc <= xc_na + 200 & 
+                                              yc >= yc_na - 200 &  yc <= yc_na + 200 & 
+                                              year == year_na,
+                                            select = abs_sal),
+                                     abs_sal),
+                                na.rm = T),
+                           abs_sal)) %>%
+  dplyr::select(-xc_na, -yc_na, -year_na) 
 ```
 
-    ##       year          area         lat             lon         
-    ##  Min.   :2015   BF_CAA:38   Min.   :66.50   Min.   :-150.00  
-    ##  1st Qu.:2015   BB    :53   1st Qu.:70.50   1st Qu.:-122.00  
-    ##  Median :2016   SV    :27   Median :74.50   Median : -74.00  
-    ##  Mean   :2016   Other : 0   Mean   :74.88   Mean   : -68.58  
-    ##  3rd Qu.:2017               3rd Qu.:78.25   3rd Qu.: -60.00  
-    ##  Max.   :2017               Max.   :83.50   Max.   :  34.00  
-    ##                                                              
-    ##  anomaly_NASC_int    mean_ice_conc   openwater_duration seaice_duration
-    ##  Min.   :-0.976000   Min.   : 5.18   Min.   :  0.00     Min.   : 37.0  
-    ##  1st Qu.:-0.508750   1st Qu.:53.00   1st Qu.: 27.50     1st Qu.:232.2  
-    ##  Median :-0.347000   Median :59.90   Median : 96.50     Median :268.5  
-    ##  Mean   : 0.000034   Mean   :61.59   Mean   : 86.97     Mean   :278.3  
-    ##  3rd Qu.: 0.015000   3rd Qu.:72.11   3rd Qu.:133.00     3rd Qu.:337.5  
-    ##  Max.   : 4.493000   Max.   :92.52   Max.   :329.00     Max.   :366.0  
-    ##                                                                        
-    ##    cons_temp          abs_sal     
-    ##  Min.   :-0.1900   Min.   :34.17  
-    ##  1st Qu.: 0.2487   1st Qu.:34.55  
-    ##  Median : 0.6815   Median :34.73  
-    ##  Mean   : 0.8521   Mean   :34.76  
-    ##  3rd Qu.: 1.2975   3rd Qu.:34.95  
-    ##  Max.   : 3.2020   Max.   :35.19  
-    ##  NA's   :24        NA's   :24
-
-**PROBLEM: Some cells do not have temperature and salinity data (red
-tiles). This needs to be fixed before modeling.**
+Maps of all variables.
 
 ``` r
-SA_CTD_seaice %>%
-  ggplot(aes(x = lon,  y = lat)) +
-  geom_polygon(data = coastlines_10m, aes(x = lon, y = lat, group = group), fill = "grey70") +
-  geom_tile(aes(fill = cons_temp), color = "grey30") + 
-  scale_fill_viridis_c(na.value = "red") +
-  facet_wrap(~ year, ncol = 1) +
-  coord_cartesian(ylim = c(65, 84.5), xlim = c(-155, 37), expand = c(0, 0)) 
+plot_grid(stat_laea %>% # Normalized backscatter anomaly
+            ggplot(aes(x = xc,  y = yc)) +
+            geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), fill = "grey80") +
+            geom_tile(aes(fill = NASC_anomaly_d), color = "grey30") +
+            scale_fill_manual("Anomaly sA", values = rev(brewer.pal(n = 5, name = "BrBG")), na.value = "red") +
+            facet_wrap(~ year, ncol = 3) +
+            coord_fixed(xlim = c(-2600, 1100), ylim = c(-1800, 1900), expand = F) + 
+            theme(axis.text = element_blank(), axis.ticks = element_blank(), axis.title = element_blank()),
+          stat_laea %>% # Conservative temperature
+            ggplot(aes(x = xc,  y = yc)) +
+            geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), fill = "grey80") +
+            geom_tile(aes(fill = cons_temp), col = "grey30") +
+            scale_fill_cmocean("Temperature", name = "thermal", na.value = "red") +
+            facet_wrap(~ year, ncol = 3) +
+            coord_fixed(xlim = c(-2600, 1100), ylim = c(-1800, 1900), expand = F) + 
+            theme(axis.text = element_blank(), axis.ticks = element_blank(), axis.title = element_blank()),
+          stat_laea %>% # Absolute salinity
+            ggplot(aes(x = xc,  y = yc)) +
+            geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), fill = "grey80") +
+            geom_tile(aes(fill = abs_sal), col = "grey30") +
+            scale_fill_cmocean("Salinity", name = "haline", na.value = "red") +
+            facet_wrap(~ year, ncol = 3) +
+            coord_fixed(xlim = c(-2600, 1100), ylim = c(-1800, 1900), expand = F) + 
+            theme(axis.text = element_blank(), axis.ticks = element_blank(), axis.title = element_blank()),
+          stat_laea %>% # Open water duration
+            ggplot(aes(x = xc,  y = yc)) +
+            geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), fill = "grey80") +
+            geom_tile(aes(fill = openwater_duration), col = "grey30") +
+            scale_fill_viridis_c("Open water days", option = "cividis", na.value = "red") +
+            facet_wrap(~ year, ncol = 3) +
+            coord_fixed(xlim = c(-2600, 1100), ylim = c(-1800, 1900), expand = F) + 
+            theme(axis.text = element_blank(), axis.ticks = element_blank(), axis.title = element_blank()),
+          stat_laea %>% # Ice concentration
+            ggplot(aes(x = xc,  y = yc)) +
+            geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), fill = "grey80") +
+            geom_tile(aes(fill = mean_ice_conc), col = "grey30") +
+            scale_fill_cmocean("Ice concentration", name = "ice", na.value = "red") +
+            facet_wrap(~ year, ncol = 3) +
+            coord_fixed(xlim = c(-2600, 1100), ylim = c(-1800, 1900), expand = F) + 
+            theme(axis.text = element_blank(), axis.ticks = element_blank(), axis.title = element_blank()),
+          ncol = 1, align = "hv", axis = "tblr")
 ```
 
-<img src="PanArctic_DSL_statistics_files/figure-gfm/map-missing-temp-sal-1.png" style="display: block; margin: auto;" />
+<img src="PanArctic_DSL_statistics_files/figure-gfm/map-all-var-1.png" style="display: block; margin: auto;" />
+
+## Data exploration
 
 ``` r
-plot_grid(SA_CTD_seaice %>%
-            ggplot() +
-            geom_point(aes(x = cons_temp, y = anomaly_NASC_int, col = area)) +
+plot_grid(stat_laea %>%
+            ggplot(aes(x = cons_temp, y = NASC_anomaly, col = area)) +
+            geom_point(alpha = 0.5) +
+            stat_smooth(method = "lm", se = F) +
             scale_x_continuous("Temperature (°C)") +
-            scale_y_continuous("Sa anomaly") +
-            theme(plot.margin = margin(0.1, 0.1, 0.1, 0.1, unit = "in")),
-          SA_CTD_seaice %>%
-            ggplot() +
-            geom_point(aes(x = abs_sal, y = anomaly_NASC_int, col = area)) +
+            scale_y_continuous("Sa anomaly"),
+          stat_laea %>%
+            ggplot(aes(x = abs_sal, y = NASC_anomaly, col = area)) +
+            geom_point(alpha = 0.5) +
+            stat_smooth(method = "lm", se = F) +
             scale_x_continuous("Salinity (g/kg)") +
-            scale_y_continuous("Sa anomaly") +
-            theme(plot.margin = margin(0.1, 0.1, 0.1, 0.1, unit = "in")),
-          SA_CTD_seaice %>%
-            ggplot() +
-            geom_point(aes(x = mean_ice_conc, y = anomaly_NASC_int, col = area)) +
-            scale_x_continuous("Mean ice conc (%)") +
-            scale_y_continuous("Sa anomaly") +
-            theme(plot.margin = margin(0.1, 0.1, 0.1, 0.1, unit = "in")),
-          SA_CTD_seaice %>%
-            ggplot() +
-            geom_point(aes(x = openwater_duration, y = anomaly_NASC_int, col = area)) +
+            scale_y_continuous("Sa anomaly"),
+          stat_laea %>%
+            ggplot(aes(x = openwater_duration, y = NASC_anomaly, col = area)) +
+            geom_point(alpha = 0.5) +
+            stat_smooth(method = "lm", se = F) +
             scale_x_continuous("Open water (days)") +
-            scale_y_continuous("Sa anomaly") +
-            theme(plot.margin = margin(0.1, 0.1, 0.1, 0.1, unit = "in")),
+            scale_y_continuous("Sa anomaly"),
+          stat_laea %>%
+            ggplot(aes(x = mean_ice_conc, y = NASC_anomaly, col = area)) +
+            geom_point(alpha = 0.5) +
+            stat_smooth(method = "lm", se = F) +
+            scale_x_continuous("Mean ice conc (%)") +
+            scale_y_continuous("Sa anomaly"),
           ncol = 2, align = "hv", axis = "tblr")
 ```
 
 <img src="PanArctic_DSL_statistics_files/figure-gfm/scatterplots-1.png" style="display: block; margin: auto;" />
 
+The two cells with open water days &gt; 200 and mean ice concentration
+&lt; 25 % are from Svalbard in 2016. These are not outliers, the ice
+edge in Svalbard in 2016 was quite far north all year round.
+
 ``` r
-SA_CTD_seaice %>%
-  ggplot() + 
-  geom_histogram(aes(x = anomaly_NASC_int), binwidth = 0.1)
+plot_grid(stat_laea %>% 
+            filter(year == 2016) %>%
+            ggplot(aes(x = xc,  y = yc)) +
+            geom_tile(aes(fill = openwater_duration), col = "grey30") +
+            geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), fill = "grey80") +
+            geom_text(aes(label = round(openwater_duration)), col = "red") +
+            scale_fill_viridis_c("Open water days", option = "cividis", limits = c(0,365)) +
+            facet_wrap(~ year, ncol = 3) +
+            coord_fixed(xlim = c(100, 500), ylim = c(-1300, -800), expand = F) +
+            theme(legend.position = "none"),
+          seaice_grid_laea %>% 
+            filter(year == 2016) %>%
+            ggplot(aes(x = xc,  y = yc)) +
+            geom_tile(aes(fill = openwater_duration), col = "grey30") +
+            geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), fill = "grey80") +
+            geom_text(aes(label = round(openwater_duration)), col = "red") +
+            scale_fill_viridis_c("Open water days", option = "cividis", limits = c(0,365)) +
+            facet_wrap(~ year, ncol = 3) +
+            coord_fixed(xlim = c(100, 500), ylim = c(-1300, -800), expand = F) +
+            theme(legend.position = "none"),
+          ncol = 2)
 ```
 
-<img src="PanArctic_DSL_statistics_files/figure-gfm/data-distribution-1.png" style="display: block; margin: auto;" />
+![](PanArctic_DSL_statistics_files/figure-gfm/sea-ice-2016-Sv-1.png)<!-- -->
 
 Data does not look very normal. The mean and variance of normalized
-backscatter anomalies are 0, 0.932, respectively.
+backscatter anomalies are 0, 0.918, respectively.
+
+``` r
+stat_laea %>%
+  ggplot() + 
+  geom_histogram(aes(x = NASC_anomaly), binwidth = 0.1)
+```
+
+![](PanArctic_DSL_statistics_files/figure-gfm/data-distribution-1.png)<!-- -->
+Gaussian linear regression.
 
 ``` r
 # Gaussian linear model
-lm_gaussian <- glm(anomaly_NASC_int ~ cons_temp + abs_sal + mean_ice_conc + openwater_duration, 
-                   data = SA_CTD_seaice,
-                   family = gaussian(link = "identity"))
+lm_gaussian <- lm(NASC_anomaly ~ cons_temp + abs_sal + mean_ice_conc + openwater_duration, 
+                  data = stat_laea)
 summary(lm_gaussian)
 ```
 
     ## 
     ## Call:
-    ## glm(formula = anomaly_NASC_int ~ cons_temp + abs_sal + mean_ice_conc + 
-    ##     openwater_duration, family = gaussian(link = "identity"), 
-    ##     data = SA_CTD_seaice)
+    ## lm(formula = NASC_anomaly ~ cons_temp + abs_sal + mean_ice_conc + 
+    ##     openwater_duration, data = stat_laea)
     ## 
-    ## Deviance Residuals: 
-    ##     Min       1Q   Median       3Q      Max  
-    ## -1.0578  -0.4241  -0.2321   0.0777   3.3558  
+    ## Residuals:
+    ##     Min      1Q  Median      3Q     Max 
+    ## -1.1162 -0.5688 -0.2367  0.2913  3.6079 
     ## 
     ## Coefficients:
-    ##                     Estimate Std. Error t value Pr(>|t|)  
-    ## (Intercept)        -0.769498  13.589656  -0.057   0.9550  
-    ## cons_temp          -0.299452   0.134573  -2.225   0.0286 *
-    ## abs_sal             0.030925   0.382137   0.081   0.9357  
-    ## mean_ice_conc      -0.003945   0.013786  -0.286   0.7754  
-    ## openwater_duration  0.001541   0.003421   0.450   0.6536  
+    ##                      Estimate Std. Error t value Pr(>|t|)  
+    ## (Intercept)        -13.225806  13.815624  -0.957   0.3409  
+    ## cons_temp           -0.306711   0.142562  -2.151   0.0340 *
+    ## abs_sal              0.335520   0.386256   0.869   0.3873  
+    ## mean_ice_conc        0.017360   0.016516   1.051   0.2959  
+    ## openwater_duration   0.008558   0.004462   1.918   0.0582 .
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
     ## 
-    ## (Dispersion parameter for gaussian family taken to be 0.7085637)
-    ## 
-    ##     Null deviance: 67.317  on 93  degrees of freedom
-    ## Residual deviance: 63.062  on 89  degrees of freedom
-    ##   (24 observations deleted due to missingness)
-    ## AIC: 241.24
-    ## 
-    ## Number of Fisher Scoring iterations: 2
+    ## Residual standard error: 0.9404 on 93 degrees of freedom
+    ## Multiple R-squared:  0.07585,    Adjusted R-squared:  0.0361 
+    ## F-statistic: 1.908 on 4 and 93 DF,  p-value: 0.1156
 
 ``` r
-autoplot(lm_gaussian) 
+autoplot(lm_gaussian)
 ```
 
 <img src="PanArctic_DSL_statistics_files/figure-gfm/gaussian-lm-1.png" style="display: block; margin: auto;" />
