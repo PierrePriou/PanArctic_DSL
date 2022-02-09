@@ -1,7 +1,7 @@
 PanArctic DSL - Acoustic gridding
 ================
 [Pierre Priou](mailto:pierre.priou@mi.mun.ca)
-2022/02/09 at 10:51
+2022/02/09 at 14:01
 
 # Package loading
 
@@ -149,7 +149,7 @@ More info on this projection can be found on the [NSIDC
 website](https://nsidc.org/data/ease/).
 
 ``` r
-cell_res <- 150 # Cell resolution in km
+cell_res <- 100 # Cell resolution in km
 arctic_laea <- raster(extent(-2700, 2700, -2700, 2700), crs = "EPSG:6931") # Seaice projection
 projection(arctic_laea) <- gsub("units=m", "units=km", projection(arctic_laea)) # Convert proj unit from m to km
 res(arctic_laea) <- c(cell_res, cell_res) # Define the 100 km cell resolution
@@ -227,7 +227,7 @@ plot_grid(SA_grid_laea %>% # Map integrated normalized backscatter anomaly
           SA_grid_laea %>% # Map centre of mass
             ggplot() +
             geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), fill = "grey80") +
-            geom_tile(aes(x = xc, y = yc, fill = CM)) +
+            geom_tile(aes(x = xc, y = yc, fill = CM), color = "grey30", alpha = 0.8, size = 0.15) +
             scale_fill_viridis_c("EPSG:6931 - Centre of mass (m)", option = "cividis") +
             facet_wrap(~ year, ncol = 3) +
             coord_fixed(xlim = c(-2600, 1100), ylim = c(-1800, 1900), expand = F) + 
