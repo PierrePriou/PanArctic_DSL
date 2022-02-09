@@ -33,7 +33,7 @@ options(dplyr.summarise.inform = F) # Suppress summarise() warning
 
 # Integrated s~A~ and centre of mass
 
-Acoustic data were collected continuously at 38 kHz. We selected data when the ship were stationary (< 1 knot). To match acoustic records to CTD and remote sensing data, and to homogenize data spatio-temporally, I rasterized acoustic data per year. I used two different grids; the WGS84 projection (EPSG:4326) with grid cells of 2°lon x 1°lat, and the EASE-Grid 2.0 North (EPSG:6931) with grid cells of 100 km x 100 km—which is the default grid for sea-ice data. For each cell I calculated the mean integrated nautical area scattering coefficient (s~A~; m^2^ nmi^-2^) and centre of mass over mesopelagic depths (200-1000 m). Then, I calculated the normalized backscatter anomaly for each grid cell per area—Beaufort Sea and Canadian Arctic Archipelago, Baffin Bay, and Svalbard—per year.
+Acoustic data were collected continuously at 38 kHz. We selected data when the ship were stationary (< 1 knot). To match acoustic records to CTD and remote sensing data, and to homogenize data spatio-temporally, I rasterized acoustic data per year. I used two different grids; the WGS84 projection (EPSG:4326) with grid cells of 2°lon x 1°lat, and the EASE-Grid 2.0 North (EPSG:6931)—which is the default grid for sea-ice data—with grid cells of 150 km x 150 km. For each cell I calculated the mean integrated nautical area scattering coefficient (s~A~; m^2^ nmi^-2^) and centre of mass over mesopelagic depths (200-1000 m). Then, I calculated the normalized backscatter anomaly for each grid cell per area—Beaufort Sea and Canadian Arctic Archipelago, Baffin Bay, and Svalbard—per year.
 
 ```{r data-loading, message=FALSE}
 load("data/acoustics/MVBS_2015_2017.RData") # Acoustic data
@@ -70,24 +70,30 @@ for (i in seq(2015, 2017, 1)) { # Data gridding
                                    lon >= -25 & lon <= 145 & lat > 77 & lat <= 90 ~ "SV"),
                          levels = c("BF_CAA", "BB", "SV"))) %>%
     filter(abs(lon - lon_mean) < 2 & abs(lat - lat_mean) < 1) %>% # Quality check
-    dplyr::select(year, area, lat, lon, NASC_int, CM) %>% 
-    group_by(year, area) %>%
-    mutate(NASC_anomaly = (NASC_int - mean(NASC_int)) / sd(NASC_int),  # Calculate normalized backscatter anomaly
-           NASC_anomaly_d = factor(case_when(NASC_anomaly < -1 ~ "<-1", # Discretize colour scale
-                                                     NASC_anomaly >= -1 & NASC_anomaly < -0.5 ~ "[-1;-0.5[",
-                                                     NASC_anomaly >= -0.5 & NASC_anomaly <= 0.5 ~ "[-0.5;0.5]",
-                                                     NASC_anomaly > 0.5 & NASC_anomaly <= 1 ~ "]0.5;1]",
-                                                     NASC_anomaly > 1 ~ ">1"),
-                                           levels = c("<-1", "[-1;-0.5[", "[-0.5;0.5]", "]0.5;1]", ">1"))) %>%
-    ungroup()
+    dplyr::select(year, area, lat, lon, NASC_int, CM)
  SA_grid_latlon <- bind_rows(SA_grid_latlon, SA_tmp_latlon)
 }
 rm(SA_tmp, SA_tmp_latlon, i) # Remove temporary data
+
+SA_grid_latlon <- SA_grid_latlon %>% # Calculate normalized backscatter anomalies
+  group_by(year, area) %>%
+  mutate(mean_NASC_area_year = mean(NASC_int),
+         sd_NASC_area_year = sd(NASC_int)) %>%
+  ungroup() %>%
+  mutate(NASC_anomaly = (NASC_int - mean_NASC_area_year) / sd_NASC_area_year,  # Calculate normalized backscatter anomaly
+         NASC_anomaly_d = factor(case_when(NASC_anomaly < -1 ~ "<-1", # Discretize colour scale
+                                           NASC_anomaly >= -1 & NASC_anomaly < -0.5 ~ "[-1;-0.5[",
+                                           NASC_anomaly >= -0.5 & NASC_anomaly <= 0.5 ~ "[-0.5;0.5]",
+                                           NASC_anomaly > 0.5 & NASC_anomaly <= 1 ~ "]0.5;1]",
+                                           NASC_anomaly > 1 ~ ">1"),
+                                           levels = c("<-1", "[-1;-0.5[", "[-0.5;0.5]", "]0.5;1]", ">1"))) %>%
+  ungroup()
+
 ```
 
 Plot mesopelagic normalized s~A~ anomalies and centre of mass with the WGS84 projection.
 
-```{r EPSG-4326-map-acoustic, message=FALSE, warning=FALSE, fig.width=10, fig.height=6}
+```{r EPSG-4326-map-acoustic, message=FALSE, fig.width=10, fig.height=6}
 coast_10m_latlon <- readOGR("data/bathy/ne_10m_land.shp", verbose = F) %>% # Coastline in latlon
   spTransform(CRSobj = crs(arctic_latlon)) %>% # Make sure that the shapefile is in the right projection
   crop(extent(-180, 180, 0, 90)) %>% # Crop shapefile
@@ -109,7 +115,7 @@ plot_grid(SA_grid_latlon %>% # Map integrated normalized backscatter anomaly
             geom_tile(aes(x = lon, y = lat, fill = NASC_anomaly_d), color = "grey30", alpha = 0.8, size = 0.15) +
             scale_fill_manual("EPSG:4326 - Normalized sA anomaly", values = col_pal) +
             facet_wrap(~ year, ncol = 1) +
-            coord_cartesian(xlim = c(-155, 40), ylim = c(65, 85), expand = c(0, 0))  +
+            coord_cartesian(xlim = c(-155, 40), ylim = c(65, 85), expand = F)  +
             guides(fill = guide_legend(keywidth = 0.05,
                                        keyheight = 0.1,
                                        default.unit = "in", 
@@ -122,7 +128,7 @@ plot_grid(SA_grid_latlon %>% # Map integrated normalized backscatter anomaly
             geom_tile(aes(x = lon, y = lat, fill = CM)) +
             scale_fill_viridis_c("EPSG:4326 - Centre of mass (m)", option = "cividis") +
             facet_wrap(~ year, ncol = 1) +
-            coord_cartesian(xlim = c(-155, 40), ylim = c(65, 85), expand = c(0, 0))  +
+            coord_cartesian(xlim = c(-155, 40), ylim = c(65, 85), expand = F)  +
             theme(legend.position = "top", legend.key.height = unit(0.1, "in"), legend.key.width = unit(0.3, "in")),
           ncol = 2, align = "hv", axis = "tblr")
 ```
@@ -132,7 +138,7 @@ plot_grid(SA_grid_latlon %>% # Map integrated normalized backscatter anomaly
 More info on this projection can be found on the [NSIDC website](https://nsidc.org/data/ease/).
 
 ```{r EPSG-6931-acoustic-grid}
-cell_res <- 100 # Cell resolution in km
+cell_res <- 150 # Cell resolution in km
 arctic_laea <- raster(extent(-2700, 2700, -2700, 2700), crs = "EPSG:6931") # Seaice projection
 projection(arctic_laea) <- gsub("units=m", "units=km", projection(arctic_laea)) # Convert proj unit from m to km
 res(arctic_laea) <- c(cell_res, cell_res) # Define the 100 km cell resolution
@@ -161,24 +167,29 @@ for (i in seq(2015, 2017, 1)) { # Data gridding
                                    lon > -95 & lon <= -50 & lat > 66 & lat <= 82 ~ "BB",
                                    lon >= -25 & lon <= 145 & lat > 77 & lat <= 90 ~ "SV"),
                          levels = c("BF_CAA", "BB", "SV"))) %>%
-    dplyr::select(year, area, lat, lon, xc, yc, NASC_int, CM) %>% 
-    group_by(year, area) %>%
-    mutate(NASC_anomaly = (NASC_int - mean(NASC_int)) / sd(NASC_int),  # Calculate normalized backscatter anomaly
-           NASC_anomaly_d = factor(case_when(NASC_anomaly < -1 ~ "<-1", # Discretize colour scale
-                                                     NASC_anomaly >= -1 & NASC_anomaly < -0.5 ~ "[-1;-0.5[",
-                                                     NASC_anomaly >= -0.5 & NASC_anomaly <= 0.5 ~ "[-0.5;0.5]",
-                                                     NASC_anomaly > 0.5 & NASC_anomaly <= 1 ~ "]0.5;1]",
-                                                     NASC_anomaly > 1 ~ ">1"),
-                                           levels = c("<-1", "[-1;-0.5[", "[-0.5;0.5]", "]0.5;1]", ">1"))) %>%
-    ungroup()
+    dplyr::select(year, area, lat, lon, xc, yc, NASC_int, CM) 
   SA_grid_laea <- bind_rows(SA_grid_laea, SA_tmp_laea)
 }
 rm(SA_tmp, SA_tmp_laea, i, cell_res) # Remove temporary data
+
+SA_grid_laea <- SA_grid_laea %>% # Calculate normalized backscatter anomalies
+  group_by(year, area) %>%
+  mutate(mean_NASC_area_year = mean(NASC_int),
+         sd_NASC_area_year = sd(NASC_int)) %>%
+  ungroup() %>%
+  mutate(NASC_anomaly = (NASC_int - mean_NASC_area_year) / sd_NASC_area_year,  # Calculate normalized backscatter anomaly
+         NASC_anomaly_d = factor(case_when(NASC_anomaly < -1 ~ "<-1", # Discretize colour scale
+                                           NASC_anomaly >= -1 & NASC_anomaly < -0.5 ~ "[-1;-0.5[",
+                                           NASC_anomaly >= -0.5 & NASC_anomaly <= 0.5 ~ "[-0.5;0.5]",
+                                           NASC_anomaly > 0.5 & NASC_anomaly <= 1 ~ "]0.5;1]",
+                                           NASC_anomaly > 1 ~ ">1"),
+                                           levels = c("<-1", "[-1;-0.5[", "[-0.5;0.5]", "]0.5;1]", ">1"))) %>%
+  ungroup()
 ```
 
 Plot mesopelagic normalized s~A~ anomalies and centre of mass with the EASE-Grid 2.0 North. 
 
-```{r EPSG-6931-map-acoustic, message=FALSE, warning=FALSE, fig.width=8, fig.height=7}
+```{r EPSG-6931-map-acoustic, message=FALSE, fig.width=8, fig.height=7}
 coast_10m_laea <- readOGR("data/bathy/ne_10m_land.shp", verbose = F) %>% # Coastline in laea
   spTransform(CRSobj = crs(arctic_latlon)) %>% # Make sure that the shapefile is in the right projection
   crop(extent(-180, 180, 0, 90)) %>% # Crop shapefile
@@ -194,21 +205,22 @@ plot_grid(SA_grid_laea %>% # Map integrated normalized backscatter anomaly
             geom_tile(aes(x = xc, y = yc, fill = NASC_anomaly_d), color = "grey30", alpha = 0.8, size = 0.15) +
             scale_fill_manual("EPSG:6931 - Normalized sA anomaly", values = col_pal) +
             facet_wrap(~ year, ncol = 3) +
-            coord_fixed(xlim = c(-2700, 1300), ylim = c(-1900, 2000), expand = c(0, 0)) +
+            coord_fixed(xlim = c(-2600, 1100), ylim = c(-1800, 1900), expand = F) + 
             guides(fill = guide_legend(keywidth = 0.05,
                                        keyheight = 0.1,
                                        default.unit = "in",
                                        label.position = "bottom"),
                    color = "none") +
-            theme(legend.position = "top"),
-          SA_grid_laea %>% # Map absolute salinity
+            theme(legend.position = "top", axis.text = element_blank(), axis.ticks = element_blank(), axis.title = element_blank()),
+          SA_grid_laea %>% # Map centre of mass
             ggplot() +
             geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), fill = "grey80") +
-            geom_tile(aes(x = xc, y = yc, fill = CM)) +
+            geom_tile(aes(x = xc, y = yc, fill = CM), color = "grey30", alpha = 0.8, size = 0.15) +
             scale_fill_viridis_c("EPSG:6931 - Centre of mass (m)", option = "cividis") +
             facet_wrap(~ year, ncol = 3) +
-            coord_fixed(xlim = c(-2700, 1300), ylim = c(-1900, 2000), expand = c(0, 0)) +
-            theme(legend.position = "top", legend.key.height = unit(0.1, "in"), legend.key.width = unit(0.3, "in")),
+            coord_fixed(xlim = c(-2600, 1100), ylim = c(-1800, 1900), expand = F) + 
+            theme(legend.position = "top", legend.key.height = unit(0.1, "in"), legend.key.width = unit(0.3, "in"),
+                  axis.text = element_blank(), axis.ticks = element_blank(), axis.title = element_blank()),
           ncol = 1, align = "hv", axis = "tblr")
 ```
 
