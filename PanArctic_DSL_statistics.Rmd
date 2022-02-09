@@ -18,6 +18,7 @@ library(ggpubr)       # Deal with stats
 library(ggfortify)    # Plotting glm
 library(RColorBrewer) # Diverging colour palettes
 library(cmocean)      # Oceanographic colour palettes
+library(moments)      # Overlay distributions
 # Custom figure theme
 theme_set(theme_bw())
 theme_update(axis.text = element_text(size = 9),
@@ -36,7 +37,7 @@ I want to test whether temperature and salinity at mesopelagic depth, sea-ice co
 
 ```{r data-loading, message=FALSE}
 # Map projections
-cell_res <- 200 # Cell resolution in km
+cell_res <- 100 # Cell resolution in km
 arctic_laea <- raster(extent(-2700, 2700, -2700, 2700), crs = "EPSG:6931") # Seaice projection
 projection(arctic_laea) <- gsub("units=m", "units=km", projection(arctic_laea)) # Convert proj unit from m to km
 res(arctic_laea) <- c(cell_res, cell_res) # Define the 100 km cell resolution
@@ -205,53 +206,40 @@ plot_grid(stat_laea %>% # Normalized backscatter anomaly
 plot_grid(stat_laea %>%
             ggplot(aes(x = cons_temp, y = NASC_anomaly)) +
             geom_point(alpha = 0.5) +
-            stat_smooth(method = "lm", se = F) +
+            # stat_smooth(method = "lm", se = F) +
             scale_x_continuous("Temperature (°C)") +
             scale_y_continuous("Sa anomaly"),
           stat_laea %>%
             ggplot(aes(x = abs_sal, y = NASC_anomaly)) +
             geom_point(alpha = 0.5) +
-            stat_smooth(method = "lm", se = F) +
+            # stat_smooth(method = "lm", se = F) +
             scale_x_continuous("Salinity (g/kg)") +
             scale_y_continuous("Sa anomaly"),
           stat_laea %>%
             ggplot(aes(x = openwater_duration, y = NASC_anomaly)) +
             geom_point(alpha = 0.5) +
-            stat_smooth(method = "lm", se = F) +
+            # stat_smooth(method = "lm", se = F) +
             scale_x_continuous("Open water (days)") +
             scale_y_continuous("Sa anomaly"),
           stat_laea %>%
             ggplot(aes(x = mean_ice_conc, y = NASC_anomaly)) +
             geom_point(alpha = 0.5) +
-            stat_smooth(method = "lm", se = F) +
+            # stat_smooth(method = "lm", se = F) +
             scale_x_continuous("Mean ice conc (%)") +
             scale_y_continuous("Sa anomaly"),
           ncol = 2, align = "hv", axis = "tblr")
 ```
 
-Data does not look very normal. The mean and variance of normalized backscatter anomalies are `r c(round(mean(stat_laea$NASC_anomaly), 3), round(var(stat_laea$NASC_anomaly), 3))`, respectively.
-
-```{r data-distribution}
+```{r distribution-responses}
 stat_laea %>%
-  ggplot() + 
-  geom_histogram(aes(x = NASC_anomaly), binwidth = 0.1)
-```
-Gaussian linear regression.
-
-```{r gaussian-lm, fig.align='center'}
-# Gaussian linear model
-lm_gaussian <- lm(NASC_anomaly ~ cons_temp + mean_ice_conc + openwater_duration, 
-                  data = SA_laea)
-summary(lm_gaussian)
-autoplot(lm_gaussian)
-```
-```{r}
-test <- stat_laea %>% # Calculate normalized backscatter anomalies
-  group_by(area, year) %>%
-  mutate(mean_NASC_area_year = mean(NASC_int),
-         sd_NASC_area_year = sd(NASC_int)) %>%
-  ungroup() %>%
-  mutate(year = as.factor(year),
-         NASC_ano = (NASC_int - mean_NASC_area_year) / sd_NASC_area_year,
+  ggdensity(x = "NASC_anomaly", fill = "lightgray") +
+  stat_overlay_normal_density(color = "red", linetype = "dashed")
+stat_laea %>%
+  ggdensity(x = "NASC_int", fill = "lightgray") +
+  stat_overlay_normal_density(color = "red", linetype = "dashed")
+stat_laea %>%
+  mutate(SA_int = 10 * log10(NASC_int)) %>%
+  ggdensity(x = "SA_int", fill = "lightgray") +
+  stat_overlay_normal_density(color = "red", linetype = "dashed")
 ```
 
