@@ -1,7 +1,7 @@
 PanArctic DSL - CTD
 ================
 [Pierre Priou](mailto:pierre.priou@mi.mun.ca)
-2022/02/08 at 10:40
+2022/02/09 at 10:58
 
 # Package loading
 
@@ -33,10 +33,9 @@ CTD data were collected regularly during each of the survey. To match
 CTD records with acoustic data, I rasterized CTD data on the same grid
 as the acoustic data. I tried two different grids; the WGS84 projection
 (EPSG:4326) with grid cells of 2°lon \* 1°lat, and the EASE-Grid 2.0
-North (EPSG:6931) with grid cells of 100 km \* 100 km which is the
-default grid for sea-ice data. For each cell I calculated the mean
-conservative temperature and absolute salinity between 200 and 1000 m
-depth.
+North (EPSG:6931) with grid cells of 150 km \* 150 km. For each cell I
+calculated the mean conservative temperature and absolute salinity
+between 200 and 1000 m depth.
 
 ``` r
 load("data/CTD/CTD_2015_2019.RData") # CTD data
@@ -99,7 +98,7 @@ plot_grid(CTD_grid_latlon %>% # Map conservative temperature
             geom_tile(aes(x = lon, y = lat, fill = cons_temp)) +
             scale_fill_cmocean("EPSG:4326 - Mesopelagic cons. temp. (°C)", name = "thermal") +
             facet_wrap(~ year, ncol = 1) +
-            coord_cartesian(xlim = c(-155, 40), ylim = c(65, 85), expand = c(0, 0))  +
+            coord_cartesian(xlim = c(-155, 40), ylim = c(65, 85), expand = F)  +
             theme(legend.position = "top", legend.key.height = unit(0.1, "in"), legend.key.width = unit(0.3, "in")),
           CTD_grid_latlon %>% # Map absolute salinity
             ggplot() +
@@ -107,7 +106,7 @@ plot_grid(CTD_grid_latlon %>% # Map conservative temperature
             geom_tile(aes(x = lon, y = lat, fill = abs_sal)) +
             scale_fill_cmocean("EPSG:4326 - Mesopelagic abs. sal. (g/kg)", name = "haline") +
             facet_wrap(~ year, ncol = 1) +
-            coord_cartesian(xlim = c(-155, 40), ylim = c(65, 85), expand = c(0, 0))  +
+            coord_cartesian(xlim = c(-155, 40), ylim = c(65, 85), expand = F)  +
             theme(legend.position = "top", legend.key.height = unit(0.1, "in"), legend.key.width = unit(0.3, "in")),
           ncol = 2, align = "hv", axis = "tblr")
 ```
@@ -120,7 +119,7 @@ More info on this projection can be found on the [NSIDC
 website](https://nsidc.org/data/ease/).
 
 ``` r
-cell_res <- 100 # Cell resolution in km
+cell_res <- 150 # Cell resolution in km
 arctic_laea <- raster(extent(-2700, 2700, -2700, 2700), crs = "EPSG:6931") # Seaice projection
 projection(arctic_laea) <- gsub("units=m", "units=km", projection(arctic_laea)) # Convert proj unit from m to km
 res(arctic_laea) <- c(cell_res, cell_res) # Define the 100 km cell resolution
@@ -176,16 +175,18 @@ plot_grid(CTD_grid_laea %>% # Map conservative temperature
             geom_tile(aes(x = xc, y = yc, fill = cons_temp)) +
             scale_fill_cmocean("EPSG:6931 - Mesopelagic cons. temp. (°C)", name = "thermal") +
             facet_wrap(~ year, ncol = 3) +
-            coord_fixed(xlim = c(-2700, 1300), ylim = c(-1900, 2000), expand = c(0, 0)) +
-            theme(legend.position = "top", legend.key.height = unit(0.1, "in"), legend.key.width = unit(0.3, "in")),
+            coord_fixed(xlim = c(-2600, 1100), ylim = c(-1800, 1900), expand = F) + 
+            theme(legend.position = "top", legend.key.height = unit(0.1, "in"), legend.key.width = unit(0.3, "in"),
+                  axis.text = element_blank(), axis.ticks = element_blank(), axis.title = element_blank()),
           CTD_grid_laea %>% # Map absolute salinity
             ggplot() +
             geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), fill = "grey80") +
             geom_tile(aes(x = xc, y = yc, fill = abs_sal)) +
             scale_fill_cmocean("EPSG:6931 - Mesopelagic abs. sal. (g/kg)", name = "haline") +
             facet_wrap(~ year, ncol = 3) +
-            coord_fixed(xlim = c(-2700, 1300), ylim = c(-1900, 2000), expand = c(0, 0)) +
-            theme(legend.position = "top", legend.key.height = unit(0.1, "in"), legend.key.width = unit(0.3, "in")),
+            coord_fixed(xlim = c(-2600, 1100), ylim = c(-1800, 1900), expand = F) + 
+            theme(legend.position = "top", legend.key.height = unit(0.1, "in"), legend.key.width = unit(0.3, "in"),
+                  axis.text = element_blank(), axis.ticks = element_blank(), axis.title = element_blank()),
           ncol = 1, align = "hv", axis = "tblr")
 ```
 

@@ -1,7 +1,7 @@
 PanArctic DSL - Remote sensing
 ================
 [Pierre Priou](mailto:pierre.priou@mi.mun.ca)
-2022/02/04 at 18:18
+2022/02/09 at 11:02
 
 # Package loading
 
@@ -154,14 +154,14 @@ plot_grid(read_csv("data/remote_sensing/sea_ice/20151231_laea_ice_conc.csv") %>%
             geom_tile() + 
             scale_fill_cmocean("Ice concentration (%)", name = "ice") +
             ggtitle("2015-02-12 - CDR") + 
-            coord_fixed(expand = c(0, 0)) +
+            coord_fixed(expand = F) +
             theme(legend.position = "top", legend.key.height = unit(0.1, "in"), legend.key.width = unit(0.3, "in")),
           read_csv("data/remote_sensing/sea_ice/20170212_laea_ice_conc.csv") %>%
             ggplot(aes(x = xc, y = yc, fill = ice_conc)) + 
             geom_tile() + 
             scale_fill_cmocean("Ice concentration (%)", name = "ice") +
             ggtitle("2017-02-12 - ICDR") + 
-            coord_fixed(expand = c(0, 0)) +
+            coord_fixed(expand = F) +
             theme(legend.position = "top", legend.key.height = unit(0.1, "in"), legend.key.width = unit(0.3, "in")),
           ncol = 2, align = "hv", axis = "tblr")
 ```
@@ -209,10 +209,10 @@ and sea ice duration.
 More info on this projection can be found on the [NSIDC
 website](https://nsidc.org/data/ease/). Because “raw” sea ice data has a
 25 km \* 25 km resolution, I match that resolution to the final
-projection (100 km \* 100 km).
+projection (150 km \* 150 km).
 
 ``` r
-cell_res <- 100 # Cell resolution in km
+cell_res <- 150 # Cell resolution in km
 arctic_laea <- raster(extent(-2700, 2700, -2700, 2700), crs = "EPSG:6931") # Seaice projection
 projection(arctic_laea) <- gsub("units=m", "units=km", projection(arctic_laea)) # Convert proj unit from m to km
 res(arctic_laea) <- c(cell_res, cell_res) # Define the 100 km cell resolution
@@ -264,8 +264,9 @@ plot_grid(seaice_grid_laea %>% # Map mean ice concentration
             scale_fill_cmocean("EPSG:6931 - Mean ice concentration (%)", name = "ice") +
             geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), fill = "grey80") +
             facet_wrap(~ year, ncol = 3) +
-            coord_fixed(xlim = c(-2700, 1300), ylim = c(-1900, 2000), expand = c(0, 0)) +
-            theme(legend.position = "top", legend.key.height = unit(0.1, "in"), legend.key.width = unit(0.3, "in")),
+            coord_fixed(xlim = c(-2600, 1100), ylim = c(-1800, 1900), expand = F) + 
+            theme(legend.position = "top", legend.key.height = unit(0.1, "in"), legend.key.width = unit(0.3, "in"),
+                  axis.text = element_blank(), axis.ticks = element_blank(), axis.title = element_blank()),
           seaice_grid_laea %>% # Map openwater duration
             filter(is.na(mean_ice_conc) == F) %>% # Remove land
             ggplot() +
@@ -273,8 +274,9 @@ plot_grid(seaice_grid_laea %>% # Map mean ice concentration
             scale_fill_viridis_c("EPSG:6931 - Open water duration (days)") +
             geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), fill = "grey80") +
             facet_wrap(~ year, ncol = 3) +
-            coord_fixed(xlim = c(-2700, 1300), ylim = c(-1900, 2000), expand = c(0, 0)) +
-            theme(legend.position = "top", legend.key.height = unit(0.1, "in"), legend.key.width = unit(0.3, "in")),
+            coord_fixed(xlim = c(-2600, 1100), ylim = c(-1800, 1900), expand = F) + 
+            theme(legend.position = "top", legend.key.height = unit(0.1, "in"), legend.key.width = unit(0.3, "in"),
+                  axis.text = element_blank(), axis.ticks = element_blank(), axis.title = element_blank()),
           ncol = 1, align = "hv", axis = "tblr")
 ```
 
@@ -331,16 +333,16 @@ plot_grid(seaice_grid_latlon %>% # Map mean ice concentration
             scale_fill_cmocean("EPSG:4326 - Mean ice concentration (%)", name = "ice") +
             geom_polygon(data = coast_10m_latlon, aes(x = lon, y = lat, group = group), fill = "grey80") +
             facet_wrap(~ year, ncol = 1) +
-            coord_cartesian(xlim = c(-155, 40), ylim = c(65, 85), expand = c(0, 0))  +
+            coord_cartesian(xlim = c(-155, 40), ylim = c(65, 85), expand = F)  +
             theme(legend.position = "top", legend.key.height = unit(0.1, "in"), legend.key.width = unit(0.3, "in")),
           seaice_grid_latlon %>% # Map absolute salinity
             filter(is.na(mean_ice_conc) == F) %>% # Remove land
             ggplot() +
             geom_tile(aes(x = lon, y = lat, fill = openwater_duration)) +
-            scale_fill_viridis_c("EPSG:4326 - Open water duration (days)") +
+            scale_fill_viridis_c("EPSG:4326 - Open water duration (days)", direction = -1) +
             geom_polygon(data = coast_10m_latlon, aes(x = lon, y = lat, group = group), fill = "grey80") +
             facet_wrap(~ year, ncol = 1) +
-            coord_cartesian(xlim = c(-155, 40), ylim = c(65, 85), expand = c(0, 0))  +
+            coord_cartesian(xlim = c(-155, 40), ylim = c(65, 85), expand = F)  +
             theme(legend.position = "top", legend.key.height = unit(0.1, "in"), legend.key.width = unit(0.3, "in")),
           ncol = 2, align = "hv", axis = "tblr")
 ```
