@@ -21,6 +21,7 @@ library(marmap)                 # Bathymetry data of the Arctic Ocean
 library(ggforce)                # Draw polygons
 library(cmocean)                # Pretty color palettes
 library(ggpubr)                 # Display stats with ggplot
+library(RColorBrewer)           # Diverging color palette
 source("R/getNOAA.ice.bathy.R") # Load bathy data from NOAA
 # Custom figure theme
 theme_set(theme_bw())
@@ -96,14 +97,11 @@ trawl_latlon <- trawl_station %>% # Location of trawls
 # Remote sensing data
 load("data/remote_sensing/remote_sensing_chl.RData")
 load("data/remote_sensing/seaice_grids.RData")
-
-# Remove unused variable
-rm(cell_res) 
 ```
 
 I re-project data from the WGS84 projection to the EASE-Grid 2.0 North projection.
 
-```{r data-laea-projection}
+```{r data-laea-projection, cache=TRUE}
 # Laea projection for bathy and all other files
 arctic_laea <- raster(extent(-2700, 2700, -2700, 2700), crs = "EPSG:6931") # Seaice projection
 projection(arctic_laea) <- gsub("units=m", "units=km", projection(arctic_laea)) # Convert proj unit from m to km
@@ -306,7 +304,6 @@ Sv_raster %>%
         axis.line=element_line())
 ```
 
-
 **WORK IN PROGRESS**
 
 I'm trying to streamline the code.
@@ -434,6 +431,25 @@ map_sa_anomaly <- SA_anomaly_2deg %>%
         axis.title = element_blank())
 map_sa_anomaly
 ```
+
+```{r fig3-map-sa-anomalies-laea, fig.align='center', fig.height=3.25, fig.width=6, dpi=600}
+# Map integrated normalized backscatter anomaly
+SA_grid_laea %>% 
+  ggplot() +
+  geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), fill = "grey80") +
+  geom_tile(aes(x = xc, y = yc, fill = NASC_anomaly_d), color = "grey30", alpha = 0.8, size = 0.15) +
+  scale_fill_manual("EPSG:6931 - Normalized sA anomaly",
+                    values = rev(brewer.pal(n = 5, name = "BrBG"))) +
+  facet_wrap(~ year, ncol = 3) +
+  coord_fixed(xlim = c(-2600, 1100), ylim = c(-1800, 1900), expand = F) + 
+  guides(fill = guide_legend(keywidth = 0.05,
+                             keyheight = 0.1,
+                             default.unit = "in",
+                             label.position = "bottom"),
+         color = "none") +
+  theme(legend.position = "top", axis.text = element_blank(), axis.ticks = element_blank(), axis.title = element_blank())
+```
+
 
 ## Figure 4. Environmental drivers of mesopelagic backscatter
 
