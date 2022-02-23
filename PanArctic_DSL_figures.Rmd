@@ -1,5 +1,5 @@
 ---
-title: "PanArctic DSL - Analyses"
+title: "PanArctic DSL - Figures"
 author: "[Pierre Priou](mailto:pierre.priou@mi.mun.ca)"
 date: "`r format(Sys.time(), '%Y/%m/%d at %H:%M')`"
 output: github_document
