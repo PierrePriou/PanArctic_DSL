@@ -14,6 +14,7 @@ library(tidyverse)              # Tidy code
 library(lubridate)              # Deal with dates
 library(kableExtra)             # Pretty tables
 library(cowplot)                # Plots on a grid
+library(raster)                 # Data gridding
 library(rgdal)                  # Read shapefiles
 library(rworldxtra)             # Higher resolution coastline data
 library(marmap)                 # Bathymetry data of the Arctic Ocean
@@ -36,32 +37,20 @@ options(dplyr.summarise.inform = F) # Suppress summarise() warning
 ```
 
 ```{r data-loading, message=FALSE}
-# Geographical data
-coastlines_110m <- readOGR("data/bathy/ne_110m_land.shp", verbose = F) %>% 
-  fortify() %>%
-  rename(lon = long, region = id)
-coastlines_50m <- readOGR("data/bathy/ne_50m_land.shp", verbose = F) %>% 
-  fortify() %>%
-  rename(lon = long, region = id)
-coastlines_10m <- readOGR("data/bathy/ne_10m_land.shp", verbose = F) %>% 
-  fortify() %>%
-  rename(lon = long, region = id)
+# Map projection
+arctic_latlon <- raster(extent(-155, 35, 66, 85), # Base projection for acoustic and CTD data
+                        crs = "EPSG:4326", 
+                        res = c(2, 1)) # cells of 2 degree longitude per 1 degree latitude
+
+# Coastline shapefiles
+coast_10m_latlon <- readOGR("data/bathy/ne_10m_land.shp", verbose = F) %>% # Coastline in laea
+  spTransform(CRSobj = crs(arctic_latlon)) %>% # Make sure that the shapefile is in the right projection
+  crop(extent(-180, 180, 0, 90)) %>% # Crop shapefile
+  fortify() %>% # Convert to a dataframe for ggplot
+  rename(lon = long)
+
 # Bathy data
 bathy_df <- getNOAA.ice.bathy(lon1 = -180, lon2 = 180, lat1 = 50, lat2 = 90,
-                              resolution = 6, keep = T, path = "data/bathy/") %>%
-  fortify.bathy() %>%
-  rename(lon = x, lat = y, depth = z) %>%
-  mutate(depth_d=factor(case_when(between(depth, -50, Inf) ~ "0-50",
-                                  between(depth, -100, -50) ~ "50-100",
-                                  between(depth, -200, -100) ~ "100-200",
-                                  between(depth, -500, -200) ~ "200-500",
-                                  between(depth, -1000, -500) ~ "500-1000",
-                                  between(depth, -2000, -1000) ~ "1000-2000",
-                                  between(depth, -4000, -2000) ~ "2000-4000",
-                                  between(depth, -Inf, -4000) ~ "4000-8000"),
-                        levels=c(">0","0-50","50-100","100-200","200-500","500-1000","1000-2000","2000-4000","4000-8000")))
-# Bathy data
-bathyHD_df <- getNOAA.ice.bathy(lon1 = -180, lon2 = 180, lat1 = 50, lat2 = 90,
                               resolution = 2, keep = T, path = "data/bathy/") %>%
   fortify.bathy() %>%
   rename(lon = x, lat = y, depth = z) %>%
@@ -74,27 +63,126 @@ bathyHD_df <- getNOAA.ice.bathy(lon1 = -180, lon2 = 180, lat1 = 50, lat2 = 90,
                                   between(depth, -4000, -2000) ~ "2000-4000",
                                   between(depth, -Inf, -4000) ~ "4000-8000"),
                         levels=c(">0","0-50","50-100","100-200","200-500","500-1000","1000-2000","2000-4000","4000-8000")))
-# Areas of interest
-area_BF_CAA <- data.frame(x = c(-153, -141.5, -93, -94, -153), y = c(75, 69, 69, 78, 78))
-area_BB <- data.frame(x = c(-85, -65, -51.5, -51.5, -85), y = c(72, 66.3, 66.3, 82, 82))
-area_SV <- data.frame(x = c(40, 21, 0, 0, 40), y = c(80, 78, 77, 85, 85))
-area_BF_CAA_mercator <- data.frame(x = c(-153.5, -153.5, -90, -90), y = c(67, 78, 78, 67))
-area_BB_mercator <- data.frame(x = c(-86, -65, -50, -50, -86), y = c(72, 66, 66, 82.5, 82.5))
-area_SV_mercator <- data.frame(x = c(37, 37, 2, 2), y = c(75, 85, 85, 75))
-area_BF_CAA_2 <- data.frame(x = c(-158, -158, -93, -93, -158), y = c(79, 68.5, 68.5, 79, 79))
-area_BB_2 <- data.frame(x = c(-86, -65, -51.5, -51.5, -86), y = c(72, 65.5, 65.5, 83, 83))
-area_SV_2 <- data.frame(x = c(46, 46, 0, 0, 46), y = c(85, 76, 76, 85, 85))
+
+# Arctic circle and areas of interest
+arctic_circle_latlon <- data.frame(lon = seq(-180, 180, 0.1)) %>%
+  mutate(lat = 66.5)
+area_BF_CAA_latlon <- data.frame(lon = c(-158, -158, -93, -93, -158), lat = c(79, 68.5, 68.5, 79, 79))
+area_BB_latlon <- data.frame(lon = c(-86, -65, -51.5, -51.5, -86), lat = c(72, 65.5, 65.5, 83, 83))
+area_SV_latlon <- data.frame(lon = c(46, 46, 0, 0, 46), lat = c(85, 76, 76, 85, 85))
+
 # Acoustic data
 load("data/acoustics/MVBS_2015_2017.RData")
+load("data/acoustics/SA_grids.RData")
+MVBS_latlon <- MVBS %>% # Location of acoustic data
+  mutate(lat = round(lat, 1),
+         lon = round(lon, 1)) %>%
+  group_by(lat,lon) %>%
+  summarise(lat = mean(lat), 
+            lon = mean(lon)) %>%
+  ungroup() 
+
 # CTD data
 load("data/CTD/CTD_2015_2019.RData")
+load("data/CTD/CTD_grids.RData")
+
 # Trawl data
 load("data/nets/trawl_mwt_2015_2017.RData")
-# Stats data
-# load("data/acoustics/kruskal_dunn_spatial_interannual.RData")
-# Primary production data
+trawl_latlon <- trawl_station %>% # Location of trawls
+  group_by(date) %>%
+  summarise(lat = mean(lat),
+            lon = mean(lon))
+
+# Remote sensing data
 load("data/remote_sensing/remote_sensing_chl.RData")
+load("data/remote_sensing/seaice_grids.RData")
+
+# Remove unused variable
+rm(cell_res) 
 ```
+
+I re-project data from the WGS84 projection to the EASE-Grid 2.0 North projection.
+
+```{r data-laea-projection}
+# Laea projection for bathy and all other files
+arctic_laea <- raster(extent(-2700, 2700, -2700, 2700), crs = "EPSG:6931") # Seaice projection
+projection(arctic_laea) <- gsub("units=m", "units=km", projection(arctic_laea)) # Convert proj unit from m to km
+cell_res <- 150 # Cell resolution in km
+res(arctic_laea) <- c(cell_res, cell_res) # Define the 100 km cell resolution
+
+proj_bathy_laea <- raster(extent(-2700, 2700, -2700, 2700), crs = "EPSG:6931", res = c(5, 5)) # Seaice projection
+projection(proj_bathy_laea) <- gsub("units=m", "units=km", projection(arctic_laea)) # Convert proj unit from m to km
+
+# Project bathymetric data 
+bathy_laea <- SpatialPointsDataFrame(SpatialPoints(cbind(bathy_df$lon, bathy_df$lat), 
+                                                   proj4string = CRS("EPSG:4326")),
+                                     data.frame(depth = bathy_df$depth)) %>%
+  spTransform(., CRSobj = crs(proj_bathy_laea)) %>% # Change projection to EPSG:6931
+  rasterize(., proj_bathy_laea, fun = mean, na.rm = T) %>% # Rasterize data in latlon
+  dropLayer(1) %>% # Remove ID layer
+  rasterToPoints() %>% # Convert raster to data frame
+  as.data.frame() %>%
+  rename(xc = x, yc = y) %>%
+  ungroup() %>%
+  mutate(depth_d = factor(case_when(between(depth, -100, Inf) ~ "0-100",
+                                    between(depth, -200, -100) ~ "100-200",
+                                    between(depth, -500, -200) ~ "200-500",
+                                    between(depth, -1000, -500) ~ "500-1000",
+                                    between(depth, -2000, -1000) ~ "1000-2000",
+                                    between(depth, -3000, -2000) ~ "2000-3000",
+                                    between(depth, -4000, -3000) ~ "3000-4000",
+                                    between(depth, -Inf, -4000) ~ "4000-5500"),
+                          levels = c(">0", "0-100", "100-200", "200-500", "500-1000",
+                                     "1000-2000", "2000-3000", "3000-4000", "4000-5500")))
+
+# Coastline shapefile
+coast_10m_laea <- readOGR("data/bathy/ne_10m_land.shp", verbose = F) %>% # Coastline in laea
+  spTransform(CRSobj = crs(arctic_latlon)) %>% # Make sure that the shapefile is in the right projection
+  crop(extent(-180, 180, 0, 90)) %>% # Crop shapefile
+  spTransform(CRSobj = crs(arctic_laea)) %>% # Project shapefile in laea
+  fortify() %>% # Convert to a dataframe for ggplot
+  rename(xc = long, yc = lat)
+
+# Location of trawls
+trawl_laea <- SpatialPoints(cbind(trawl_latlon$lon, trawl_latlon$lat), 
+                            proj4string = CRS("EPSG:4326")) %>%
+  spTransform(., CRSobj = crs(arctic_laea)) %>% # Change projection to EPSG:6931
+  as.data.frame() %>%
+  rename(xc = coords.x1, yc = coords.x2)
+
+# Location of acoustic data
+MVBS_laea <- SpatialPoints(cbind(MVBS_latlon$lon, MVBS_latlon$lat), 
+                           proj4string = CRS("EPSG:4326")) %>%
+  spTransform(., CRSobj = crs(arctic_laea)) %>% # Change projection to EPSG:6931
+  as.data.frame() %>%
+  rename(xc = coords.x1, yc = coords.x2) # Rename variables
+
+# Arctic circle and areas of interest
+arctic_circle_laea <- SpatialPoints(cbind(arctic_circle_latlon$lon, arctic_circle_latlon$lat), 
+                                    proj4string = CRS("EPSG:4326")) %>%
+  spTransform(., CRSobj = crs(arctic_laea)) %>% # Change projection to EPSG:6931
+  as.data.frame() %>%
+  rename(xc = coords.x1, yc = coords.x2) # Rename variables
+area_BF_CAA_laea <- SpatialPoints(cbind(c(-152, -152, -140, -122.5, -93, -93), c(78, 73, 68, 68, 68, 78)), 
+                                  proj4string = CRS("EPSG:4326")) %>%
+  spTransform(., CRSobj = crs(arctic_laea)) %>% # Change projection to EPSG:6931
+  as.data.frame() %>%
+  rename(xc = coords.x1, yc = coords.x2)
+area_BB_laea <- SpatialPoints(cbind(area_BB_latlon$lon, area_BB_latlon$lat), 
+                              proj4string = CRS("EPSG:4326")) %>%
+  spTransform(., CRSobj = crs(arctic_laea)) %>% # Change projection to EPSG:6931
+  as.data.frame() %>%
+  rename(xc = coords.x1, yc = coords.x2)
+area_SV_laea <- SpatialPoints(cbind(c(40, 40, 0, 0), c(85, 78, 78, 85)), 
+                              proj4string = CRS("EPSG:4326")) %>%
+  spTransform(., CRSobj = crs(arctic_laea)) %>% # Change projection to EPSG:6931
+  as.data.frame() %>%
+  rename(xc = coords.x1, yc = coords.x2)
+
+# Remove unused variable
+rm(cell_res)
+```
+
 
 # Plots 
 
@@ -102,11 +190,7 @@ load("data/remote_sensing/remote_sensing_chl.RData")
 
 Careful this map takes forever to compute (> 18 h) when bathy has to be drawn.
 
-```{r fig1-map-station, fig.align='center', fig.height=3.25, fig.width=6, dpi=600}
-trawl_loc <- trawl_station %>%
-  group_by(date) %>%
-  summarise(lat = mean(lat),
-            lon = mean(lon))
+```{r fig1-map-station-original, fig.align='center', fig.height=3.25, fig.width=6, dpi=600}
 MVBS %>%
   mutate(lat = round(lat, 1),
          lon = round(lon, 1)) %>%
@@ -116,23 +200,50 @@ MVBS %>%
   ungroup() %>%
   ggplot(aes(x = lon, y = lat)) +
   # Plot bathy
-  # geom_tile(data = bathyHD_df, aes(x = lon, y = lat, fill = depth_d)) +
+  # geom_tile(data = bathy_df, aes(x = lon, y = lat, fill = depth_d)) +
   # scale_fill_cmocean("Depth (m)", name = "deep", discrete = T, na.value = NA, alpha = 0.6) +
   # Plot coastlines
-  geom_polygon(data = coastlines_10m, aes(x = lon, y = lat, group = group), fill = "grey70") +
+  geom_polygon(data = coast_10m_latlon, aes(x = lon, y = lat, group = group), fill = "grey70") +
   # Arctic circle
   geom_segment(aes(x = -180, xend = 0, y = 66.5, yend = 66.5), col = "grey40", lty = 2, size = 0.3) +
   geom_segment(aes(x = 0, xend = 180, y = 66.5, yend = 66.5), col = "grey40", lty = 2, size = 0.3) +
   # Areas of interest
-  geom_shape(data=area_BF_CAA_2, aes(x=x,y=y), fill=NA, col="black", lwd=0.2, lty=1) +
-  geom_shape(data=area_BB_2, aes(x=x,y=y), fill=NA, col="black", lwd=0.2, lty=1) +
-  geom_shape(data=area_SV_2, aes(x=x,y=y), fill=NA, col="black", lwd=0.2, lty=1) +
+  geom_shape(data = area_BF_CAA_latlon, aes(x = lon, y = lat), fill = NA, col = "black", lwd = 0.2, lty = 1) +
+  geom_shape(data = area_BB_latlon, aes(x = lon, y = lat), fill = NA, col = "black", lwd = 0.2, lty = 1) +
+  geom_shape(data = area_SV_latlon, aes(x = lon, y = lat), fill = NA, col = "black", lwd = 0.2, lty = 1) +
   # Acoustic data
   geom_point(size = 0.7, shape = 4, color = "black") +
   # Trawl locations
-  geom_point(data = trawl_loc, aes(x = lon, y = lat), shape = 23, size = 1.4, color = "black", fill = "orange") +
+  geom_point(data = trawl_latlon, aes(x = lon, y = lat), shape = 23, size = 1.4, color = "black", fill = "orange") +
   # Change projection
   coord_map("azequalarea", ylim = c(66, 90), xlim = c(-160, 70), orientation = c(90,0,-60)) +
+  guides(fill = guide_legend(keywidth = 0.2, keyheight = 0.2, default.unit = "in"), color = "none") +
+  theme(legend.position = "right", panel.border = element_rect(fill = NA), axis.text = element_blank(),
+        axis.ticks = element_blank(), axis.title = element_blank())
+```
+
+To overcome that, I project the bathy data on the EASE-Grid 2.0 North, prior to plotting. This results in a much quicker plotting time.
+
+```{r fig1-map-station-laea, fig.align='center', fig.height=3.25, fig.width=6, dpi=600}
+# Bathymetric map of the Arctic with location of acoustic and trawl
+MVBS_laea %>%
+  ggplot(aes(x = xc, y = yc)) +
+  # Plot bathy
+  geom_raster(data = bathy_laea, aes(x = xc, y = yc, fill = depth_d)) +
+  scale_fill_cmocean("Depth (m)", name = "deep", discrete = T, na.value = NA, alpha = 0.7) +
+  # Plot coastlines
+  geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), fill = "grey80") +
+  # # Arctic circle
+  geom_path(data = arctic_circle_laea, aes(x = xc, y = yc), col = "grey40", lty = 2, size = 0.3) +
+  # Areas of interest
+  geom_shape(data = area_BF_CAA_laea, aes(x = xc, y = yc), fill = NA, col = "black", lwd = 0.2, lty = 1, radius = unit(0.05, "in")) +
+  geom_shape(data = area_BB_laea, aes(x = xc, y = yc), fill = NA, col = "black", lwd = 0.2, lty = 1, radius = unit(0.05, "in")) +
+  geom_shape(data = area_SV_laea, aes(x = xc, y = yc), fill = NA, col = "black", lwd = 0.2, lty = 1, radius = unit(0.05, "in")) +
+  # Acoustic data
+  geom_point(size = 0.7, shape = 4, color = "black") +
+  # Trawl locations
+  geom_point(data = trawl_laea, aes(x = xc, y = yc), shape = 23, size = 1.4, color = "black", fill = "orange") +
+  coord_fixed(xlim = c(-2700, 1500), ylim = c(-1900, 2000), expand = F) +
   guides(fill = guide_legend(keywidth = 0.2, keyheight = 0.2, default.unit = "in"), color = "none") +
   theme(legend.position = "right", panel.border = element_rect(fill = NA), axis.text = element_blank(),
         axis.ticks = element_blank(), axis.title = element_blank())
