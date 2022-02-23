@@ -1,7 +1,7 @@
-PanArctic DSL - Analyses
+PanArctic DSL - Figures
 ================
 [Pierre Priou](mailto:pierre.priou@mi.mun.ca)
-2022/02/23 at 18:09
+2022/02/23 at 18:18
 
 # Package and data loading
 
@@ -223,7 +223,7 @@ MVBS %>%
         axis.ticks = element_blank(), axis.title = element_blank())
 ```
 
-<img src="PanArctic_DSL_analyses_files/figure-gfm/fig1-map-station-original-1.png" style="display: block; margin: auto;" />
+<img src="PanArctic_DSL_figures_files/figure-gfm/fig1-map-station-original-1.png" style="display: block; margin: auto;" />
 
 To overcome that, I project the bathy data on the EASE-Grid 2.0 North,
 prior to plotting. This results in a much quicker plotting time.
@@ -253,7 +253,7 @@ MVBS_laea %>%
         axis.ticks = element_blank(), axis.title = element_blank())
 ```
 
-<img src="PanArctic_DSL_analyses_files/figure-gfm/fig1-map-station-laea-1.png" style="display: block; margin: auto;" />
+<img src="PanArctic_DSL_figures_files/figure-gfm/fig1-map-station-laea-1.png" style="display: block; margin: auto;" />
 
 ## Figure 2. Vertical S<sub>V</sub> profiles
 
@@ -315,7 +315,7 @@ Sv_raster %>%
 
     ## Warning: Removed 22 row(s) containing missing values (geom_path).
 
-<img src="PanArctic_DSL_analyses_files/figure-gfm/fig2-Sv-profile-area-year-1.png" style="display: block; margin: auto;" />
+<img src="PanArctic_DSL_figures_files/figure-gfm/fig2-Sv-profile-area-year-1.png" style="display: block; margin: auto;" />
 
 **WORK IN PROGRESS**
 
@@ -447,7 +447,7 @@ map_sa_anomaly
 
     ## Warning: Removed 7197600 rows containing non-finite values (stat_contour).
 
-<img src="PanArctic_DSL_analyses_files/figure-gfm/fig3-map-sa-anomalies-1.png" style="display: block; margin: auto;" />
+<img src="PanArctic_DSL_figures_files/figure-gfm/fig3-map-sa-anomalies-1.png" style="display: block; margin: auto;" />
 
 ``` r
 SA_grid_laea %>% 
@@ -468,7 +468,7 @@ SA_grid_laea %>%
   theme(legend.position = "right", axis.text = element_blank(), axis.ticks = element_blank(), axis.title = element_blank())
 ```
 
-<img src="PanArctic_DSL_analyses_files/figure-gfm/fig3-map-sa-anomalies-laea-1.png" style="display: block; margin: auto;" />
+<img src="PanArctic_DSL_figures_files/figure-gfm/fig3-map-sa-anomalies-laea-1.png" style="display: block; margin: auto;" />
 
 ## Table 1. Abundance mesopelagic fish
 
@@ -534,7 +534,7 @@ relative_abundance_area <- trawl_station %>%
 relative_abundance_area
 ```
 
-<img src="PanArctic_DSL_analyses_files/figure-gfm/table1-heatmap-abundance-1.png" style="display: block; margin: auto;" />
+<img src="PanArctic_DSL_figures_files/figure-gfm/table1-heatmap-abundance-1.png" style="display: block; margin: auto;" />
 
 # Supplementary data
 
