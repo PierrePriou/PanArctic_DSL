@@ -1,7 +1,7 @@
 PanArctic DSL - Remote sensing
 ================
 [Pierre Priou](mailto:pierre.priou@mi.mun.ca)
-2022/02/09 at 14:05
+2022/02/23 at 11:31
 
 # Package loading
 
@@ -212,7 +212,7 @@ website](https://nsidc.org/data/ease/). Because “raw” sea ice data has a
 projection (150 km \* 150 km).
 
 ``` r
-cell_res <- 100 # Cell resolution in km
+cell_res <- 150 # Cell resolution in km
 arctic_laea <- raster(extent(-2700, 2700, -2700, 2700), crs = "EPSG:6931") # Seaice projection
 projection(arctic_laea) <- gsub("units=m", "units=km", projection(arctic_laea)) # Convert proj unit from m to km
 res(arctic_laea) <- c(cell_res, cell_res) # Define the 100 km cell resolution
@@ -243,6 +243,9 @@ for (i in seq(2015, 2017, 1)) { # Data gridding
     dplyr::select(year, area, lat, lon, xc, yc, seaice_duration, openwater_duration, mean_ice_conc)
   seaice_grid_laea <- bind_rows(seaice_grid_laea, seaice_tmp_laea)
 }
+seaice_grid_laea <- seaice_grid_laea %>%
+  mutate(cell_res = cell_res) # Add cell resolution to dataframe
+
 rm(seaice_tmp, seaice_tmp_laea, i, cell_res) # Remove temporary data
 ```
 
@@ -271,7 +274,7 @@ plot_grid(seaice_grid_laea %>% # Map mean ice concentration
             filter(is.na(mean_ice_conc) == F) %>% # Remove land
             ggplot() +
             geom_tile(aes(x = xc, y = yc, fill = openwater_duration)) +
-            scale_fill_viridis_c("EPSG:6931 - Open water duration (days)") +
+            scale_fill_viridis_c("EPSG:6931 - Open water duration (days)", direction = -1) +
             geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), fill = "grey80") +
             facet_wrap(~ year, ncol = 3) +
             coord_fixed(xlim = c(-2600, 1100), ylim = c(-1800, 1900), expand = F) + 

@@ -1,7 +1,7 @@
 PanArctic DSL - Acoustic gridding
 ================
 [Pierre Priou](mailto:pierre.priou@mi.mun.ca)
-2022/02/09 at 14:01
+2022/02/23 at 11:28
 
 # Package loading
 
@@ -149,7 +149,7 @@ More info on this projection can be found on the [NSIDC
 website](https://nsidc.org/data/ease/).
 
 ``` r
-cell_res <- 100 # Cell resolution in km
+cell_res <- 150 # Cell resolution in km
 arctic_laea <- raster(extent(-2700, 2700, -2700, 2700), crs = "EPSG:6931") # Seaice projection
 projection(arctic_laea) <- gsub("units=m", "units=km", projection(arctic_laea)) # Convert proj unit from m to km
 res(arctic_laea) <- c(cell_res, cell_res) # Define the 100 km cell resolution
@@ -181,12 +181,13 @@ for (i in seq(2015, 2017, 1)) { # Data gridding
     dplyr::select(year, area, lat, lon, xc, yc, NASC_int, CM) 
   SA_grid_laea <- bind_rows(SA_grid_laea, SA_tmp_laea)
 }
-rm(SA_tmp, SA_tmp_laea, i, cell_res) # Remove temporary data
+rm(SA_tmp, SA_tmp_laea, i) # Remove temporary data
 
 SA_grid_laea <- SA_grid_laea %>% # Calculate normalized backscatter anomalies
   group_by(year, area) %>%
-  mutate(mean_NASC_area_year = mean(NASC_int),
-         sd_NASC_area_year = sd(NASC_int)) %>%
+  mutate(cell_res = cell_res, # Add cell resolution to dataframe
+         mean_NASC_area_year = mean(NASC_int), # Calculate mean NASC per area per year
+         sd_NASC_area_year = sd(NASC_int)) %>% # Calculate standard deviation of NASC per area per year
   ungroup() %>%
   mutate(NASC_anomaly = (NASC_int - mean_NASC_area_year) / sd_NASC_area_year,  # Calculate normalized backscatter anomaly
          NASC_anomaly_d = factor(case_when(NASC_anomaly < -1 ~ "<-1", # Discretize colour scale
