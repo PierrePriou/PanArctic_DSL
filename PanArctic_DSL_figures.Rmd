@@ -76,6 +76,7 @@ area_SV_latlon <- data.frame(lon = c(46, 46, 0, 0, 46), lat = c(85, 76, 76, 85, 
 # Acoustic data
 load("data/acoustics/MVBS_2015_2017.RData")
 load("data/acoustics/SA_grids.RData")
+load("data/acoustics/Sv_grids.RData")
 MVBS_latlon <- MVBS %>% # Location of acoustic data
   mutate(lat = round(lat, 1),
          lon = round(lon, 1)) %>%
@@ -231,7 +232,7 @@ MVBS_laea %>%
   geom_raster(data = bathy_laea, aes(x = xc, y = yc, fill = depth_d)) +
   scale_fill_cmocean("Depth (m)", name = "deep", discrete = T, na.value = NA, alpha = 0.6) +
   # Plot coastlines
-  geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), fill = "grey80") +
+  geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), fill = "grey30") +
   # Arctic circle
   geom_path(data = arctic_circle_laea, aes(x = xc, y = yc), col = "grey40", lty = 2, size = 0.3) +
   # Areas of interest
@@ -250,36 +251,39 @@ MVBS_laea %>%
 
 ## Figure 2. Vertical S~V~ profiles
 
-Code that works and used for producing the plot in the manuscript from 2021_12_17
+```{r fig2-Sv-profiles-area-year, fig.align='center', fig.width=6.5, fig.height=3}
+col_pal <- c("#80CBB1", "#347BA5", "#302346") # Custom colour palette
 
-```{r fig2-Sv-profile-area-year, fig.align='center', dpi=100, fig.width=6.5, fig.height=3}
-# Custom color palette
-col_pal <- c("#80CBB1", "#347BA5", "#302346")
-# Calculate mean and median vertical profile for each area
-Sv_raster %>%
-  # Calculate mean and median Sv profiles per area per year
-  group_by(depth, area, year) %>%
-  summarise(sv_lin_median_areayear=median(sv_lin_median),
-            sv_lin_q2.5_areayear=median(sv_lin_q2.5),
-            sv_lin_q97.5_areayear=median(sv_lin_q97.5)) %>%
-  mutate(Sv_median=10*log10(sv_lin_median_areayear), 
-         Sv_q2.5=10*log10(sv_lin_q2.5_areayear),
-         Sv_q97.5=10*log10(sv_lin_q97.5_areayear)) %>%
+p_Sv_grid_laea <- Sv_grid_laea %>% # Plot median profiles
+  group_by(depth, area, year) %>% # Calculate mean and median Sv profiles per area per year
+  summarise(sv_lin_q0.05_areayear = median(sv_lin_q0.05),
+            sv_lin_q0.25_areayear = median(sv_lin_q0.25),
+            sv_lin_q0.50_areayear = median(sv_lin_q0.50),
+            sv_lin_q0.75_areayear = median(sv_lin_q0.75),
+            sv_lin_q0.95_areayear = median(sv_lin_q0.95)) %>%
+  mutate(Sv_q0.05_median = 10 * log10(sv_lin_q0.05_areayear), 
+         Sv_q0.25_median = 10 * log10(sv_lin_q0.25_areayear),
+         Sv_q0.50_median = 10 * log10(sv_lin_q0.50_areayear),
+         Sv_q0.25_median = 10 * log10(sv_lin_q0.25_areayear),
+         Sv_q0.75_median = 10 * log10(sv_lin_q0.75_areayear),
+         Sv_q0.95_median = 10 * log10(sv_lin_q0.95_areayear)) %>%
   ungroup() %>%
-  # Plotting details
-  # Remove empty water column and very low backscatter
-  mutate(Sv_median_1=if_else(Sv_median < -200, NaN, Sv_median),
-         Sv_q2.5_1=if_else(Sv_q2.5 < -200, NaN, Sv_q2.5),
-         Sv_q97.5_1=if_else(Sv_q97.5 < -105, NaN, Sv_q97.5)) %>%
-  # Replace low values by min limit for plotting continuous ribbon
-  mutate(Sv_median_2=if_else(is.na(Sv_median_1)==F & Sv_median_1<=-105, -105, Sv_median_1),
-         Sv_q2.5_2=if_else(is.na(Sv_median_1)==F & is.na(Sv_q2.5_1)==T & is.na(Sv_q97.5_1)==F, -105,
-                     if_else(is.na(Sv_median_1)==T & is.na(Sv_q2.5_1)==T & is.na(Sv_q97.5_1)==F, -105, 
-                     if_else(is.na(Sv_q2.5_1)==F & Sv_q2.5_1 <=-105, -105, Sv_q2.5_1))),
-         Sv_q97.5_2=Sv_q97.5_1) %>%
-  mutate(Sv_median_3=if_else(Sv_median_2==-105 & Sv_q2.5_2==-105 & is.na(Sv_q97.5_2)==T, NaN, Sv_median_2),
-         Sv_q2.5_3=if_else(Sv_median_2==-105 & Sv_q2.5_2==-105 & is.na(Sv_q97.5_2)==T, NaN, Sv_median_3),
-         Sv_q97.5_3=Sv_q97.5_2) %>%
+  # Plotting details for allowing geom_ribbon to work
+  mutate(Sv_q0.05_median = case_when(Sv_q0.05_median == -999 ~ NaN,
+                                     Sv_q0.05_median > -999 & Sv_q0.05_median <= -105 ~ -105,
+                                     Sv_q0.05_median > -105 ~ Sv_q0.05_median),
+         Sv_q0.25_median = case_when(Sv_q0.25_median == -999 ~ NaN,
+                                     Sv_q0.25_median > -999 & Sv_q0.25_median <= -105 ~ -105,
+                                     Sv_q0.25_median > -105 ~ Sv_q0.25_median),
+         Sv_q0.50_median = case_when(Sv_q0.50_median == -999 ~ NaN,
+                                     Sv_q0.50_median > -999 & Sv_q0.50_median <= -105 ~ -105,
+                                     Sv_q0.50_median > -105 ~ Sv_q0.50_median),
+         Sv_q0.75_median = case_when(Sv_q0.75_median == -999 ~ NaN,
+                                     Sv_q0.75_median > -999 & Sv_q0.75_median <= -105 ~ -105,
+                                     Sv_q0.75_median > -105 ~ Sv_q0.75_median),
+         Sv_q0.95_median = case_when(Sv_q0.95_median == -999 ~ NaN,
+                                     Sv_q0.95_median > -999 & Sv_q0.95_median <= -105 ~ -105,
+                                     Sv_q0.95_median > -105 ~ Sv_q0.95_median)) %>%
   arrange(year, area, depth) %>%
   mutate(area=factor(if_else(area=="BF_CAA", "Beaufort Sea &\nCan. Arctic Archipelago",
                        if_else(area=="BB", "Baffin Bay",
@@ -287,85 +291,25 @@ Sv_raster %>%
                        levels=c("Beaufort Sea &\nCan. Arctic Archipelago","Baffin Bay","Svalbard"))) %>%
   # Plot
   ggplot() +
-  geom_vline(xintercept=200, lty=2, col="grey20") +
-  geom_ribbon(aes(x=depth, ymin=Sv_q2.5_2, ymax=Sv_q97.5_2, fill=as.factor(year), group=year), alpha=0.2) +
-  geom_line(aes(x=depth, y=Sv_median_2, col=as.factor(year), group=year)) +
-  scale_x_reverse("Depth (m)", breaks=seq(0,1000,200)) +
-  geom_hline(yintercept=-105, col="white") +
-  scale_y_continuous(expression("S"[V]*" (dB re 1 m"^-1*")"), breaks=seq(-200,0,10), limits=c(-105,-65), expand=c(0,0)) +
-  scale_color_manual(values=col_pal) +
-  scale_fill_manual(values=col_pal) +
-  coord_flip() +
-  facet_grid(~area) +
-  theme(legend.title=element_blank(),
-        legend.position=c(0.94,0.275),
-        legend.background=element_blank(),
-        legend.key=element_blank(), 
-        panel.border=element_blank(),
-        axis.line=element_line())
-```
-
-**WORK IN PROGRESS**
-
-I'm trying to streamline the code.
-
-```{r Sv-profiles-area-year-in-progress, eval=FALSE, fig.align='center', fig.width=6.5, fig.height=3}
-col_pal <- c("#80CBB1", "#347BA5", "#302346") # Custom colour palette
-Sv_area_year <- Sv_raster %>%
-  group_by(depth, area, year) %>%
-  # Calculate mean and median Sv profiles per area per year
-  summarise(sv_lin_median_areayear = median(sv_lin_median),
-            sv_lin_q2.5_areayear = median(sv_lin_q2.5),
-            sv_lin_q97.5_areayear = median(sv_lin_q97.5)) %>%
-  # Transform into volume backscattering strength (dB)
-  mutate(Sv_median = 10 * log10(sv_lin_median_areayear), 
-         Sv_q2.5 = 10 * log10(sv_lin_q2.5_areayear),
-         Sv_q97.5 = 10 * log10(sv_lin_q97.5_areayear)) %>%
-  ungroup() %>%
-  # Plotting details
-  # # # Remove empty water column and very low backscatter
-  # mutate(Sv_median_1 = if_else(Sv_median < -200, NaN, Sv_median),
-  #        Sv_q2.5_1 = if_else(Sv_q2.5 < -200, NaN, Sv_q2.5),
-  #        Sv_q97.5_1 = if_else(Sv_q97.5 < -105, NaN, Sv_q97.5)) %>%
-  # Remove empty water column and very low backscatter
-  mutate(Sv_q97.5_1 = if_else(Sv_q97.5 < -105, NaN, Sv_q97.5),
-         Sv_q2.5_1 = case_when(Sv_q97.5 < -105 ~ NaN,
-                               Sv_q2.5 < -105 ~ NaN,
-                               Sv_q2.5 >= -105 ~ Sv_q2.5)) %>%
-  # Replace low values by min limit for plotting continuous ribbon
-  mutate(Sv_q2.5_2 = if_else(is.na(Sv_q2.5_1) == T & is.na(Sv_q97.5_1) == F, -105,
-                             if_else(is.na(Sv_q2.5_1) == T & is.na(Sv_q97.5_1) == F, -105, 
-                                     if_else(is.na(Sv_q2.5_1) == F & Sv_q2.5_1 <= -105, -105, Sv_q2.5_1))),
-         Sv_q97.5_2 = Sv_q97.5_1) %>%
-  # mutate(Sv_median_2 = if_else(is.na(Sv_median_1) == F & Sv_median_1 <= -105, -105, Sv_median_1),
-  #        Sv_q2.5_2 = if_else(is.na(Sv_median_1) == F & is.na(Sv_q2.5_1) == T & is.na(Sv_q97.5_1) == F, -105,
-  #                    if_else(is.na(Sv_median_1) == T & is.na(Sv_q2.5_1) == T & is.na(Sv_q97.5_1) == F, -105, 
-  #                    if_else(is.na(Sv_q2.5_1) == F & Sv_q2.5_1 <= -105, -105, Sv_q2.5_1))),
-  #        Sv_q97.5_2 = Sv_q97.5_1) %>%
-  arrange(year, area, depth) %>%
-  # filter(area == "BF_CAA") %>%
-  # mutate(area=factor(case_when(area == "BF_CAA" ~ "Beaufort Sea &\nCan. Arctic Archipelago",
-  #                              area == "BB" ~ "Baffin Bay",
-  #                              area == "SV" ~ "Svalbard"),
-  #                    levels = c("Beaufort Sea &\nCan. Arctic Archipelago", "Baffin Bay", "Svalbard"))) %>%
-  # Plot
-  ggplot() +
   geom_vline(xintercept = 200, lty = 2, col = "grey20") +
-  # geom_ribbon(aes(x = depth, ymin = Sv_q2.5_2, ymax = Sv_q97.5_2, fill = as.factor(year), group = year), alpha = 0.2) +
-  # geom_line(aes(x = depth, y = Sv_median_2, col = as.factor(year), group = year)) +
-  geom_ribbon(aes(x = depth, ymin = Sv_q2.5, ymax = Sv_q97.5, fill = as.factor(year), group = year), alpha = 0.2, na.rm=T) +
-  geom_line(aes(x = depth, y = Sv_median, col = as.factor(year), group = year)) +
+  geom_ribbon(aes(x = depth, ymin = Sv_q0.05_median, ymax = Sv_q0.95_median, fill = as.factor(year), group = year),
+              alpha = 0.2, na.rm = T) +
+  geom_line(aes(x = depth, y = Sv_q0.50_median, col = as.factor(year), group = year), na.rm = T) +
   scale_x_reverse("Depth (m)", breaks = seq(0, 1000, 200)) +
-  # geom_hline(yintercept = -105, col = "white") +
-  # coord_cartesian(ylim = c(-105, -65)) +
-  # scale_y_continuous(expression("S"[V]*" (dB re 1 m"^-1*")"), breaks = seq(-200, 0, 10), limits = c(-105, -65), expand = c(0, 0)) +
+  geom_hline(yintercept = -105, col = "white") +
+  scale_y_continuous(expression("S"[V]*" (dB re 1 m"^-1*")"), breaks = seq(-200, 0, 10), expand = c(0, 0)) +
   scale_color_manual(values = col_pal) +
   scale_fill_manual(values = col_pal) +
-  coord_flip(ylim = c(-100, -65)) +
-  facet_grid( ~ area) +
-  theme(legend.title = element_blank(), legend.position = c(0.94, 0.275), legend.background = element_blank(),
-        legend.key = element_blank(),panel.border = element_blank(), axis.line = element_line())
-Sv_area_year
+  coord_flip(ylim = c(-105, -65)) +
+  facet_grid(~ area) +
+  theme(legend.title = element_blank(),
+        legend.position = c(0.94, 0.275),
+        legend.background = element_blank(),
+        legend.key = element_blank(), 
+        panel.border = element_blank(),
+        axis.line = element_line())
+ggsave("plots/Fig2_Sv_profiles_area_year.png", p_Sv_grid_laea, height = 3, width = 6.5, dpi = 600, units = "in")
+p_Sv_grid_laea
 ```
 
 ## Figure 3. Map of mesopelagic backscatter hotspots
