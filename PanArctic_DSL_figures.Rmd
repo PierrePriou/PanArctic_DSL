@@ -224,9 +224,9 @@ MVBS %>%
 
 To overcome that, I project the bathy data on the EASE-Grid 2.0 North, prior to plotting. This results in a much quicker plotting time.
 
-```{r fig1-map-station-laea, fig.align='center', fig.height=3.25, fig.width=6}
+```{r fig1-map-station-laea, fig.align='center', fig.height=4, fig.width=6}
 # Bathymetric map of the Arctic with location of acoustic and trawl
-MVBS_laea %>%
+p_MVBS_laea <- MVBS_laea %>%
   ggplot(aes(x = xc, y = yc)) +
   # Plot bathy
   geom_raster(data = bathy_laea, aes(x = xc, y = yc, fill = depth_d)) +
@@ -234,11 +234,11 @@ MVBS_laea %>%
   # Plot coastlines
   geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), fill = "grey30") +
   # Arctic circle
-  geom_path(data = arctic_circle_laea, aes(x = xc, y = yc), col = "grey40", lty = 2, size = 0.3) +
+  geom_path(data = arctic_circle_laea, aes(x = xc, y = yc), col = "grey10", lty = 2, size = 0.3) +
   # Areas of interest
-  geom_shape(data = area_BF_CAA_laea, aes(x = xc, y = yc), fill = NA, col = "black", lwd = 0.2, lty = 1, radius = unit(0.05, "in")) +
-  geom_shape(data = area_BB_laea, aes(x = xc, y = yc), fill = NA, col = "black", lwd = 0.2, lty = 1, radius = unit(0.05, "in")) +
-  geom_shape(data = area_SV_laea, aes(x = xc, y = yc), fill = NA, col = "black", lwd = 0.2, lty = 1, radius = unit(0.05, "in")) +
+  geom_shape(data = area_BF_CAA_laea, aes(x = xc, y = yc), fill = NA, col = "black", lwd = 0.3, lty = 1, radius = unit(0.15, "in")) +
+  geom_shape(data = area_BB_laea, aes(x = xc, y = yc), fill = NA, col = "black", lwd = 0.3, lty = 1, radius = unit(0.15, "in")) +
+  geom_shape(data = area_SV_laea, aes(x = xc, y = yc), fill = NA, col = "black", lwd = 0.3, lty = 1, radius = unit(0.15, "in")) +
   # Acoustic data
   geom_point(size = 0.7, shape = 4, color = "black") +
   # Trawl locations
@@ -247,6 +247,8 @@ MVBS_laea %>%
   guides(fill = guide_legend(keywidth = 0.2, keyheight = 0.2, default.unit = "in"), color = "none") +
   theme(legend.position = "right", panel.border = element_rect(fill = NA), axis.text = element_blank(),
         axis.ticks = element_blank(), axis.title = element_blank())
+ggsave("plots/Fig1_map_stations.png", p_MVBS_laea, height = 4, width = 6.5, dpi = 600, units = "in")
+p_MVBS_laea
 ```
 
 ## Figure 2. Vertical S~V~ profiles
