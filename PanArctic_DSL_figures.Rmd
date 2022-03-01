@@ -384,14 +384,15 @@ SA_grid_laea %>%
   ggplot() +
   # Plot bathy
   geom_raster(data = bathy_laea, aes(x = xc, y = yc, fill = depth_d)) +
-  # scale_fill_grey(start = 0.8, end = 0.2, alpha = 0.6) +
-  scale_fill_cmocean("Depth (m)", name = "deep", discrete = T, na.value = NA, alpha = 0.5) +
+  scale_fill_cmocean("Depth (m)", name = "deep", discrete = T, na.value = NA, alpha = 0.3) +
+  # scale_fill_brewer("Depth (m)", type = "seq", palette = "Greys") +
   guides(fill = "none") + # Remove legend
   new_scale_fill() +
+  geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), fill = "grey30") +
   # Plot backscatter anomalies
-  geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), fill = "grey70") +
   geom_tile(aes(x = xc, y = yc, fill = NASC_anomaly_d), color = "grey30", size = 0.15) +
   scale_fill_manual("Normalized sA anomaly", values = rev(brewer.pal(n = 5, name = "BrBG"))) +
+  # scale_fill_manual("Normalized sA anomaly", values = rev(brewer.pal(n = 5, name = "RdBu"))) +
   facet_wrap(~ year, ncol = 3) +
   coord_fixed(xlim = c(-2600, 1100), ylim = c(-1800, 1900), expand = F) +
   guides(fill = guide_legend(keywidth = 0.2, keyheight = 0.2, default.unit = "in"), color = "none") +
