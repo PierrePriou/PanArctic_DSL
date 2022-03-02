@@ -33,9 +33,9 @@ theme_update(axis.text = element_text(size = 9),
 options(dplyr.summarise.inform = F) # Suppress summarise() warning
 ```
 
-# Download sea ice data
+# Sea ice data
 
-Code that downloads sea ice data from the [Copernicus website]( https://cds.climate.copernicus.eu/cdsapp#!/dataset/satellite-sea-ice-concentration?tab=overview). We use the daily sea ice concentration derived from satellite observations from ECMWF. Data is downloaded in two batches because ECMWF changed their Climate Data Record (CDR) on 2016-01-01. I changed the sea ice data projection from Lambert's azimuthal Equal Area (EPSG:6931) to WGS84 (EPSG:4326) and match the resolution to that of backscatter anomalies (2 deg longitude * 1 deg latitude).
+Code that downloads sea ice data from the [Copernicus Climate website]( https://cds.climate.copernicus.eu/cdsapp#!/dataset/satellite-sea-ice-concentration?tab=overview). We use the daily sea ice concentration derived from satellite observations from ECMWF. Data is downloaded in two batches because ECMWF changed their Climate Data Record (CDR) on 2016-01-01. I changed the sea ice data projection from Lambert's azimuthal Equal Area (EPSG:6931) to WGS84 (EPSG:4326) and match the resolution to that of backscatter anomalies (2 deg longitude * 1 deg latitude).
 
 ## CDR data 2015-01-01 - 2015-12-31
 
@@ -139,7 +139,7 @@ for (d in dates) {
 rm(request, tmp_raw, tmp_coord, tmp_seaice) # Remove unused variables
 ```
 
-# Data tidying and gridding 
+## Data tidying and gridding 
 
 First, I plot data to see if download worked.
 
@@ -189,7 +189,7 @@ save(seaice_year, file = "data/remote_sensing/remote_sensing_seaice_year.RData")
 
 To match sea ice records with acoustic data, I rasterized sea ice data on the same grid as the acoustic data. I tried two different grids; the WGS84 projection (EPSG:4326) with grid cells of 2°lon * 1°lat, and the EASE-Grid 2.0 North (EPSG:6931) which is the default grid for sea-ice data. For each cell I calculated the mean ice concentration, open water and sea ice duration. 
 
-## EPSG:6931 - EASE-Grid 2.0 North (Lambert's equal-area, azimuthal)
+### EPSG:6931 - EASE-Grid 2.0 North (Lambert's equal-area, azimuthal)
 
 More info on this projection can be found on the [NSIDC website](https://nsidc.org/data/ease/). Because "raw" sea ice data has a 25 km * 25 km resolution, I match that resolution to the final projection (150 km * 150 km).
 
@@ -264,7 +264,7 @@ plot_grid(seaice_grid_laea %>% # Map mean ice concentration
           ncol = 1, align = "hv", axis = "tblr")
 ```
 
-## EPSG:4326 - WGS84 projection 
+### EPSG:4326 - WGS84 projection 
 
 ```{r EPSG-4326-seaice-grid}
 arctic_latlon <- raster(extent(-155, 35, 66, 85), # Base projection for acoustic and CTD data
@@ -328,7 +328,7 @@ plot_grid(seaice_grid_latlon %>% # Map mean ice concentration
           ncol = 2, align = "hv", axis = "tblr")
 ```
 
-# Save data 
+## Save data 
 
 ```{r save-data}
 save(seaice_grid_laea, seaice_grid_latlon, file = "data/remote_sensing/seaice_grids.RData") # Save data
