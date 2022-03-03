@@ -16,3 +16,4 @@ vignettes/*.pdf
 data/
 plots/
 R/
+/.ipynb_checkpoints
