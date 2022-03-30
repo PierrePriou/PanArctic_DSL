@@ -1,7 +1,7 @@
 PanArctic DSL - Remote sensing
 ================
 [Pierre Priou](mailto:pierre.priou@mi.mun.ca)
-2022/02/23 at 11:31
+2022/03/30 at 15:40
 
 # Package loading
 
@@ -30,9 +30,9 @@ theme_update(axis.text = element_text(size = 9),
 options(dplyr.summarise.inform = F) # Suppress summarise() warning
 ```
 
-# Download sea ice data
+# Sea ice data
 
-Code that downloads sea ice data from the [Copernicus
+Code that downloads sea ice data from the [Copernicus Climate
 website](https://cds.climate.copernicus.eu/cdsapp#!/dataset/satellite-sea-ice-concentration?tab=overview).
 We use the daily sea ice concentration derived from satellite
 observations from ECMWF. Data is downloaded in two batches because ECMWF
@@ -144,7 +144,7 @@ for (d in dates) {
 rm(request, tmp_raw, tmp_coord, tmp_seaice) # Remove unused variables
 ```
 
-# Data tidying and gridding
+## Data tidying and gridding
 
 First, I plot data to see if download worked.
 
@@ -204,7 +204,7 @@ EASE-Grid 2.0 North (EPSG:6931) which is the default grid for sea-ice
 data. For each cell I calculated the mean ice concentration, open water
 and sea ice duration.
 
-## EPSG:6931 - EASE-Grid 2.0 North (Lambert’s equal-area, azimuthal)
+### EPSG:6931 - EASE-Grid 2.0 North (Lambert’s equal-area, azimuthal)
 
 More info on this projection can be found on the [NSIDC
 website](https://nsidc.org/data/ease/). Because “raw” sea ice data has a
@@ -285,7 +285,7 @@ plot_grid(seaice_grid_laea %>% # Map mean ice concentration
 
 ![](PanArctic_DSL_remote_sensing_files/figure-gfm/EPSG-6931-map-CTD-1.png)<!-- -->
 
-## EPSG:4326 - WGS84 projection
+### EPSG:4326 - WGS84 projection
 
 ``` r
 arctic_latlon <- raster(extent(-155, 35, 66, 85), # Base projection for acoustic and CTD data
@@ -352,8 +352,15 @@ plot_grid(seaice_grid_latlon %>% # Map mean ice concentration
 
 ![](PanArctic_DSL_remote_sensing_files/figure-gfm/EPSG-4326-map-seaice-1.png)<!-- -->
 
-# Save data
+## Save data
 
 ``` r
 save(seaice_grid_laea, seaice_grid_latlon, file = "data/remote_sensing/seaice_grids.RData") # Save data
 ```
+
+# Arctic Ocean Physics Reanalysis
+
+The [Arctic Ocean Physics
+Reanalysis](https://resources.marine.copernicus.eu/product-detail/ARCTIC_MULTIYEAR_PHY_002_003/INFORMATION)
+dataset was downloaded using a Jupyter notebook. The dataset has a 12.5
+km<sup>2</sup>

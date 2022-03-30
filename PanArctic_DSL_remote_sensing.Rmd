@@ -13,6 +13,8 @@ always_allow_html: true
 library(tidyverse)  # Tidy code
 library(lubridate)  # Deal with dates
 library(tidync)     # Read NetCDF
+library(ncmeta)     # Metadata NetCDF
+library(sf)         # Spatial data
 library(raster)     # Rasterize data
 library(rgdal)      # Read shapefiles
 library(ecmwfr)     # Download Copernicus data
@@ -333,3 +335,9 @@ plot_grid(seaice_grid_latlon %>% # Map mean ice concentration
 ```{r save-data}
 save(seaice_grid_laea, seaice_grid_latlon, file = "data/remote_sensing/seaice_grids.RData") # Save data
 ```
+
+# Arctic Ocean Physics Reanalysis 
+
+The [Arctic Ocean Physics Reanalysis](https://resources.marine.copernicus.eu/product-detail/ARCTIC_MULTIYEAR_PHY_002_003/INFORMATION) dataset was downloaded using a Jupyter notebook. The dataset has a 12.5 km^2^ grid resolution and a specific polar stereographic projection. Because PROJ4 is not supported by `rgdal` anymore, I need to find a way to convert the PROJ4 to PROJ6. 
+
+
