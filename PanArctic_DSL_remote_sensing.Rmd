@@ -338,6 +338,43 @@ save(seaice_grid_laea, seaice_grid_latlon, file = "data/remote_sensing/seaice_gr
 
 # Arctic Ocean Physics Reanalysis 
 
-The [Arctic Ocean Physics Reanalysis](https://resources.marine.copernicus.eu/product-detail/ARCTIC_MULTIYEAR_PHY_002_003/INFORMATION) dataset was downloaded using a Jupyter notebook. The dataset has a 12.5 km^2^ grid resolution and a specific polar stereographic projection. Because PROJ4 is not supported by `rgdal` anymore, I need to find a way to convert the PROJ4 to PROJ6. 
+The [Arctic Ocean Physics Reanalysis](https://resources.marine.copernicus.eu/product-detail/ARCTIC_MULTIYEAR_PHY_002_003/INFORMATION) dataset was downloaded using a Jupyter notebook. The dataset has a 12.5 km^2^ grid resolution and a specific polar stereographic projection. Because PROJ4 strings are not have been replaced by WKT2 strings in `rgdal`, I need to convert the PROJ4 custom projection of Copernicus into a WKT2 string. I need to verify if the `st_crs` function converts the proj4 string into a WKT2 string correctly.
+
+The variables are: 
+
+* thetao: Temperature degree Celsius
+* so: Salinity psu
+* vxo: Zonal velocity m/s (x)
+* vyo: Meridional velocity m/s (y)
+* x: x-coordinate (not longitude, need to be reprojected)
+* y: y-coordinate (not latitude, need to be reprojected)
+* depth: depth in meters
+* time: time in hours since 1950-01-01 00:00:00
+
+```{r}
+# Read NetCDF
+test <- tidync("data/remote_sensing/physics/20150115_0m_phy_CMEMS.nc") %>%
+  activate("D0,D1,D3,D2") %>% # D0 = x, D1 = y, D3 = depth, D2 = time
+  hyper_tibble() %>%
+  mutate(date = as.POSIXct(time*3600, origin = "1950-01-01 00:00:00", tz = "UTC"))
+
+# Define projection
+# proj_original <- "+proj=stere +a=6378273.0 +b=6378273.0 +lon_0=-45.0 +lat_0=90.0 +lat_ts=90.0 +ellps=sphere +units=m "
+proj_original <- "+proj=stere +lat_0=90 +lat_ts=90 +lon_0=-45 +x_0=0 +y_0=0 +R=6378273 +units=m"
 
 
+# Project data
+test_latlon <- SpatialPointsDataFrame(SpatialPoints(cbind(test$x, test$y), proj4string = CRS(proj_original)),
+                                      data.frame(thetao = test$thetao,
+                                                 vxo = test$vxo,
+                                                 vyo = test$vyo,
+                                                 so = test$so,
+                                                 depth = test$depth,
+                                                 time = test$time)) %>%
+  spTransform(., CRSobj = crs("EPSG:4326")) %>%
+  as.data.frame() 
+  
+bbox(test_latlon) # Latitude is off, longitude seems fine
+
+plot(test_latlon, axes = T)  
+```
