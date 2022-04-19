@@ -20,6 +20,7 @@ library(rgdal)      # Read shapefiles
 library(ecmwfr)     # Download Copernicus data
 library(cowplot)    # Plots on a grid
 library(cmocean)    # Oceanographic colour palettes
+library(metR)
 # Custom figure theme
 theme_set(theme_bw())
 theme_update(axis.text = element_text(size = 9),
@@ -436,3 +437,18 @@ phy <- list.files("data/remote_sensing/physics", pattern = "*.csv", full.names =
          velocity = sqrt(vxo ^ 2 + vyo ^ 2), # current velocity
          v_angle = atan(vyo / vxo) * (180 / pi)) # current direction
 ```
+
+Plot to check whether calculations worked. This is East Svalbard.
+
+```{r plot-current}
+phy %>%
+  filter(year == 2015 & month == 2 & depth == 222 & between(x, 7, 15) & between(y, -10, -6)) %>%
+  ggplot() +
+  geom_raster(aes(x = x, y = y, fill = velocity)) + 
+  geom_vector(aes(x = x, y = y, dx = vxo, dy = vyo, mag = Mag(vxo, vyo)),
+              arrow.angle = 30, arrow.type = "open", arrow.length = .5,
+              pivot = 0, preserve.dir = TRUE, direction = "ccw") +
+  scale_fill_cmocean(name = "speed") +
+  coord_cartesian()
+```
+
