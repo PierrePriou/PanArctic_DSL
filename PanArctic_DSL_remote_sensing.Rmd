@@ -422,5 +422,17 @@ for (y in seq(2015, 2017, 1)) { # Loop through data per year
   write_csv(phy_year, file = paste0("data/remote_sensing/physics/physics_reanalysis_", y, ".csv")) 
   print(paste0("Processing of ", y, " data finished."))
 }
-rm(phy_coord_tmp, phy_ice_tmp, phy_oce_tmp, phy_tmp)
+rm(phy_coord_tmp, phy_ice_tmp, phy_oce_tmp, phy_tmp, phy_year)
+```
+
+Tidy csv data and calculate current velocity and angle 
+
+```{r physics-tidy, message=FALSE}
+# Read files
+phy <- list.files("data/remote_sensing/physics", pattern = "*.csv", full.names = T) %>%
+  map_dfr(.f = ~ read_csv(.)) %>% # Read files 
+  mutate(year = year(date),
+         month = month(date),
+         velocity = sqrt(vxo ^ 2 + vyo ^ 2), # current velocity
+         v_angle = atan(vyo / vxo) * (180 / pi)) # current direction
 ```
