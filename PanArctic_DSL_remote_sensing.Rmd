@@ -391,3 +391,36 @@ test_sf4 <- st_as_sf(test, coords = c("lon", "lat"), crs = "EPSG:4326") %>% # Co
   st_transform(., crs = "EPSG:6931") # Convert to EPSG:6931
 plot(test_sf3["thetao"], axes = TRUE) # Work
 ```
+
+Batch processing of Arctic Ocean Physics Reanalysis data. For convenience, all NetCDF data is combined per year and saved as csv. 
+
+```{r physics-csv, eval=FALSE}
+for (y in seq(2015, 2017, 1)) { # Loop through data per year
+  phy_year <-  data.frame() # Empty dataframe that will be filled with gridded sea ice data
+  file_list <- list.files("data/remote_sensing/physics", pattern = paste0(y), full.names = T) # List files per year
+  for (i in file_list) { # Loop through each file
+    # Read NetCDF 
+    phy_ice_tmp <- tidync(i) %>%
+      activate("D0,D1,D2") %>% # sea ice data and mixed layer depth
+      hyper_tibble()
+    phy_oce_tmp <- tidync(i) %>%
+      activate("D0,D1,D3,D2") %>% # temperature, salinity, depth, and current velocity
+      hyper_tibble()
+    phy_coord_tmp <- tidync(i) %>%
+      activate("D0,D1") %>% # latitude and longitude
+      hyper_tibble()
+    # Combine datasets
+    phy_tmp <- left_join(phy_ice_tmp, phy_oce_tmp, by = c("x", "y", "time")) %>%
+      left_join(., phy_coord_tmp, by = c("x", "y")) %>%
+      filter(is.na(depth) == F) %>% # Remove data from land or below seafloor
+      mutate(date = as.POSIXct(time * 3600, origin = "1950-01-01 00:00:00", tz = "UTC")) %>% # Calculate date
+      rename(lat = latitude, lon = longitude)
+    # Append data together
+    phy_year <- bind_rows(phy_year, phy_tmp)
+  }
+  # Write one csv per year
+  write_csv(phy_year, file = paste0("data/remote_sensing/physics/physics_reanalysis_", y, ".csv")) 
+  print(paste0("Processing of ", y, " data finished."))
+}
+rm(phy_coord_tmp, phy_ice_tmp, phy_oce_tmp, phy_tmp)
+```
