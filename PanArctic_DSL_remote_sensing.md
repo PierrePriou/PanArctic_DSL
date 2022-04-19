@@ -1,7 +1,7 @@
 PanArctic DSL - Remote sensing
 ================
 [Pierre Priou](mailto:pierre.priou@mi.mun.ca)
-2022/03/30 at 15:40
+2022/04/20 at 10:21
 
 # Package loading
 
@@ -10,11 +10,14 @@ PanArctic DSL - Remote sensing
 library(tidyverse)  # Tidy code
 library(lubridate)  # Deal with dates
 library(tidync)     # Read NetCDF
+library(ncmeta)     # Metadata NetCDF
+library(sf)         # Spatial data
 library(raster)     # Rasterize data
 library(rgdal)      # Read shapefiles
 library(ecmwfr)     # Download Copernicus data
 library(cowplot)    # Plots on a grid
 library(cmocean)    # Oceanographic colour palettes
+library(metR)
 # Custom figure theme
 theme_set(theme_bw())
 theme_update(axis.text = element_text(size = 9),
@@ -363,4 +366,141 @@ save(seaice_grid_laea, seaice_grid_latlon, file = "data/remote_sensing/seaice_gr
 The [Arctic Ocean Physics
 Reanalysis](https://resources.marine.copernicus.eu/product-detail/ARCTIC_MULTIYEAR_PHY_002_003/INFORMATION)
 dataset was downloaded using a Jupyter notebook. The dataset has a 12.5
-km<sup>2</sup>
+km<sup>2</sup> grid resolution and a specific polar stereographic
+projection. Because PROJ4 strings are not have been replaced by WKT2
+strings in `rgdal`, I need to convert the PROJ4 custom projection of
+Copernicus into a WKT2 string. I need to verify if the `st_crs` function
+converts the proj4 string into a WKT2 string correctly.
+
+The variables are:
+
+-   thetao: Temperature degree Celsius
+-   so: Salinity psu
+-   vxo: Zonal velocity m/s (x)
+-   vyo: Meridional velocity m/s (y)
+-   x: x-coordinate (not longitude, need to be reprojected)
+-   y: y-coordinate (not latitude, need to be reprojected)
+-   mlotst: mixed layer thickness (m)
+-   siconc: sea ice concentration (1)
+-   sithick: sea ice thickness (m)
+-   depth: depth in meters
+-   time: time in hours since 1950-01-01 00:00:00
+-   latitude: latitude
+-   longitude: longitude
+
+## Exploratory code
+
+``` r
+test_ice <- tidync("data/remote_sensing/physics/20150115_222m_phy_CMEMS.nc") %>% # Read sea ice data and mixed layer depth
+  activate("D0,D1,D2") %>%
+  hyper_tibble() 
+test_oce <- tidync("data/remote_sensing/physics/20150115_222m_phy_CMEMS.nc") %>% # Read temperature, salinity, and current velocity
+  activate("D0,D1,D3,D2") %>% # D0 = x, D1 = y, D3 = depth, D2 = time
+  hyper_tibble()
+test_meta <- tidync("data/remote_sensing/physics/20150115_222m_phy_CMEMS.nc") %>% # Read sea ice data and mixed layer depth
+  activate("D0,D1") %>%
+  hyper_tibble()
+
+test <- left_join(test_ice, test_oce, by = c("x", "y", "time")) %>% # Combine data
+  left_join(., test_meta, by = c("x", "y")) %>%
+  filter(is.na(depth) == F) %>% # Remove data from land or below seafloor
+  mutate(date = as.POSIXct(time*3600, origin = "1950-01-01 00:00:00", tz = "UTC")) %>% # Calculate date
+  rename(lat = latitude, lon = longitude) %>%
+  dplyr::select(-time)
+
+proj_original <- "+proj=stere +a=6378273.0 +b=6378273.0 +lon_0=-45.0 +lat_0=90.0 +lat_ts=90.0 +ellps=sphere +units=m" # Define projection
+
+test_sf <- st_as_sf(test, coords = c("x", "y"), crs = proj_original) # Convert dataframe to sf
+plot(test_sf["vxo"], axes = TRUE)
+```
+
+![](PanArctic_DSL_remote_sensing_files/figure-gfm/processing-trial-sf-1.png)<!-- -->
+
+``` r
+test_sf2 <- st_as_sf(test, coords = c("x", "y"), crs = proj_original) %>% # Convert dataframe to sf
+  st_transform(., crs = "EPSG:4326") # Transform to EPSG:4326
+plot(test_sf2["vxo"], axes = TRUE) # Not working
+```
+
+![](PanArctic_DSL_remote_sensing_files/figure-gfm/processing-trial-sf-2.png)<!-- -->
+
+``` r
+test_sf3 <- st_as_sf(test, coords = c("lon", "lat"), crs = "EPSG:4326") # Convert dataframe to sf with correct CRS
+plot(test_sf3["vxo"], axes = TRUE) # Work
+```
+
+![](PanArctic_DSL_remote_sensing_files/figure-gfm/processing-trial-sf-3.png)<!-- -->
+
+``` r
+test_sf4 <- st_as_sf(test, coords = c("lon", "lat"), crs = "EPSG:4326") %>% # Convert dataframe to sf with correct CRS
+  st_transform(., crs = "EPSG:6931") # Convert to EPSG:6931
+plot(test_sf4["vxo"], axes = TRUE) # Work
+```
+
+![](PanArctic_DSL_remote_sensing_files/figure-gfm/processing-trial-sf-4.png)<!-- -->
+
+``` r
+rm(test_ice, test_meta, test_oce, test_sf, test_sf2, test_sf3, test_sf4, test)
+```
+
+Batch processing of Arctic Ocean Physics Reanalysis data. For
+convenience, all NetCDF data is combined per year and saved as csv.
+
+``` r
+for (y in seq(2015, 2017, 1)) { # Loop through data per year
+  phy_year <-  data.frame() # Empty dataframe that will be filled with gridded sea ice data
+  file_list <- list.files("data/remote_sensing/physics", pattern = paste0(y), full.names = T) # List files per year
+  for (i in file_list) { # Loop through each file
+    # Read NetCDF 
+    phy_ice_tmp <- tidync(i) %>%
+      activate("D0,D1,D2") %>% # sea ice data and mixed layer depth
+      hyper_tibble()
+    phy_oce_tmp <- tidync(i) %>%
+      activate("D0,D1,D3,D2") %>% # temperature, salinity, depth, and current velocity
+      hyper_tibble()
+    phy_coord_tmp <- tidync(i) %>%
+      activate("D0,D1") %>% # latitude and longitude
+      hyper_tibble()
+    # Combine datasets
+    phy_tmp <- left_join(phy_ice_tmp, phy_oce_tmp, by = c("x", "y", "time")) %>%
+      left_join(., phy_coord_tmp, by = c("x", "y")) %>%
+      filter(is.na(depth) == F) %>% # Remove data from land or below seafloor
+      mutate(date = as.POSIXct(time * 3600, origin = "1950-01-01 00:00:00", tz = "UTC")) %>% # Calculate date
+      rename(lat = latitude, lon = longitude)
+    # Append data together
+    phy_year <- bind_rows(phy_year, phy_tmp)
+  }
+  # Write one csv per year
+  write_csv(phy_year, file = paste0("data/remote_sensing/physics/physics_reanalysis_", y, ".csv")) 
+  print(paste0("Processing of ", y, " data finished."))
+}
+rm(phy_coord_tmp, phy_ice_tmp, phy_oce_tmp, phy_tmp, phy_year)
+```
+
+Tidy csv data and calculate current velocity and angle
+
+``` r
+# Read files
+phy <- list.files("data/remote_sensing/physics", pattern = "*.csv", full.names = T) %>%
+  map_dfr(.f = ~ read_csv(.)) %>% # Read files 
+  mutate(year = year(date),
+         month = month(date),
+         velocity = sqrt(vxo ^ 2 + vyo ^ 2), # current velocity
+         v_angle = atan(vyo / vxo) * (180 / pi)) # current direction
+```
+
+Plot to check whether calculations worked. This is East Svalbard.
+
+``` r
+phy %>%
+  filter(year == 2015 & month == 2 & depth == 222 & between(x, 7, 15) & between(y, -10, -6)) %>%
+  ggplot() +
+  geom_raster(aes(x = x, y = y, fill = velocity)) + 
+  geom_vector(aes(x = x, y = y, dx = vxo, dy = vyo, mag = velocity),
+              arrow.angle = 30, arrow.type = "open", arrow.length = .5,
+              pivot = 0, preserve.dir = TRUE, direction = "ccw") +
+  scale_fill_cmocean(name = "speed") +
+  coord_cartesian()
+```
+
+![](PanArctic_DSL_remote_sensing_files/figure-gfm/plot-current-1.png)<!-- -->

@@ -357,6 +357,7 @@ The variables are:
 * latitude: latitude
 * longitude: longitude
 
+## Exploratory code
 
 ```{r processing-trial-sf}
 test_ice <- tidync("data/remote_sensing/physics/20150115_222m_phy_CMEMS.nc") %>% # Read sea ice data and mixed layer depth
@@ -379,18 +380,20 @@ test <- left_join(test_ice, test_oce, by = c("x", "y", "time")) %>% # Combine da
 proj_original <- "+proj=stere +a=6378273.0 +b=6378273.0 +lon_0=-45.0 +lat_0=90.0 +lat_ts=90.0 +ellps=sphere +units=m" # Define projection
 
 test_sf <- st_as_sf(test, coords = c("x", "y"), crs = proj_original) # Convert dataframe to sf
-plot(test_sf["thetao"], axes = TRUE)
+plot(test_sf["vxo"], axes = TRUE)
 
 test_sf2 <- st_as_sf(test, coords = c("x", "y"), crs = proj_original) %>% # Convert dataframe to sf
   st_transform(., crs = "EPSG:4326") # Transform to EPSG:4326
-plot(test_sf2["thetao"], axes = TRUE) # Not working
+plot(test_sf2["vxo"], axes = TRUE) # Not working
 
 test_sf3 <- st_as_sf(test, coords = c("lon", "lat"), crs = "EPSG:4326") # Convert dataframe to sf with correct CRS
-plot(test_sf3["thetao"], axes = TRUE) # Work
+plot(test_sf3["vxo"], axes = TRUE) # Work
 
 test_sf4 <- st_as_sf(test, coords = c("lon", "lat"), crs = "EPSG:4326") %>% # Convert dataframe to sf with correct CRS
   st_transform(., crs = "EPSG:6931") # Convert to EPSG:6931
-plot(test_sf3["thetao"], axes = TRUE) # Work
+plot(test_sf4["vxo"], axes = TRUE) # Work
+
+rm(test_ice, test_meta, test_oce, test_sf, test_sf2, test_sf3, test_sf4, test)
 ```
 
 Batch processing of Arctic Ocean Physics Reanalysis data. For convenience, all NetCDF data is combined per year and saved as csv. 
@@ -445,10 +448,9 @@ phy %>%
   filter(year == 2015 & month == 2 & depth == 222 & between(x, 7, 15) & between(y, -10, -6)) %>%
   ggplot() +
   geom_raster(aes(x = x, y = y, fill = velocity)) + 
-  geom_vector(aes(x = x, y = y, dx = vxo, dy = vyo, mag = Mag(vxo, vyo)),
+  geom_vector(aes(x = x, y = y, dx = vxo, dy = vyo, mag = velocity),
               arrow.angle = 30, arrow.type = "open", arrow.length = .5,
               pivot = 0, preserve.dir = TRUE, direction = "ccw") +
   scale_fill_cmocean(name = "speed") +
   coord_cartesian()
 ```
-
