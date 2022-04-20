@@ -331,12 +331,6 @@ plot_grid(seaice_grid_latlon %>% # Map mean ice concentration
           ncol = 2, align = "hv", axis = "tblr")
 ```
 
-## Save data 
-
-```{r save-data}
-save(seaice_grid_laea, seaice_grid_latlon, file = "data/remote_sensing/seaice_grids.RData") # Save data
-```
-
 # Arctic Ocean Physics Reanalysis 
 
 The [Arctic Ocean Physics Reanalysis](https://resources.marine.copernicus.eu/product-detail/ARCTIC_MULTIYEAR_PHY_002_003/INFORMATION) dataset was downloaded using a Jupyter notebook. The dataset has a 12.5 km^2^ grid resolution and a specific polar stereographic projection. Because PROJ4 strings are not have been replaced by WKT2 strings in `rgdal`, I need to convert the PROJ4 custom projection of Copernicus into a WKT2 string. I need to verify if the `st_crs` function converts the proj4 string into a WKT2 string correctly.
@@ -538,5 +532,6 @@ phy_grid_laea %>% # Map current velocity at 222 m
 # Save data 
 
 ```{r save-data}
+save(seaice_grid_laea, seaice_grid_latlon, file = "data/remote_sensing/seaice_grids.RData") # Save data
 save(phy_grid_laea, file = "data/remote_sensing/physics_grids.RData") # Save data
 ```
