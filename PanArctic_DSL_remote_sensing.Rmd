@@ -429,16 +429,21 @@ for (y in seq(2015, 2017, 1)) { # Loop through data per year
 rm(phy_coord_tmp, phy_ice_tmp, phy_oce_tmp, phy_tmp, phy_year)
 ```
 
-Tidy csv data and calculate current velocity and angle 
+Tidy csv data and calculate current velocity and angle. I also calculate the annual average of each variable. The annual average dataset will be used for comparison with acoustic data.
 
 ```{r physics-tidy, message=FALSE}
-# Read files
-phy <- list.files("data/remote_sensing/physics", pattern = "*.csv", full.names = T) %>%
+phy <- list.files("data/remote_sensing/physics", pattern = "*.csv", full.names = T) %>% # List files
   map_dfr(.f = ~ read_csv(.)) %>% # Read files 
   mutate(year = year(date),
          month = month(date),
          velocity = sqrt(vxo ^ 2 + vyo ^ 2), # current velocity
          v_angle = atan(vyo / vxo) * (180 / pi)) # current direction
+
+phy_year <- phy %>% 
+  dplyr::select(- date, - month) %>%
+  group_by(year, x, y, depth) %>% # Group by cell by year by depth
+  summarise_all(mean) %>% # Calculate annual average for each variable
+  ungroup()
 ```
 
 Plot to check whether calculations worked. This is East Svalbard.
