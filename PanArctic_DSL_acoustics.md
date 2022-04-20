@@ -1,7 +1,7 @@
 PanArctic DSL - Acoustic gridding
 ================
 [Pierre Priou](mailto:pierre.priou@mi.mun.ca)
-2022/02/24 at 16:31
+2022/04/20 at 12:02
 
 # Package loading
 
@@ -149,7 +149,7 @@ More info on this projection can be found on the [NSIDC
 website](https://nsidc.org/data/ease/).
 
 ``` r
-cell_res <- 150 # Cell resolution in km
+cell_res <- 100 # Cell resolution in km
 arctic_laea <- raster(extent(-2700, 2700, -2700, 2700), crs = "EPSG:6931") # Seaice projection
 projection(arctic_laea) <- gsub("units=m", "units=km", projection(arctic_laea)) # Convert proj unit from m to km
 res(arctic_laea) <- c(cell_res, cell_res) # Define the 100 km cell resolution
@@ -245,7 +245,7 @@ More info on this projection can be found on the [NSIDC
 website](https://nsidc.org/data/ease/).
 
 ``` r
-cell_res <- 25 # Cell resolution in km
+cell_res <- 100 # Cell resolution in km
 arctic_sv_laea <- raster(extent(-2700, 2700, -2700, 2700), crs = "EPSG:6931") # Seaice projection
 projection(arctic_sv_laea) <- gsub("units=m", "units=km", projection(arctic_sv_laea)) # Convert proj unit from m to km
 res(arctic_sv_laea) <- c(cell_res, cell_res) # Define the 100 km cell resolution
