@@ -1,7 +1,7 @@
 PanArctic DSL - Statistics
 ================
 [Pierre Priou](mailto:pierre.priou@mi.mun.ca)
-2022/04/20 at 16:01
+2022/04/22 at 14:22
 
 # Package loading
 
@@ -16,6 +16,12 @@ library(ggfortify)    # Plotting glm
 library(RColorBrewer) # Diverging colour palettes
 library(cmocean)      # Oceanographic colour palettes
 library(moments)      # Overlay distributions
+library(ggcorrplot)   # Correlation plots
+```
+
+    ## Warning: package 'ggcorrplot' was built under R version 4.1.3
+
+``` r
 # Custom figure theme
 theme_set(theme_bw())
 theme_update(axis.text = element_text(size = 9),
@@ -39,7 +45,7 @@ WGS84 or the EASE-Grid 2.0 North.
 
 ``` r
 # Map projections
-cell_res <- 100 # Cell resolution in km
+cell_res <- 150 # Cell resolution in km
 arctic_laea <- raster(extent(-2700, 2700, -2700, 2700), crs = "EPSG:6931") # Seaice projection
 projection(arctic_laea) <- gsub("units=m", "units=km", projection(arctic_laea)) # Convert proj unit from m to km
 res(arctic_laea) <- c(cell_res, cell_res) # Define the 100 km cell resolution
@@ -64,7 +70,8 @@ coast_10m_laea <- readOGR("data/bathy/ne_10m_land.shp", verbose = F) %>% # Coast
 # Gridded acoustic, CTD, and sea ice data
 load("data/acoustics/SA_grids.RData") # Acoustic data
 # load("data/CTD/CTD_grids.RData") # CTD data
-load("data/remote_sensing/physics_grids.RData") # Remote sensing sea ice data
+load("data/remote_sensing/physics_grids.RData") # Modelled physics data 
+load("data/remote_sensing/seaice_grids.RData") # Remote sensing sea ice data
 
 rm(list = ls(pattern = "latlon")) # Remove EPSG:4326 files
 ```
@@ -82,7 +89,7 @@ phy_laea <- phy_grid_laea %>% # Tidy remote sensing dataset for joining
   dplyr::select(-lat, -lon)
 
 stat_laea <- left_join(SA_laea, phy_laea, by = c("year", "area", "xc", "yc", "cell_res")) %>% # Join acoustic and seaice
-  filter(depth == 222) %>% # Select data at 222 m depth
+  filter(depth == 380) %>% # Select data at 222 m depth
   mutate(SA_int = 10 * log10(NASC_int))
 ```
 
@@ -151,7 +158,7 @@ stat_laea %>% # Ice concentration
   geom_tile(aes(fill = velocity), color = "grey30") +
   scale_fill_cmocean("velo (m/s)", name = "speed", na.value = "red") +
   facet_wrap(~ year, ncol = 3) +
-  ggtitle("Current velocity at 222 m depth") +
+  ggtitle("Current velocity at 380 m depth") +
   coord_fixed(xlim = c(-2600, 1100), ylim = c(-1800, 1900), expand = F) + 
   theme(axis.text = element_blank(), axis.ticks = element_blank(), axis.title = element_blank())
 ```
@@ -202,43 +209,21 @@ stat_laea %>% # Ice concentration
 
 ## Data exploration
 
+First I check the general correlation for the entire data set and then I
+check whether there are correlations within each cell.
+
 ``` r
-plot_grid(stat_laea %>%
-            ggplot(aes(x = cons_temp, y = NASC_anomaly)) +
-            geom_point(alpha = 0.5) +
-            # stat_smooth(method = "lm", se = F) +
-            scale_x_continuous("Temperature (°C)") +
-            scale_y_continuous("Sa anomaly"),
-          stat_laea %>%
-            ggplot(aes(x = abs_sal, y = NASC_anomaly)) +
-            geom_point(alpha = 0.5) +
-            # stat_smooth(method = "lm", se = F) +
-            scale_x_continuous("Salinity (g/kg)") +
-            scale_y_continuous("Sa anomaly"),
-          stat_laea %>%
-            ggplot(aes(x = openwater_duration, y = NASC_anomaly)) +
-            geom_point(alpha = 0.5) +
-            # stat_smooth(method = "lm", se = F) +
-            scale_x_continuous("Open water (days)") +
-            scale_y_continuous("Sa anomaly"),
-          stat_laea %>%
-            ggplot(aes(x = mean_ice_conc, y = NASC_anomaly)) +
-            geom_point(alpha = 0.5) +
-            # stat_smooth(method = "lm", se = F) +
-            scale_x_continuous("Mean ice conc (%)") +
-            scale_y_continuous("Sa anomaly"),
-          ncol = 2, align = "hv", axis = "tblr")
+corr <- stat_laea %>% # Compute Spearman correlation matrix
+  dplyr::select(NASC_int, SA_int, NASC_anomaly, thetao, so, velocity, mlotst, siconc, sithick) %>%
+  cor(., method = "spearman") %>%
+  round(., 2)
+corr_pvalues <- stat_laea %>% # Compute Spearman correlation matrix p-values
+  dplyr::select(NASC_int, SA_int, NASC_anomaly, thetao, so, velocity, mlotst, siconc, sithick) %>%
+  cor_pmat(., method = "spearman") 
 ```
 
 ``` r
-stat_laea %>%
-  ggdensity(x = "NASC_anomaly", fill = "lightgray") +
-  stat_overlay_normal_density(color = "red", linetype = "dashed")
-stat_laea %>%
-  ggdensity(x = "NASC_int", fill = "lightgray") +
-  stat_overlay_normal_density(color = "red", linetype = "dashed")
-stat_laea %>%
-  mutate(SA_int = 10 * log10(NASC_int)) %>%
-  ggdensity(x = "SA_int", fill = "lightgray") +
-  stat_overlay_normal_density(color = "red", linetype = "dashed")
+ggcorrplot(corr, type = "lower", p.mat = corr_pvalues)
 ```
+
+![](PanArctic_DSL_statistics_files/figure-gfm/corr-plot-1.png)<!-- -->
