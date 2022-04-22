@@ -197,7 +197,7 @@ To match sea ice records with acoustic data, I rasterized sea ice data on the sa
 More info on this projection can be found on the [NSIDC website](https://nsidc.org/data/ease/). Because "raw" sea ice data has a 25 km * 25 km resolution, I match that resolution to the final projection (150 km * 150 km).
 
 ```{r EPSG-6931-seaice-grid}
-cell_res <- 100 # Cell resolution in km
+cell_res <- 150 # Cell resolution in km
 arctic_laea <- raster(extent(-2700, 2700, -2700, 2700), crs = "EPSG:6931") # Seaice projection
 projection(arctic_laea) <- gsub("units=m", "units=km", projection(arctic_laea)) # Convert proj unit from m to km
 res(arctic_laea) <- c(cell_res, cell_res) # Define the 100 km cell resolution
@@ -459,7 +459,7 @@ phy %>%
 Data is projected on the EPSG:6931 projection. 
 
 ```{r EPSG-6931-physics-grid}
-cell_res <- 100 # Cell resolution in km
+cell_res <- 150 # Cell resolution in km
 arctic_laea <- raster(extent(-2700, 2700, -2700, 2700), crs = "EPSG:6931") # Seaice projection
 projection(arctic_laea) <- gsub("units=m", "units=km", projection(arctic_laea)) # Convert proj unit from m to km
 res(arctic_laea) <- c(cell_res, cell_res) # Define the 100 km cell resolution
