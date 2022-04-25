@@ -38,7 +38,7 @@ I want to test whether temperature and salinity at mesopelagic depth, sea-ice co
 
 ```{r data-loading, message=FALSE}
 # Map projections
-cell_res <- 150 # Cell resolution in km
+cell_res <- 50 # Cell resolution in km
 arctic_laea <- raster(extent(-2700, 2700, -2700, 2700), crs = "EPSG:6931") # Seaice projection
 projection(arctic_laea) <- gsub("units=m", "units=km", projection(arctic_laea)) # Convert proj unit from m to km
 res(arctic_laea) <- c(cell_res, cell_res) # Define the 100 km cell resolution
@@ -71,7 +71,7 @@ rm(list = ls(pattern = "latlon")) # Remove EPSG:4326 files
 
 # Data preparation
 
-First I combine data using the EASE-Grid 2.0 North (EPSG:6931).
+I combine data using the EASE-Grid 2.0 North (EPSG:6931).
 
 ```{r combine-data}
 SA_laea <- SA_grid_laea %>%  # Tidy anomaly dataset for joining
@@ -83,6 +83,9 @@ stat_laea <- left_join(SA_laea, phy_laea, by = c("year", "area", "xc", "yc", "ce
   filter(depth == 380) %>% # Select data at 222 m depth
   mutate(SA_int = 10 * log10(NASC_int))
 ```
+
+# Data exploration 
+
 
 Maps of all variables.
 
@@ -182,20 +185,19 @@ stat_laea %>% # Ice concentration
   theme(axis.text = element_blank(), axis.ticks = element_blank(), axis.title = element_blank())
 ```
 
-# Data exploration
-
-First I check the general correlation for the entire data set and then I check whether there are correlations within each cell.
+Check the general correlation for the entire data set.
 
 ```{r corr-calculations}
 corr <- stat_laea %>% # Compute Spearman correlation matrix
-  dplyr::select(NASC_int, SA_int, NASC_anomaly, thetao, so, velocity, mlotst, siconc, sithick) %>%
+  dplyr::select(SA_int, NASC_anomaly, thetao, so, velocity, mlotst, siconc, sithick) %>%
   cor(., method = "spearman") %>%
   round(., 2)
 corr_pvalues <- stat_laea %>% # Compute Spearman correlation matrix p-values
-  dplyr::select(NASC_int, SA_int, NASC_anomaly, thetao, so, velocity, mlotst, siconc, sithick) %>%
+  dplyr::select(SA_int, NASC_anomaly, thetao, so, velocity, mlotst, siconc, sithick) %>%
   cor_pmat(., method = "spearman") 
 ```
 
 ```{r corr-plot}
 ggcorrplot(corr, type = "lower", p.mat = corr_pvalues)
 ```
+S~A~ int is not correlated with temperature and velocity. However, these correlation are for the entire dataset and do not take into account the spatial aspect of the data.
