@@ -1,7 +1,7 @@
 PanArctic DSL - Remote sensing
 ================
 [Pierre Priou](mailto:pierre.priou@mi.mun.ca)
-2022/04/25 at 09:12
+2022/04/25 at 19:11
 
 # Package loading
 
@@ -215,7 +215,7 @@ website](https://nsidc.org/data/ease/). Because “raw” sea ice data has a
 projection (150 km \* 150 km).
 
 ``` r
-cell_res <- 50 # Cell resolution in km
+cell_res <- 100 # Cell resolution in km
 arctic_laea <- raster(extent(-2700, 2700, -2700, 2700), crs = "EPSG:6931") # Seaice projection
 projection(arctic_laea) <- gsub("units=m", "units=km", projection(arctic_laea)) # Convert proj unit from m to km
 res(arctic_laea) <- c(cell_res, cell_res) # Define the 100 km cell resolution
@@ -508,10 +508,12 @@ phy %>%
 
 ### EPSG:6931 - EASE-Grid 2.0 North (Lambert’s equal-area, azimuthal)
 
-Data is projected on the EPSG:6931 projection.
+Data is projected on the EPSG:6931 projection. I also calculate
+temperature (x - mean(x over the whole time series) and current
+anomalies.
 
 ``` r
-cell_res <- 50 # Cell resolution in km
+cell_res <- 100 # Cell resolution in km
 arctic_laea <- raster(extent(-2700, 2700, -2700, 2700), crs = "EPSG:6931") # Seaice projection
 projection(arctic_laea) <- gsub("units=m", "units=km", projection(arctic_laea)) # Convert proj unit from m to km
 res(arctic_laea) <- c(cell_res, cell_res) # Define the 100 km cell resolution
@@ -556,7 +558,14 @@ for (i in seq(2015, 2017, 1)) { # Loop through each year
 rm(phy_year_tmp, phy_tmp_laea, i, j) # Remove temporary data
 
 phy_grid_laea <- phy_grid_laea %>%
-  mutate(cell_res = cell_res) # Add cell resolution to dataframe
+  group_by(depth, area) %>%
+  mutate(cell_res = cell_res, # Add cell resolution to dataframe
+         mean_temp_area_depth = mean(thetao),
+         mean_velo_area_depth = mean(velocity)) %>%
+  ungroup() %>%
+  mutate(temp_anomaly = thetao - mean_temp_area_depth,
+         velocity_anomaly = velocity - mean_velo_area_depth) %>%
+  ungroup()
 ```
 
 Gridding worked correctly.
