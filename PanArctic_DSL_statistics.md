@@ -1,7 +1,7 @@
 PanArctic DSL - Statistics
 ================
 [Pierre Priou](mailto:pierre.priou@mi.mun.ca)
-2022/04/22 at 14:22
+2022/04/26 at 18:35
 
 # Package loading
 
@@ -10,6 +10,7 @@ PanArctic DSL - Statistics
 library(tidyverse)    # Tidy code
 library(cowplot)      # Plots on a grid
 library(raster)       # Data gridding
+library(sf)           # Spatial data
 library(rgdal)        # Read shapefiles
 library(ggpubr)       # Deal with stats
 library(ggfortify)    # Plotting glm
@@ -45,7 +46,7 @@ WGS84 or the EASE-Grid 2.0 North.
 
 ``` r
 # Map projections
-cell_res <- 150 # Cell resolution in km
+cell_res <- 100 # Cell resolution in km
 arctic_laea <- raster(extent(-2700, 2700, -2700, 2700), crs = "EPSG:6931") # Seaice projection
 projection(arctic_laea) <- gsub("units=m", "units=km", projection(arctic_laea)) # Convert proj unit from m to km
 res(arctic_laea) <- c(cell_res, cell_res) # Define the 100 km cell resolution
@@ -67,20 +68,31 @@ coast_10m_laea <- readOGR("data/bathy/ne_10m_land.shp", verbose = F) %>% # Coast
   fortify() %>% # Convert to a dataframe for ggplot
   rename(xc = long, yc = lat)
 
+# IHO regions
+# IHO_latlon <- readOGR("data/arctic_regions/World_Seas_IHO_v3.shp", verbose = F) %>% # Coastline in latlon
+#   spTransform(CRSobj = crs(arctic_latlon)) %>% # Make sure that the shapefile is in the right projection
+#   crop(extent(-180, 180, 0, 90)) %>% # Crop shapefile
+#   fortify() %>% # Convert to dataframe for ggplot
+#   rename(xc = long, yc = lat)
+# IHO_laea <- readOGR("data/arctic_regions/World_Seas_IHO_v3.shp", verbose = F) %>% # Coastline in latlon
+#   spTransform(CRSobj = crs(arctic_latlon)) %>% # Make sure that the shapefile is in the right projection
+#   crop(extent(-180, 180, 0, 90)) %>% # Crop shapefile
+#   spTransform(CRSobj = crs(arctic_laea)) %>% # Project shapefile in laea
+#   fortify() %>% # Convert to dataframe for ggplot
+#   rename(xc = long, yc = lat)
+
 # Gridded acoustic, CTD, and sea ice data
 load("data/acoustics/SA_grids.RData") # Acoustic data
 # load("data/CTD/CTD_grids.RData") # CTD data
 load("data/remote_sensing/physics_grids.RData") # Modelled physics data 
 load("data/remote_sensing/seaice_grids.RData") # Remote sensing sea ice data
-
-rm(list = ls(pattern = "latlon")) # Remove EPSG:4326 files
 ```
 
-# EPSG:6931 - EASE-Grid 2.0 North
+# Data preparation
 
-## Data preparation
-
-First I combine data using the EASE-Grid 2.0 North (EPSG:6931).
+I combine data using the EASE-Grid 2.0 North (EPSG:6931) and normalize
+the covariates. Calculation of the anomalies are also computed based on
+the IHO areas.
 
 ``` r
 SA_laea <- SA_grid_laea %>%  # Tidy anomaly dataset for joining
@@ -89,9 +101,15 @@ phy_laea <- phy_grid_laea %>% # Tidy remote sensing dataset for joining
   dplyr::select(-lat, -lon)
 
 stat_laea <- left_join(SA_laea, phy_laea, by = c("year", "area", "xc", "yc", "cell_res")) %>% # Join acoustic and seaice
-  filter(depth == 380) %>% # Select data at 222 m depth
-  mutate(SA_int = 10 * log10(NASC_int))
+  # filter(depth == 380) %>% # Select data at 380 m depth
+  mutate(SA_int = 10 * log10(NASC_int)) %>%
+  group_by(area) %>%
+  mutate(SA_int_n = (SA_int - min(SA_int)) / (max(SA_int - min(SA_int))),
+         velocity_n = (velocity - min(velocity)) / (max(velocity - min(velocity)))) %>%
+  ungroup()
 ```
+
+# Data exploration
 
 Maps of all variables.
 
@@ -99,7 +117,7 @@ Maps of all variables.
 stat_laea %>% # Backscatter
   ggplot(aes(x = xc,  y = yc)) +
   geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), fill = "grey80") +
-  geom_tile(aes(fill = SA_int), color = "grey30") +
+  geom_tile(aes(fill = SA_int_n), color = "grey30") +
   scale_fill_viridis_c("SA int (dB)", option = "turbo", na.value = "red") +
   facet_wrap(~ year, ncol = 3) +
   ggtitle("Integrated SA") +
@@ -130,7 +148,7 @@ stat_laea %>% # Temperature
   geom_tile(aes(fill = thetao), color = "grey30") +
   scale_fill_cmocean("Temp (dC)", name = "thermal", na.value = "red") +
   facet_wrap(~ year, ncol = 3) +
-  ggtitle("Temperature at 222 m depth") +
+  ggtitle("Temperature at 380 m depth") +
   coord_fixed(xlim = c(-2600, 1100), ylim = c(-1800, 1900), expand = F) + 
   theme(axis.text = element_blank(), axis.ticks = element_blank(), axis.title = element_blank())
 ```
@@ -144,7 +162,7 @@ stat_laea %>% # Salinity
   geom_tile(aes(fill = so), color = "grey30") +
   scale_fill_cmocean("Sal (psu)", name = "haline", na.value = "red") +
   facet_wrap(~ year, ncol = 3) +
-  ggtitle("Salinity at 222 m depth") +
+  ggtitle("Salinity at 380 m depth") +
   coord_fixed(xlim = c(-2600, 1100), ylim = c(-1800, 1900), expand = F) + 
   theme(axis.text = element_blank(), axis.ticks = element_blank(), axis.title = element_blank())
 ```
@@ -164,6 +182,20 @@ stat_laea %>% # Ice concentration
 ```
 
 ![](PanArctic_DSL_statistics_files/figure-gfm/map-velocity-1.png)<!-- -->
+
+``` r
+stat_laea %>% # Ice concentration
+  ggplot(aes(x = xc,  y = yc)) +
+  geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), fill = "grey80") +
+  geom_tile(aes(fill = velocity_n), color = "grey30") +
+  scale_fill_cmocean("Normalized velo", name = "speed", na.value = "red") +
+  facet_wrap(~ year, ncol = 3) +
+  ggtitle("Current velocity at 380 m depth") +
+  coord_fixed(xlim = c(-2600, 1100), ylim = c(-1800, 1900), expand = F) + 
+  theme(axis.text = element_blank(), axis.ticks = element_blank(), axis.title = element_blank())
+```
+
+![](PanArctic_DSL_statistics_files/figure-gfm/map-velocity-normalized-1.png)<!-- -->
 
 ``` r
 stat_laea %>% # Mixed layer depth
@@ -207,23 +239,141 @@ stat_laea %>% # Ice concentration
 
 ![](PanArctic_DSL_statistics_files/figure-gfm/map-siconc-1.png)<!-- -->
 
-## Data exploration
-
-First I check the general correlation for the entire data set and then I
-check whether there are correlations within each cell.
+Check the general correlation for the entire data set.
 
 ``` r
 corr <- stat_laea %>% # Compute Spearman correlation matrix
-  dplyr::select(NASC_int, SA_int, NASC_anomaly, thetao, so, velocity, mlotst, siconc, sithick) %>%
+  dplyr::select(SA_int_n, NASC_anomaly, thetao, temp_anomaly, velocity, velocity_anomaly, siconc) %>%
   cor(., method = "spearman") %>%
   round(., 2)
 corr_pvalues <- stat_laea %>% # Compute Spearman correlation matrix p-values
-  dplyr::select(NASC_int, SA_int, NASC_anomaly, thetao, so, velocity, mlotst, siconc, sithick) %>%
+  dplyr::select(SA_int_n, NASC_anomaly, thetao, temp_anomaly, velocity, velocity_anomaly, siconc) %>%
   cor_pmat(., method = "spearman") 
 ```
+
+    ## Warning in cor.test.default(mat[, i], mat[, j], ...): Cannot compute exact p-
+    ## value with ties
+
+    ## Warning in cor.test.default(mat[, i], mat[, j], ...): Cannot compute exact p-
+    ## value with ties
+
+    ## Warning in cor.test.default(mat[, i], mat[, j], ...): Cannot compute exact p-
+    ## value with ties
+
+    ## Warning in cor.test.default(mat[, i], mat[, j], ...): Cannot compute exact p-
+    ## value with ties
+
+    ## Warning in cor.test.default(mat[, i], mat[, j], ...): Cannot compute exact p-
+    ## value with ties
+
+    ## Warning in cor.test.default(mat[, i], mat[, j], ...): Cannot compute exact p-
+    ## value with ties
+
+    ## Warning in cor.test.default(mat[, i], mat[, j], ...): Cannot compute exact p-
+    ## value with ties
+
+    ## Warning in cor.test.default(mat[, i], mat[, j], ...): Cannot compute exact p-
+    ## value with ties
+
+    ## Warning in cor.test.default(mat[, i], mat[, j], ...): Cannot compute exact p-
+    ## value with ties
+
+    ## Warning in cor.test.default(mat[, i], mat[, j], ...): Cannot compute exact p-
+    ## value with ties
+
+    ## Warning in cor.test.default(mat[, i], mat[, j], ...): Cannot compute exact p-
+    ## value with ties
+
+    ## Warning in cor.test.default(mat[, i], mat[, j], ...): Cannot compute exact p-
+    ## value with ties
+
+    ## Warning in cor.test.default(mat[, i], mat[, j], ...): Cannot compute exact p-
+    ## value with ties
+
+    ## Warning in cor.test.default(mat[, i], mat[, j], ...): Cannot compute exact p-
+    ## value with ties
+
+    ## Warning in cor.test.default(mat[, i], mat[, j], ...): Cannot compute exact p-
+    ## value with ties
 
 ``` r
 ggcorrplot(corr, type = "lower", p.mat = corr_pvalues)
 ```
 
 ![](PanArctic_DSL_statistics_files/figure-gfm/corr-plot-1.png)<!-- -->
+
+S<sub>A</sub> int is not correlated with temperature and velocity.
+However, these correlation are for the entire dataset and do not take
+into account the spatial aspect of the data.
+
+# Spatial correlation
+
+## Integrated backscatter
+
+``` r
+stat_laea %>%
+  # filter(area == "SV") %>%
+  ggplot(aes(x = velocity, y = SA_int_n)) +
+  # ggplot(aes(x = velocity, y = NASC_anomaly)) +
+  geom_point() + 
+  geom_smooth(method = "lm") +
+  # facet_wrap(~ IHO_area) +
+  facet_wrap(~ area) +
+  theme(legend.position = "top")
+```
+
+    ## `geom_smooth()` using formula 'y ~ x'
+
+![](PanArctic_DSL_statistics_files/figure-gfm/scatterplot-velocity-1.png)<!-- -->
+
+``` r
+stat_laea %>%
+  # filter(area == "SV") %>%
+  ggplot(aes(x = temp_anomaly, y = SA_int_n)) +
+  # ggplot(aes(x = velocity, y = NASC_anomaly)) +
+  geom_point() + 
+  geom_smooth(method = "lm") +
+  # facet_wrap(~ IHO_area) +
+  facet_wrap(~ area, scales = "free_x") +
+  theme(legend.position = "top")
+```
+
+    ## `geom_smooth()` using formula 'y ~ x'
+
+![](PanArctic_DSL_statistics_files/figure-gfm/scatterplot-temp-anomaly-1.png)<!-- -->
+
+``` r
+stat_laea %>%
+  # filter(area == "SV") %>%
+  ggplot(aes(x = siconc, y = SA_int_n)) +
+  # ggplot(aes(x = velocity, y = NASC_anomaly)) +
+  geom_point() + 
+  geom_smooth(method = "lm") +
+  # facet_wrap(~ IHO_area) +
+  facet_wrap(~ area, scales = "free_x") +
+  theme(legend.position = "top")
+```
+
+    ## `geom_smooth()` using formula 'y ~ x'
+
+![](PanArctic_DSL_statistics_files/figure-gfm/scatterplot-siconc-1.png)<!-- -->
+
+I will calculate the correlation between integrated backscatter and
+current velocity for each cell of the raster. Before calculating the
+correlation I need to check the distribution of the data.
+
+``` r
+plot_grid(stat_laea %>%
+            ggdensity(x = "SA_int_n", fill = "lightgray") +
+            stat_overlay_normal_density(color = "red", linetype = "dashed") +
+            scale_x_continuous(expression("S"[A]*" int (dB)")),
+          stat_laea %>%
+            ggdensity(x = "velocity_n", fill = "lightgray") +
+            stat_overlay_normal_density(color = "red", linetype = "dashed") +
+            scale_x_continuous(expression("Current velocity (m s"^-1*")")))
+```
+
+![](PanArctic_DSL_statistics_files/figure-gfm/distribution-NASC-anomaly-velocity-1.png)<!-- -->
+
+The grey black curve is the density of the data (S<sub>A</sub> int and )
+and the red curve is the normal distribution.
