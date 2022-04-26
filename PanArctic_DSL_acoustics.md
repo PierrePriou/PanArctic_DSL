@@ -1,7 +1,7 @@
 PanArctic DSL - Acoustic gridding
 ================
 [Pierre Priou](mailto:pierre.priou@mi.mun.ca)
-2022/04/25 at 18:58
+2022/04/26 at 18:02
 
 # Package loading
 
@@ -10,6 +10,7 @@ PanArctic DSL - Acoustic gridding
 library(tidyverse)    # Tidy code
 library(cowplot)      # Plots on a grid
 library(raster)       # Data gridding
+library(sf)           # Spatial data
 library(rgdal)        # Read shapefiles
 library(cmocean)      # Oceanographic color palettes
 library(RColorBrewer) # Diverging color palette
@@ -26,6 +27,34 @@ theme_update(axis.text = element_text(size = 9),
              plot.margin = unit(c(0.02, 0.02, 0.02, 0.02), "in"),
              plot.title = element_text(size = 9, face = "bold"))
 options(dplyr.summarise.inform = F) # Suppress summarise() warning
+```
+
+I use the area definitions from IHO Sea Areas (International
+Hydrographic Organization) to combine data.
+
+``` r
+# Projections
+arctic_latlon <- raster(extent(-155, 35, 66, 85), # Base projection for acoustic and CTD data
+                        crs = "EPSG:4326", 
+                        res = c(2, 1)) # cells of 2 degree longitude per 1 degree latitude
+arctic_laea <- raster(extent(-2700, 2700, -2700, 2700), crs = "EPSG:6931") # Seaice projection
+projection(arctic_laea) <- gsub("units=m", "units=km", projection(arctic_laea)) # Convert proj unit from m to km
+cell_res <- 100 # Cell resolution in km
+res(arctic_laea) <- c(cell_res, cell_res) # Define the 100 km cell resolution
+
+# IHO areas
+# sf::sf_use_s2(T) # Turn off s2 processing
+IHO_sf_latlon <- read_sf("data/arctic_regions/World_Seas_IHO_v3.shp") %>%
+  filter(ID %in% c("5", "13", "14", "14A", "15", "17")) %>% # Filter for relevant regions
+  st_transform(crs = crs(arctic_latlon)) %>%
+  st_make_valid() %>% # Correct invalid polygons
+  filter(st_is_valid(.) == TRUE)
+IHO_sf_laea <- read_sf("data/arctic_regions/World_Seas_IHO_v3.shp") %>%
+  filter(ID %in% c("5", "13", "14", "14A", "15", "17")) %>% # Filter for relevant regions
+  st_transform(crs = crs(arctic_latlon)) %>%
+  st_transform(crs = crs(arctic_laea)) %>%
+  st_make_valid() %>% # Correct invalid polygons
+  filter(st_is_valid(.) == TRUE) 
 ```
 
 # Integrated s<sub>A</sub> and centre of mass
@@ -50,10 +79,6 @@ load("data/acoustics/MVBS_2015_2017.RData") # Acoustic data
 ## 2D Integrated backscatter - EPSG:4326 - WGS84 projection
 
 ``` r
-arctic_latlon <- raster(extent(-155, 35, 66, 85), # Base projection for acoustic and CTD data
-                        crs = "EPSG:4326", 
-                        res = c(2, 1)) # cells of 2 degree longitude per 1 degree latitude
-
 SA_grid_latlon <- data.frame() # Empty dataframe that will be filled with gridded CTD data
 
 for (i in seq(2015, 2017, 1)) { # Data gridding
@@ -95,7 +120,16 @@ SA_grid_latlon <- SA_grid_latlon %>% # Calculate normalized backscatter anomalie
                                            NASC_anomaly > 0.5 & NASC_anomaly <= 1 ~ "]0.5;1]",
                                            NASC_anomaly > 1 ~ ">1"),
                                            levels = c("<-1", "[-1;-0.5[", "[-0.5;0.5]", "]0.5;1]", ">1"))) %>%
-  ungroup()
+  ungroup() %>%
+  st_as_sf(coords = c("lon", "lat"), crs = st_crs(arctic_latlon), remove = F) %>%
+  st_join(., IHO_sf_latlon, join = st_within) %>%
+  st_drop_geometry() %>%
+  mutate(NAME = if_else(is.na(NAME) == T & lon > -100 & lat < 70, "Davis Strait",
+                if_else(is.na(NAME) == T & lon > -100 & lat > 70, "Baffin Bay",
+                if_else(is.na(NAME) == T & lon < -100, "The Northwestern Passages", NAME)))) %>%
+  rename(IHO_area = NAME, area = area.x) %>%
+  dplyr::select(year, lat, lon, IHO_area, area, NASC_int, CM, mean_NASC_area_year, sd_NASC_area_year, 
+                NASC_anomaly, NASC_anomaly_d)
 ```
 
 Plot mesopelagic normalized s<sub>A</sub> anomalies and centre of mass
@@ -149,11 +183,6 @@ More info on this projection can be found on the [NSIDC
 website](https://nsidc.org/data/ease/).
 
 ``` r
-cell_res <- 100 # Cell resolution in km
-arctic_laea <- raster(extent(-2700, 2700, -2700, 2700), crs = "EPSG:6931") # Seaice projection
-projection(arctic_laea) <- gsub("units=m", "units=km", projection(arctic_laea)) # Convert proj unit from m to km
-res(arctic_laea) <- c(cell_res, cell_res) # Define the 100 km cell resolution
-
 SA_grid_laea <- data.frame() # Empty dataframe that will be filled with gridded CTD data
 
 for (i in seq(2015, 2017, 1)) { # Data gridding
@@ -196,7 +225,15 @@ SA_grid_laea <- SA_grid_laea %>% # Calculate normalized backscatter anomalies
                                            NASC_anomaly > 0.5 & NASC_anomaly <= 1 ~ "]0.5;1]",
                                            NASC_anomaly > 1 ~ ">1"),
                                            levels = c("<-1", "[-1;-0.5[", "[-0.5;0.5]", "]0.5;1]", ">1"))) %>%
-  ungroup()
+  ungroup() %>%
+  st_as_sf(coords = c("xc", "yc"), crs = st_crs(arctic_laea), remove = F) %>%
+  st_join(., IHO_sf_laea, join = st_within) %>%
+  st_drop_geometry() %>%
+  mutate(NAME = if_else(is.na(NAME) == T & yc < 0, "Baffin Bay",
+                if_else(is.na(NAME) == T & yc > 0 & lat > 70, "The Northwestern Passages", NAME))) %>%
+  rename(IHO_area = NAME, area = area.x) %>%
+  dplyr::select(year, xc, yc, lon, lat, IHO_area, area, NASC_int, CM, mean_NASC_area_year, sd_NASC_area_year,
+                NASC_anomaly, NASC_anomaly_d, cell_res)
 ```
 
 Plot mesopelagic normalized s<sub>A</sub> anomalies and centre of mass
@@ -245,11 +282,6 @@ More info on this projection can be found on the [NSIDC
 website](https://nsidc.org/data/ease/).
 
 ``` r
-cell_res <- 100 # Cell resolution in km
-arctic_sv_laea <- raster(extent(-2700, 2700, -2700, 2700), crs = "EPSG:6931") # Seaice projection
-projection(arctic_sv_laea) <- gsub("units=m", "units=km", projection(arctic_sv_laea)) # Convert proj unit from m to km
-res(arctic_sv_laea) <- c(cell_res, cell_res) # Define the 100 km cell resolution
-
 Sv_grid_laea <- data.frame() # Empty dataframe that will be filled with gridded CTD data
 
 for (i in seq(2015, 2017, 1)) { # Loop through every year
@@ -262,8 +294,8 @@ for (i in seq(2015, 2017, 1)) { # Loop through every year
     Sv_tmp_0.05 <- SpatialPointsDataFrame(SpatialPoints(cbind(Sv_tmp$lon, Sv_tmp$lat), 
                                                         proj4string = CRS("EPSG:4326")),
                                           data.frame(sv_lin = Sv_tmp$sv_lin)) %>%
-      spTransform(., CRSobj = crs(arctic_sv_laea)) %>% # Change projection to EPSG:6931
-      rasterize(., arctic_sv_laea, fun = function(x, ...) {quantile(unique(na.omit(x)), 0.05)}, na.rm = F) %>% 
+      spTransform(., CRSobj = crs(arctic_laea)) %>% # Change projection to EPSG:6931
+      rasterize(., arctic_laea, fun = function(x, ...) {quantile(unique(na.omit(x)), 0.05)}, na.rm = F) %>% 
       dropLayer(1) %>% # Remove ID layer
       rasterToPoints() %>% # Convert raster to data frame
       as.data.frame() %>%
@@ -273,8 +305,8 @@ for (i in seq(2015, 2017, 1)) { # Loop through every year
     Sv_tmp_0.25 <- SpatialPointsDataFrame(SpatialPoints(cbind(Sv_tmp$lon, Sv_tmp$lat), 
                                                         proj4string = CRS("EPSG:4326")),
                                           data.frame(sv_lin = Sv_tmp$sv_lin)) %>%
-      spTransform(., CRSobj = crs(arctic_sv_laea)) %>% # Change projection to EPSG:6931
-      rasterize(., arctic_sv_laea, fun = function(x, ...) {quantile(unique(na.omit(x)), 0.25)}, na.rm = F) %>% 
+      spTransform(., CRSobj = crs(arctic_laea)) %>% # Change projection to EPSG:6931
+      rasterize(., arctic_laea, fun = function(x, ...) {quantile(unique(na.omit(x)), 0.25)}, na.rm = F) %>% 
       dropLayer(1) %>% # Remove ID layer
       rasterToPoints() %>% # Convert raster to data frame
       as.data.frame() %>%
@@ -286,8 +318,8 @@ for (i in seq(2015, 2017, 1)) { # Loop through every year
                                          data.frame(lat = Sv_tmp$lat,
                                                     lon = Sv_tmp$lon,
                                                     sv_lin = Sv_tmp$sv_lin)) %>%
-      spTransform(., CRSobj = crs(arctic_sv_laea)) %>% # Change projection to EPSG:6931
-      rasterize(., arctic_sv_laea, fun = function(x, ...) {quantile(unique(na.omit(x)), 0.5)}, na.rm = F) %>% 
+      spTransform(., CRSobj = crs(arctic_laea)) %>% # Change projection to EPSG:6931
+      rasterize(., arctic_laea, fun = function(x, ...) {quantile(unique(na.omit(x)), 0.5)}, na.rm = F) %>% 
       dropLayer(1) %>% # Remove ID layer
       rasterToPoints() %>% # Convert raster to data frame
       as.data.frame() %>%
@@ -297,8 +329,8 @@ for (i in seq(2015, 2017, 1)) { # Loop through every year
     Sv_tmp_0.75 <- SpatialPointsDataFrame(SpatialPoints(cbind(Sv_tmp$lon, Sv_tmp$lat), 
                                                         proj4string = CRS("EPSG:4326")),
                                           data.frame(sv_lin = Sv_tmp$sv_lin)) %>%
-      spTransform(., CRSobj = crs(arctic_sv_laea)) %>% # Change projection to EPSG:6931
-      rasterize(., arctic_sv_laea, fun = function(x, ...) {quantile(unique(na.omit(x)), 0.75)}, na.rm = F) %>% 
+      spTransform(., CRSobj = crs(arctic_laea)) %>% # Change projection to EPSG:6931
+      rasterize(., arctic_laea, fun = function(x, ...) {quantile(unique(na.omit(x)), 0.75)}, na.rm = F) %>% 
       dropLayer(1) %>% # Remove ID layer
       rasterToPoints() %>% # Convert raster to data frame
       as.data.frame() %>%
@@ -308,8 +340,8 @@ for (i in seq(2015, 2017, 1)) { # Loop through every year
     Sv_tmp_0.95 <- SpatialPointsDataFrame(SpatialPoints(cbind(Sv_tmp$lon, Sv_tmp$lat), 
                                                         proj4string = CRS("EPSG:4326")),
                                           data.frame(sv_lin = Sv_tmp$sv_lin)) %>%
-      spTransform(., CRSobj = crs(arctic_sv_laea)) %>% # Change projection to EPSG:6931
-      rasterize(., arctic_sv_laea, fun = function(x, ...) {quantile(unique(na.omit(x)), 0.95)}, na.rm = F) %>% 
+      spTransform(., CRSobj = crs(arctic_laea)) %>% # Change projection to EPSG:6931
+      rasterize(., arctic_laea, fun = function(x, ...) {quantile(unique(na.omit(x)), 0.95)}, na.rm = F) %>% 
       dropLayer(1) %>% # Remove ID layer
       rasterToPoints() %>% # Convert raster to data frame
       as.data.frame() %>%
@@ -323,6 +355,11 @@ for (i in seq(2015, 2017, 1)) { # Loop through every year
     Sv_grid_laea <- bind_rows(Sv_grid_laea, Sv_grid_tmp) # Combine data
   }
 }
+rm(Sv_tmp, Sv_tmp_0.05, Sv_tmp_0.25, Sv_tmp_0.50, Sv_tmp_0.75, Sv_tmp_0.95, Sv_grid_tmp) # Remove temporary data
+
+coord_equivalences <- SA_grid_laea %>% # Calculate coord equivalences between 4326 and 6931
+  group_by(xc, yc, area, IHO_area) %>%
+  summarise()
 
 Sv_grid_laea <- Sv_grid_laea %>% # Tidy data
     mutate(Sv_q0.05 = 10 * log10(sv_lin_q0.05), # Transform into backsattering strengh (log)
@@ -335,16 +372,12 @@ Sv_grid_laea <- Sv_grid_laea %>% # Tidy data
                                    lon >= -25 & lon <= 145 & lat > 77 & lat <= 90 ~ "SV"),
                          levels = c("BF_CAA", "BB", "SV")),
            cell_res = cell_res) %>%
-  # unite(grid_ID, xc, yc, year, sep = "_", remove = F) %>% # Create unique ID for each grid cell
-  dplyr::select(year, area, xc, yc, lon, lat, depth, cell_res,
+  ungroup() %>%
+  left_join(., coord_equivalences, by = c("xc", "yc", "area")) %>%
+  dplyr::select(year, xc, yc, lon, lat, IHO_area, area, depth, cell_res,
                 sv_lin_q0.05, sv_lin_q0.25, sv_lin_q0.50, sv_lin_q0.75, sv_lin_q0.95,
                 Sv_q0.05, Sv_q0.25, Sv_q0.50, Sv_q0.75, Sv_q0.95)
-  
-rm(Sv_tmp, Sv_tmp_0.05, Sv_tmp_0.25, Sv_tmp_0.5, Sv_tmp_0.75, Sv_tmp_0.95, Sv_grid_tmp, cell_res) # Remove temporary data
 ```
-
-    ## Warning in rm(Sv_tmp, Sv_tmp_0.05, Sv_tmp_0.25, Sv_tmp_0.5, Sv_tmp_0.75, :
-    ## object 'Sv_tmp_0.5' not found
 
 Plot S<sub>V</sub> profiles for each area and year after data gridding.
 
@@ -352,7 +385,7 @@ Plot S<sub>V</sub> profiles for each area and year after data gridding.
 col_pal <- c("#80CBB1", "#347BA5", "#302346") # Custom color palette
 
 Sv_grid_laea %>% # Plot median profiles
-  group_by(depth, area, year) %>% # Calculate mean and median Sv profiles per area per year
+  group_by(depth, IHO_area, year) %>% # Calculate mean and median Sv profiles per area per year
   summarise(sv_lin_q0.05_areayear = median(sv_lin_q0.05),
             sv_lin_q0.25_areayear = median(sv_lin_q0.25),
             sv_lin_q0.50_areayear = median(sv_lin_q0.50),
@@ -381,11 +414,11 @@ Sv_grid_laea %>% # Plot median profiles
          Sv_q0.95_median = case_when(Sv_q0.95_median == -999 ~ NaN,
                                      Sv_q0.95_median > -999 & Sv_q0.95_median <= -105 ~ -105,
                                      Sv_q0.95_median > -105 ~ Sv_q0.95_median)) %>%
-  arrange(year, area, depth) %>%
-  mutate(area=factor(if_else(area=="BF_CAA", "Beaufort Sea &\nCan. Arctic Archipelago",
-                       if_else(area=="BB", "Baffin Bay",
-                       if_else(area=="SV", "Svalbard","Other"))),
-                       levels=c("Beaufort Sea &\nCan. Arctic Archipelago","Baffin Bay","Svalbard"))) %>%
+  arrange(year, IHO_area, depth) %>%
+  # mutate(area = factor(if_else(area == "BF_CAA", "Beaufort Sea &\nCan. Arctic Archipelago",
+  #                      if_else(area == "BB", "Baffin Bay",
+  #                      if_else(area == "SV", "Svalbard", "Other"))),
+  #                      levels = c("Beaufort Sea &\nCan. Arctic Archipelago", "Baffin Bay", "Svalbard"))) %>%
   # Plot
   ggplot() +
   geom_vline(xintercept = 200, lty = 2, col = "grey20") +
@@ -398,7 +431,7 @@ Sv_grid_laea %>% # Plot median profiles
   scale_color_manual(values = col_pal) +
   scale_fill_manual(values = col_pal) +
   coord_flip(ylim = c(-105, -65)) +
-  facet_grid(~ area) +
+  facet_grid(~ IHO_area) +
   theme(legend.title = element_blank(),
         legend.position = c(0.94, 0.275),
         legend.background = element_blank(),
