@@ -1,7 +1,7 @@
 PanArctic DSL - Acoustic gridding
 ================
 [Pierre Priou](mailto:pierre.priou@mi.mun.ca)
-2022/04/26 at 18:02
+2022/04/27 at 15:26
 
 # Package loading
 
@@ -39,7 +39,7 @@ arctic_latlon <- raster(extent(-155, 35, 66, 85), # Base projection for acoustic
                         res = c(2, 1)) # cells of 2 degree longitude per 1 degree latitude
 arctic_laea <- raster(extent(-2700, 2700, -2700, 2700), crs = "EPSG:6931") # Seaice projection
 projection(arctic_laea) <- gsub("units=m", "units=km", projection(arctic_laea)) # Convert proj unit from m to km
-cell_res <- 100 # Cell resolution in km
+cell_res <- 50 # Cell resolution in km
 res(arctic_laea) <- c(cell_res, cell_res) # Define the 100 km cell resolution
 
 # IHO areas
