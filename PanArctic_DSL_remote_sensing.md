@@ -1,7 +1,7 @@
 PanArctic DSL - Remote sensing
 ================
 [Pierre Priou](mailto:pierre.priou@mi.mun.ca)
-2022/04/29 at 12:26
+2022/04/29 at 16:13
 
 # Package loading
 
@@ -196,14 +196,15 @@ for (i in seq(2015, 2017, 1)) { # Loop through data per year
     summarise(total_day_year = max(yday), # Total days per year (2016 was a leap year)
               seaice_duration = sum(ice_covered_day), # Duration of sea ice cover
               mean_ice_conc = round(mean(ice_conc, na.rm = T), 2),  # Mean ice concentration
-              ice_break = first(subset(., ice_covered_day == 0)$yday), # Ice breakup day of the year
-              ice_week = first(subset(., ice_covered_day == 0)$week)) %>% # Ice breakup week of the year
+              ice_break = first(subset(., ice_conc < 50)$yday), # Ice breakup day of the year
+              ice_week = first(subset(., ice_conc < 50)$week)) %>% # Ice breakup week of the year
     mutate(openwater_duration = total_day_year - seaice_duration, # Duration of open water
            ice_break = if_else(is.na(ice_break) == T, 365, ice_break), # Areas where sea ice does not breakup
            ice_week = if_else(is.na(ice_week) == T, 52, ice_week)) %>% # Areas where sea ice does not breakup
     as_tibble()
   seaice_year <- bind_rows(seaice_year, seaice_tmp)
-  }
+}
+
 rm(seaice_tmp, i) # Remove temporary data
 save(seaice_year, file = "data/remote_sensing/remote_sensing_seaice_year.RData") # Save data
 ```
@@ -212,8 +213,11 @@ To match sea ice records with acoustic data, I rasterized sea ice data
 on the same grid as the acoustic data. I tried two different grids; the
 WGS84 projection (EPSG:4326) with grid cells of 2°lon \* 1°lat, and the
 EASE-Grid 2.0 North (EPSG:6931) which is the default grid for sea-ice
-data. For each cell I calculated the mean ice concentration, open water
-and sea ice duration.
+data. For each cell I calculated the mean ice concentration, open water,
+sea ice duration, day of ice breakup, and week of ice breakup. The ice
+breakup day is defined as the first day of the year when sea ice
+concentration fell below 50 %. Similarly, ice breakup week is the first
+week of the year when sea ice concentration fell below 50 %.
 
 ### EPSG:6931 - EASE-Grid 2.0 North (Lambert’s equal-area, azimuthal)
 
