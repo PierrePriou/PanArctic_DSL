@@ -1,13 +1,14 @@
 PanArctic DSL - Remote sensing
 ================
 [Pierre Priou](mailto:pierre.priou@mi.mun.ca)
-2022/04/27 at 09:32
+2022/04/29 at 12:26
 
 # Package loading
 
 ``` r
 # Load packages
 library(tidyverse)  # Tidy code
+library(dtplyr)     # Speed up code
 library(lubridate)  # Deal with dates
 library(tidync)     # Read NetCDF
 library(ncmeta)     # Metadata NetCDF
@@ -184,18 +185,25 @@ for (i in seq(2015, 2017, 1)) { # Loop through data per year
                             pattern = paste0(i),
                             full.names = T) %>%
     map_dfr(.f = ~ read_csv(.)) %>% # Read sea ice files
-    mutate(date = ymd(date),
-           year = year(date),
-           ice_covered_day = if_else(ice_conc > 15, 1, 0)) %>% #  > 15% ice cover = ice covered day
-    filter(status_flag != c(1, 2, 16)) %>% # Remove data from land (1), lakes (2), and possible false ice (16)
+    lazy_dt() %>% # Call dtplyr which considerably speed up calculations
+    mutate(year = i,
+           yday = yday(date), # calculate day of the year
+           week = week(date), # calculate week of the year
+           ice_covered_day = if_else(ice_conc > 15, 1, 0)) %>% # > 15% ice cover = ice covered day
+    dplyr::select(-date) %>%
+    filter(status_flag != c(1, 2, 16) & is.na(ice_conc) == F) %>% # Remove data from land (1), lakes (2), and possible false ice (16)
     group_by(year, xc, yc, lat, lon) %>% # Calculate metrics for each cell per year
-    summarise(total_day_year = n(), # Total days per year (2016 was a leap year)
+    summarise(total_day_year = max(yday), # Total days per year (2016 was a leap year)
               seaice_duration = sum(ice_covered_day), # Duration of sea ice cover
-              openwater_duration = total_day_year - seaice_duration, # Duration of open water
-              mean_ice_conc = round(mean(ice_conc, na.rm = T), 2)) %>% # Mean ice concentration
-    ungroup()
+              mean_ice_conc = round(mean(ice_conc, na.rm = T), 2),  # Mean ice concentration
+              ice_break = first(subset(., ice_covered_day == 0)$yday), # Ice breakup day of the year
+              ice_week = first(subset(., ice_covered_day == 0)$week)) %>% # Ice breakup week of the year
+    mutate(openwater_duration = total_day_year - seaice_duration, # Duration of open water
+           ice_break = if_else(is.na(ice_break) == T, 365, ice_break), # Areas where sea ice does not breakup
+           ice_week = if_else(is.na(ice_week) == T, 52, ice_week)) %>% # Areas where sea ice does not breakup
+    as_tibble()
   seaice_year <- bind_rows(seaice_year, seaice_tmp)
-}
+  }
 rm(seaice_tmp, i) # Remove temporary data
 save(seaice_year, file = "data/remote_sensing/remote_sensing_seaice_year.RData") # Save data
 ```
@@ -224,7 +232,7 @@ seaice_grid_laea <- data.frame() # Empty dataframe that will be filled with grid
 
 for (i in seq(2015, 2017, 1)) { # Data gridding
   seaice_tmp <- seaice_year %>%
-    filter(year == i) 
+    filter(year == i)
   # Rasterize data in latlon
   seaice_tmp_laea <- SpatialPointsDataFrame(SpatialPoints(cbind(seaice_tmp$xc, seaice_tmp$yc), 
                                                           proj4string = CRS("EPSG:6931")),
@@ -232,7 +240,9 @@ for (i in seq(2015, 2017, 1)) { # Data gridding
                                                        lon = seaice_tmp$lon,
                                                        seaice_duration = seaice_tmp$seaice_duration,
                                                        openwater_duration = seaice_tmp$openwater_duration,
-                                                       mean_ice_conc = seaice_tmp$mean_ice_conc)) %>%
+                                                       mean_ice_conc = seaice_tmp$mean_ice_conc,
+                                                       ice_break = seaice_tmp$ice_break,
+                                                       ice_week = seaice_tmp$ice_week)) %>%
     rasterize(., arctic_laea, fun = mean, na.rm = T) %>% # Rasterize data in laea
     dropLayer(1) %>% # Remove ID layer
     rasterToPoints() %>% # Convert raster to data frame
@@ -243,7 +253,7 @@ for (i in seq(2015, 2017, 1)) { # Data gridding
                                    lon > -95 & lon <= -50 & lat > 66 & lat <= 82 ~ "BB",
                                    lon >= -25 & lon <= 145 & lat > 77 & lat <= 90 ~ "SV"),
                          levels = c("BF_CAA", "BB", "SV"))) %>%
-    dplyr::select(year, area, lat, lon, xc, yc, seaice_duration, openwater_duration, mean_ice_conc)
+    dplyr::select(year, area, lat, lon, xc, yc, seaice_duration, openwater_duration, mean_ice_conc, ice_break, ice_week)
   seaice_grid_laea <- bind_rows(seaice_grid_laea, seaice_tmp_laea)
 }
 seaice_grid_laea <- seaice_grid_laea %>%
@@ -305,7 +315,9 @@ for (i in seq(2015, 2017, 1)) { # Data gridding
                                                             proj4string = CRS("EPSG:4326")),
                                             data.frame(seaice_duration = seaice_tmp$seaice_duration,
                                                        openwater_duration = seaice_tmp$openwater_duration,
-                                                       mean_ice_conc = seaice_tmp$mean_ice_conc)) %>%
+                                                       mean_ice_conc = seaice_tmp$mean_ice_conc,
+                                                       ice_break = seaice_tmp$ice_break,
+                                                       ice_week = seaice_tmp$ice_week)) %>%
     rasterize(., arctic_latlon, fun = mean, na.rm = T) %>% # Rasterize data in latlon
     dropLayer(1) %>% # Remove ID layer
     rasterToPoints() %>% # Convert raster to data frame
@@ -316,7 +328,7 @@ for (i in seq(2015, 2017, 1)) { # Data gridding
                                    lon > -95 & lon <= -50 & lat > 66 & lat <= 82 ~ "BB",
                                    lon >= -25 & lon <= 145 & lat > 77 & lat <= 90 ~ "SV"),
                          levels = c("BF_CAA", "BB", "SV"))) %>%
-    dplyr::select(year, area, lat, lon, seaice_duration, openwater_duration, mean_ice_conc)
+    dplyr::select(year, area, lat, lon, seaice_duration, openwater_duration, mean_ice_conc, ice_break, ice_week)
   seaice_grid_latlon <- bind_rows(seaice_grid_latlon, seaice_tmp_latlon)
 }
 rm(seaice_tmp, seaice_tmp_latlon, i) # Remove temporary data
