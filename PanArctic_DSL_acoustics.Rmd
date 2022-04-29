@@ -14,6 +14,7 @@ library(tidyverse)    # Tidy code
 library(cowplot)      # Plots on a grid
 library(raster)       # Data gridding
 library(sf)           # Spatial data
+library(fs)           # List files
 library(rgdal)        # Read shapefiles
 library(cmocean)      # Oceanographic color palettes
 library(RColorBrewer) # Diverging color palette
@@ -45,18 +46,21 @@ cell_res <- 50 # Cell resolution in km
 res(arctic_laea) <- c(cell_res, cell_res) # Define the 100 km cell resolution
 
 # IHO areas
-# sf::sf_use_s2(T) # Turn off s2 processing
-IHO_sf_latlon <- read_sf("data/arctic_regions/World_Seas_IHO_v3.shp") %>%
-  filter(ID %in% c("5", "13", "14", "14A", "15", "17")) %>% # Filter for relevant regions
+IHO_sf_latlon <- dir_ls("data/arctic_regions/", glob = "*.shp") %>% 
+  tibble(fname = .) %>%
+  mutate(data = map(fname, read_sf)) %>%
+  unnest(data) %>%
+  st_as_sf() %>%
   st_transform(crs = crs(arctic_latlon)) %>%
-  st_make_valid() %>% # Correct invalid polygons
-  filter(st_is_valid(.) == TRUE)
-IHO_sf_laea <- read_sf("data/arctic_regions/World_Seas_IHO_v3.shp") %>%
-  filter(ID %in% c("5", "13", "14", "14A", "15", "17")) %>% # Filter for relevant regions
+  st_make_valid()
+IHO_sf_laea <- dir_ls("data/arctic_regions/", glob = "*.shp") %>% 
+  tibble(fname = .) %>%
+  mutate(data = map(fname, read_sf)) %>%
+  unnest(data) %>%
+  st_as_sf() %>%
   st_transform(crs = crs(arctic_latlon)) %>%
   st_transform(crs = crs(arctic_laea)) %>%
-  st_make_valid() %>% # Correct invalid polygons
-  filter(st_is_valid(.) == TRUE) 
+  st_make_valid()
 ```
 
 # Integrated s~A~ and centre of mass
@@ -115,10 +119,10 @@ SA_grid_latlon <- SA_grid_latlon %>% # Calculate normalized backscatter anomalie
   st_as_sf(coords = c("lon", "lat"), crs = st_crs(arctic_latlon), remove = F) %>%
   st_join(., IHO_sf_latlon, join = st_within) %>%
   st_drop_geometry() %>%
-  mutate(NAME = if_else(is.na(NAME) == T & lon > -100 & lat < 70, "Davis Strait",
-                if_else(is.na(NAME) == T & lon > -100 & lat > 70, "Baffin Bay",
-                if_else(is.na(NAME) == T & lon < -100, "The Northwestern Passages", NAME)))) %>%
-  rename(IHO_area = NAME, area = area.x) %>%
+  mutate(name = if_else(is.na(name) == T & lon > -100 & lat < 70, "Davis Strait",
+                if_else(is.na(name) == T & lon > -100 & lat > 70, "Baffin Bay",
+                if_else(is.na(name) == T & lon < -100, "The Northwestern Passages", name)))) %>%
+  rename(IHO_area = name, area = area.x) %>%
   dplyr::select(year, lat, lon, IHO_area, area, NASC_int, CM, mean_NASC_area_year, sd_NASC_area_year, 
                 NASC_anomaly, NASC_anomaly_d)
 ```
@@ -216,16 +220,26 @@ SA_grid_laea <- SA_grid_laea %>% # Calculate normalized backscatter anomalies
   st_as_sf(coords = c("xc", "yc"), crs = st_crs(arctic_laea), remove = F) %>%
   st_join(., IHO_sf_laea, join = st_within) %>%
   st_drop_geometry() %>%
-  mutate(NAME = if_else(is.na(NAME) == T & yc < 0, "Baffin Bay",
-                if_else(is.na(NAME) == T & yc > 0 & lat > 70, "The Northwestern Passages", NAME))) %>%
-  rename(IHO_area = NAME, area = area.x) %>%
-  dplyr::select(year, xc, yc, lon, lat, IHO_area, area, NASC_int, CM, mean_NASC_area_year, sd_NASC_area_year,
+  mutate(name = if_else(is.na(name) == T & yc < 0, "Baffin Bay",
+                if_else(is.na(name) == T & yc > 0 & lat > 70, "The Northwestern Passages", 
+                if_else(name == "The Northwestern Passages" & yc < 0, "Baffin Bay", 
+                if_else(name == "Arctic Ocean" & name_3 == "West Arctic Ocean", "West Arctic Ocean",
+                if_else(name == "Arctic Ocean" & name_3 == "East Arctic Ocean", "East Arctic Ocean", name))))),
+         IHO_area_large = factor(case_when(name == "Beaufort Sea" ~ "BF_WAO",
+                                           name == "West Arctic Ocean" ~ "BF_WAO",
+                                           name == "Baffin Bay" ~ "BB_DS",
+                                           name == "Davis Strait" ~ "BB_DS",
+                                           name == "The Northwestern Passages" ~ "CAA",
+                                           name == "East Arctic Ocean" ~ "EAO"),
+                                 levels = c("BF_WAO", "CAA", "BB_DS", "EAO"))) %>%
+           rename(IHO_area = name, area = area.x) %>%
+  dplyr::select(year, xc, yc, lon, lat, IHO_area, IHO_area_large, area, NASC_int, CM, mean_NASC_area_year, sd_NASC_area_year,
                 NASC_anomaly, NASC_anomaly_d, cell_res)
 ```
 
-Plot mesopelagic normalized s~A~ anomalies and centre of mass with the EASE-Grid 2.0 North. 
+Map to check whether the IHO regions are well implemented.
 
-```{r EPSG-6931-map-acoustic, message=FALSE, fig.width=8, fig.height=7}
+```{r plot-areas}
 coast_10m_laea <- readOGR("data/bathy/ne_10m_land.shp", verbose = F) %>% # Coastline in laea
   spTransform(CRSobj = crs(arctic_latlon)) %>% # Make sure that the shapefile is in the right projection
   crop(extent(-180, 180, 0, 90)) %>% # Crop shapefile
@@ -233,6 +247,16 @@ coast_10m_laea <- readOGR("data/bathy/ne_10m_land.shp", verbose = F) %>% # Coast
   fortify() %>% # Convert to a dataframe for ggplot
   rename(xc = long, yc = lat)
 
+SA_grid_laea %>%
+  ggplot() +
+  geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), fill = "grey80") +
+  geom_point(aes(x = xc, y = yc, col = IHO_area_large)) +
+  coord_fixed(xlim = c(-2600, 1100), ylim = c(-1800, 1900), expand = F)
+```
+
+Plot mesopelagic normalized s~A~ anomalies and centre of mass with the EASE-Grid 2.0 North. 
+
+```{r EPSG-6931-map-acoustic, message=FALSE, fig.width=8, fig.height=7}
 col_pal <- rev(brewer.pal(n = 5, name = "BrBG"))
 
 plot_grid(SA_grid_laea %>% # Map integrated normalized backscatter anomaly
@@ -341,7 +365,7 @@ for (i in seq(2015, 2017, 1)) { # Loop through every year
 rm(Sv_tmp, Sv_tmp_0.05, Sv_tmp_0.25, Sv_tmp_0.50, Sv_tmp_0.75, Sv_tmp_0.95, Sv_grid_tmp) # Remove temporary data
 
 coord_equivalences <- SA_grid_laea %>% # Calculate coord equivalences between 4326 and 6931
-  group_by(xc, yc, area, IHO_area) %>%
+  group_by(xc, yc, area, IHO_area, IHO_area_large) %>%
   summarise()
 
 Sv_grid_laea <- Sv_grid_laea %>% # Tidy data
@@ -357,7 +381,7 @@ Sv_grid_laea <- Sv_grid_laea %>% # Tidy data
            cell_res = cell_res) %>%
   ungroup() %>%
   left_join(., coord_equivalences, by = c("xc", "yc", "area")) %>%
-  dplyr::select(year, xc, yc, lon, lat, IHO_area, area, depth, cell_res,
+  dplyr::select(year, xc, yc, lon, lat, IHO_area, IHO_area_large, area, depth, cell_res,
                 sv_lin_q0.05, sv_lin_q0.25, sv_lin_q0.50, sv_lin_q0.75, sv_lin_q0.95,
                 Sv_q0.05, Sv_q0.25, Sv_q0.50, Sv_q0.75, Sv_q0.95)
 ```
