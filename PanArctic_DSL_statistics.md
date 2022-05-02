@@ -1,7 +1,7 @@
 PanArctic DSL - Statistics
 ================
 [Pierre Priou](mailto:pierre.priou@mi.mun.ca)
-2022/05/02 at 12:23
+2022/05/02 at 12:27
 
 # Package loading
 
@@ -554,21 +554,21 @@ gam.check(GAM3, rep = 500)
     ## indicate that k is too low, especially if edf is close to k'.
     ## 
     ##                    k'  edf k-index p-value
-    ## s(v_n):IHOWAO_BF 4.00 1.00    1.01    0.53
-    ## s(v_n):IHOCAA    4.00 1.00    1.01    0.48
-    ## s(v_n):IHOBB     4.00 1.00    1.01    0.49
-    ## s(v_n):IHODS     4.00 1.00    1.01    0.56
-    ## s(v_n):IHOEAO    4.00 1.00    1.01    0.48
-    ## s(t_n):IHOWAO_BF 4.00 1.00    1.17    0.97
-    ## s(t_n):IHOCAA    4.00 1.00    1.17    0.93
-    ## s(t_n):IHOBB     4.00 3.56    1.17    0.97
-    ## s(t_n):IHODS     4.00 1.89    1.17    0.99
-    ## s(t_n):IHOEAO    4.00 1.00    1.17    0.97
-    ## s(o_n):IHOWAO_BF 4.00 2.11    0.96    0.31
-    ## s(o_n):IHOCAA    4.00 3.03    0.96    0.36
-    ## s(o_n):IHOBB     4.00 1.00    0.96    0.32
-    ## s(o_n):IHODS     4.00 1.00    0.96    0.35
-    ## s(o_n):IHOEAO    4.00 1.00    0.96    0.30
+    ## s(v_n):IHOWAO_BF 4.00 1.00    1.01    0.55
+    ## s(v_n):IHOCAA    4.00 1.00    1.01    0.52
+    ## s(v_n):IHOBB     4.00 1.00    1.01    0.54
+    ## s(v_n):IHODS     4.00 1.00    1.01    0.54
+    ## s(v_n):IHOEAO    4.00 1.00    1.01    0.52
+    ## s(t_n):IHOWAO_BF 4.00 1.00    1.17    0.98
+    ## s(t_n):IHOCAA    4.00 1.00    1.17    0.98
+    ## s(t_n):IHOBB     4.00 3.56    1.17    0.99
+    ## s(t_n):IHODS     4.00 1.89    1.17    0.97
+    ## s(t_n):IHOEAO    4.00 1.00    1.17    0.96
+    ## s(o_n):IHOWAO_BF 4.00 2.11    0.96    0.32
+    ## s(o_n):IHOCAA    4.00 3.03    0.96    0.32
+    ## s(o_n):IHOBB     4.00 1.00    0.96    0.29
+    ## s(o_n):IHODS     4.00 1.00    0.96    0.34
+    ## s(o_n):IHOEAO    4.00 1.00    0.96    0.33
     ## s(IHO)           5.00 1.50      NA      NA
 
 Check residuals versus covariates.
