@@ -1,7 +1,7 @@
 PanArctic DSL - Figures
 ================
 [Pierre Priou](mailto:pierre.priou@mi.mun.ca)
-2022/02/23 at 18:18
+2022/05/02 at 18:12
 
 # Package and data loading
 
@@ -20,7 +20,9 @@ library(cmocean)                # Pretty color palettes
 library(ggpubr)                 # Display stats with ggplot
 library(RColorBrewer)           # Diverging color palette
 library(ggnewscale)             # Multiple color scales on a single plot
+library(lemon)                  # Repeated axis on facets
 source("R/getNOAA.ice.bathy.R") # Load bathy data from NOAA
+source("R/rounder.R")
 # Custom figure theme
 theme_set(theme_bw())
 theme_update(axis.text = element_text(size = 9),
@@ -53,7 +55,7 @@ bathy_df <- getNOAA.ice.bathy(lon1 = -180, lon2 = 180, lat1 = 50, lat2 = 90,
                               resolution = 2, keep = T, path = "data/bathy/") %>%
   fortify.bathy() %>%
   rename(lon = x, lat = y, depth = z) %>%
-  mutate(depth_d=factor(case_when(between(depth, -50, Inf) ~ "0-50",
+  mutate(depth_d = factor(case_when(between(depth, -50, Inf) ~ "0-50",
                                   between(depth, -100, -50) ~ "50-100",
                                   between(depth, -200, -100) ~ "100-200",
                                   between(depth, -500, -200) ~ "200-500",
@@ -73,6 +75,7 @@ area_SV_latlon <- data.frame(lon = c(46, 46, 0, 0, 46), lat = c(85, 76, 76, 85, 
 # Acoustic data
 load("data/acoustics/MVBS_2015_2017.RData")
 load("data/acoustics/SA_grids.RData")
+load("data/acoustics/Sv_grids.RData")
 MVBS_latlon <- MVBS %>% # Location of acoustic data
   mutate(lat = round(lat, 1),
          lon = round(lon, 1)) %>%
@@ -104,7 +107,7 @@ projection.
 # Laea projection for bathy and all other files
 arctic_laea <- raster(extent(-2700, 2700, -2700, 2700), crs = "EPSG:6931") # Seaice projection
 projection(arctic_laea) <- gsub("units=m", "units=km", projection(arctic_laea)) # Convert proj unit from m to km
-cell_res <- 150 # Cell resolution in km
+cell_res <- 50 # Cell resolution in km
 res(arctic_laea) <- c(cell_res, cell_res) # Define the 100 km cell resolution
 
 proj_bathy_laea <- raster(extent(-2700, 2700, -2700, 2700), crs = "EPSG:6931", res = c(5, 5)) # Seaice projection
@@ -180,6 +183,69 @@ area_SV_laea <- SpatialPoints(cbind(c(40, 40, 0, 0), c(85, 78, 78, 85)),
   as.data.frame() %>%
   rename(xc = coords.x1, yc = coords.x2)
 
+# IHO regions
+IHO_EAO <- readOGR("data/arctic_regions/iho_eastern_arctic_ocean.shp", verbose = F) %>% # Eastern Arctic Ocean
+  spTransform(CRSobj = crs(arctic_latlon)) %>% # Make sure that the shapefile is in the right projection
+  spTransform(CRSobj = crs(arctic_laea)) %>% # Project shapefile in laea
+  fortify() %>% # Convert to dataframe for ggplot
+  rename(xc = long, yc = lat)
+```
+
+    ## Regions defined for each Polygons
+
+``` r
+IHO_WAO <- readOGR("data/arctic_regions/iho_western_arctic_ocean.shp", verbose = F) %>% # Western Arctic Ocean
+  spTransform(CRSobj = crs(arctic_latlon)) %>% # Make sure that the shapefile is in the right projection
+  spTransform(CRSobj = crs(arctic_laea)) %>% # Project shapefile in laea
+  fortify() %>% # Convert to dataframe for ggplot
+  rename(xc = long, yc = lat)
+```
+
+    ## Regions defined for each Polygons
+
+``` r
+IHO_BF <- readOGR("data/arctic_regions/iho_beaufort_sea.shp", verbose = F) %>% # Eastern Arctic Ocean
+  spTransform(CRSobj = crs(arctic_latlon)) %>% # Make sure that the shapefile is in the right projection
+  spTransform(CRSobj = crs(arctic_laea)) %>% # Project shapefile in laea
+  fortify() %>% # Convert to dataframe for ggplot
+  rename(xc = long, yc = lat)
+```
+
+    ## Regions defined for each Polygons
+
+``` r
+IHO_CAA <- readOGR("data/arctic_regions/iho_northwestern_passages.shp", verbose = F) %>% # Eastern Arctic Ocean
+  spTransform(CRSobj = crs(arctic_latlon)) %>% # Make sure that the shapefile is in the right projection
+  spTransform(CRSobj = crs(arctic_laea)) %>% # Project shapefile in laea
+  fortify() %>% # Convert to dataframe for ggplot
+  rename(xc = long, yc = lat)
+```
+
+    ## Regions defined for each Polygons
+
+``` r
+IHO_BB <- readOGR("data/arctic_regions/iho_baffin_bay.shp", verbose = F) %>% # Eastern Arctic Ocean
+  spTransform(CRSobj = crs(arctic_latlon)) %>% # Make sure that the shapefile is in the right projection
+  spTransform(CRSobj = crs(arctic_laea)) %>% # Project shapefile in laea
+  fortify() %>% # Convert to dataframe for ggplot
+  rename(xc = long, yc = lat)
+```
+
+    ## Regions defined for each Polygons
+
+``` r
+IHO_DS <- readOGR("data/arctic_regions/iho_davis_strait.shp", verbose = F) %>% # Eastern Arctic Ocean
+  spTransform(CRSobj = crs(arctic_latlon)) %>% # Make sure that the shapefile is in the right projection
+  spTransform(CRSobj = crs(arctic_laea)) %>% # Project shapefile in laea
+  fortify() %>% # Convert to dataframe for ggplot
+  rename(xc = long, yc = lat)
+```
+
+    ## Regions defined for each Polygons
+
+``` r
+IHO_regions <- bind_rows(IHO_EAO, IHO_WAO, IHO_BF, IHO_CAA, IHO_BB, IHO_DS) # Combine IHO definitions
+
 # Remove unused variable
 rm(cell_res)
 ```
@@ -223,26 +289,27 @@ MVBS %>%
         axis.ticks = element_blank(), axis.title = element_blank())
 ```
 
-<img src="PanArctic_DSL_figures_files/figure-gfm/fig1-map-station-original-1.png" style="display: block; margin: auto;" />
-
 To overcome that, I project the bathy data on the EASE-Grid 2.0 North,
 prior to plotting. This results in a much quicker plotting time.
 
 ``` r
 # Bathymetric map of the Arctic with location of acoustic and trawl
-MVBS_laea %>%
+p_MVBS_laea <- MVBS_laea %>%
   ggplot(aes(x = xc, y = yc)) +
   # Plot bathy
   geom_raster(data = bathy_laea, aes(x = xc, y = yc, fill = depth_d)) +
   scale_fill_cmocean("Depth (m)", name = "deep", discrete = T, na.value = NA, alpha = 0.6) +
-  # Plot coastlines
-  geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), fill = "grey80") +
-  # Arctic circle
-  geom_path(data = arctic_circle_laea, aes(x = xc, y = yc), col = "grey40", lty = 2, size = 0.3) +
   # Areas of interest
-  geom_shape(data = area_BF_CAA_laea, aes(x = xc, y = yc), fill = NA, col = "black", lwd = 0.2, lty = 1, radius = unit(0.05, "in")) +
-  geom_shape(data = area_BB_laea, aes(x = xc, y = yc), fill = NA, col = "black", lwd = 0.2, lty = 1, radius = unit(0.05, "in")) +
-  geom_shape(data = area_SV_laea, aes(x = xc, y = yc), fill = NA, col = "black", lwd = 0.2, lty = 1, radius = unit(0.05, "in")) +
+  geom_polygon(data = IHO_WAO, aes(x = xc, y = yc, group = group), fill = NA, col = "black", lwd = 0.3, lty = 1) +
+  geom_shape(data = IHO_BF, aes(x = xc, y = yc, group = group), fill = NA, col = "black", lwd = 0.3, lty = 1) +
+  geom_shape(data = IHO_CAA, aes(x = xc, y = yc, group = group), fill = NA, col = "black", lwd = 0.3, lty = 1) +
+  geom_shape(data = IHO_BB, aes(x = xc, y = yc, group = group), fill = NA, col = "black", lwd = 0.3, lty = 1) +
+  geom_shape(data = IHO_DS, aes(x = xc, y = yc, group = group), fill = NA, col = "black", lwd = 0.3, lty = 1) +
+  geom_shape(data = IHO_EAO, aes(x = xc, y = yc, group = group), fill = NA, col = "black", lwd = 0.3, lty = 1) +
+  # Plot coastlines
+  geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), fill = "grey30") +
+  # Arctic circle
+  geom_path(data = arctic_circle_laea, aes(x = xc, y = yc), col = "grey10", lty = 2, size = 0.3) +
   # Acoustic data
   geom_point(size = 0.7, shape = 4, color = "black") +
   # Trawl locations
@@ -251,134 +318,240 @@ MVBS_laea %>%
   guides(fill = guide_legend(keywidth = 0.2, keyheight = 0.2, default.unit = "in"), color = "none") +
   theme(legend.position = "right", panel.border = element_rect(fill = NA), axis.text = element_blank(),
         axis.ticks = element_blank(), axis.title = element_blank())
+# ggsave("plots/Fig1_map_stations.png", p_MVBS_laea, height = 4, width = 6.5, dpi = 600, units = "in")
+p_MVBS_laea
 ```
 
 <img src="PanArctic_DSL_figures_files/figure-gfm/fig1-map-station-laea-1.png" style="display: block; margin: auto;" />
 
 ## Figure 2. Vertical S<sub>V</sub> profiles
 
-Code that works and used for producing the plot in the manuscript from
-2021\_12\_17
-
-``` r
-# Custom color palette
-col_pal <- c("#80CBB1", "#347BA5", "#302346")
-# Calculate mean and median vertical profile for each area
-Sv_raster %>%
-  # Calculate mean and median Sv profiles per area per year
-  group_by(depth, area, year) %>%
-  summarise(sv_lin_median_areayear=median(sv_lin_median),
-            sv_lin_q2.5_areayear=median(sv_lin_q2.5),
-            sv_lin_q97.5_areayear=median(sv_lin_q97.5)) %>%
-  mutate(Sv_median=10*log10(sv_lin_median_areayear), 
-         Sv_q2.5=10*log10(sv_lin_q2.5_areayear),
-         Sv_q97.5=10*log10(sv_lin_q97.5_areayear)) %>%
-  ungroup() %>%
-  # Plotting details
-  # Remove empty water column and very low backscatter
-  mutate(Sv_median_1=if_else(Sv_median < -200, NaN, Sv_median),
-         Sv_q2.5_1=if_else(Sv_q2.5 < -200, NaN, Sv_q2.5),
-         Sv_q97.5_1=if_else(Sv_q97.5 < -105, NaN, Sv_q97.5)) %>%
-  # Replace low values by min limit for plotting continuous ribbon
-  mutate(Sv_median_2=if_else(is.na(Sv_median_1)==F & Sv_median_1<=-105, -105, Sv_median_1),
-         Sv_q2.5_2=if_else(is.na(Sv_median_1)==F & is.na(Sv_q2.5_1)==T & is.na(Sv_q97.5_1)==F, -105,
-                     if_else(is.na(Sv_median_1)==T & is.na(Sv_q2.5_1)==T & is.na(Sv_q97.5_1)==F, -105, 
-                     if_else(is.na(Sv_q2.5_1)==F & Sv_q2.5_1 <=-105, -105, Sv_q2.5_1))),
-         Sv_q97.5_2=Sv_q97.5_1) %>%
-  mutate(Sv_median_3=if_else(Sv_median_2==-105 & Sv_q2.5_2==-105 & is.na(Sv_q97.5_2)==T, NaN, Sv_median_2),
-         Sv_q2.5_3=if_else(Sv_median_2==-105 & Sv_q2.5_2==-105 & is.na(Sv_q97.5_2)==T, NaN, Sv_median_3),
-         Sv_q97.5_3=Sv_q97.5_2) %>%
-  arrange(year, area, depth) %>%
-  mutate(area=factor(if_else(area=="BF_CAA", "Beaufort Sea &\nCan. Arctic Archipelago",
-                       if_else(area=="BB", "Baffin Bay",
-                       if_else(area=="SV", "Svalbard","Other"))),
-                       levels=c("Beaufort Sea &\nCan. Arctic Archipelago","Baffin Bay","Svalbard"))) %>%
-  # Plot
-  ggplot() +
-  geom_vline(xintercept=200, lty=2, col="grey20") +
-  geom_ribbon(aes(x=depth, ymin=Sv_q2.5_2, ymax=Sv_q97.5_2, fill=as.factor(year), group=year), alpha=0.2) +
-  geom_line(aes(x=depth, y=Sv_median_2, col=as.factor(year), group=year)) +
-  scale_x_reverse("Depth (m)", breaks=seq(0,1000,200)) +
-  geom_hline(yintercept=-105, col="white") +
-  scale_y_continuous(expression("S"[V]*" (dB re 1 m"^-1*")"), breaks=seq(-200,0,10), limits=c(-105,-65), expand=c(0,0)) +
-  scale_color_manual(values=col_pal) +
-  scale_fill_manual(values=col_pal) +
-  coord_flip() +
-  facet_grid(~area) +
-  theme(legend.title=element_blank(),
-        legend.position=c(0.94,0.275),
-        legend.background=element_blank(),
-        legend.key=element_blank(), 
-        panel.border=element_blank(),
-        axis.line=element_line())
-```
-
-    ## Warning: Removed 22 row(s) containing missing values (geom_path).
-
-<img src="PanArctic_DSL_figures_files/figure-gfm/fig2-Sv-profile-area-year-1.png" style="display: block; margin: auto;" />
-
-**WORK IN PROGRESS**
-
-I’m trying to streamline the code.
+### Old plot
 
 ``` r
 col_pal <- c("#80CBB1", "#347BA5", "#302346") # Custom colour palette
-Sv_area_year <- Sv_raster %>%
-  group_by(depth, area, year) %>%
-  # Calculate mean and median Sv profiles per area per year
-  summarise(sv_lin_median_areayear = median(sv_lin_median),
-            sv_lin_q2.5_areayear = median(sv_lin_q2.5),
-            sv_lin_q97.5_areayear = median(sv_lin_q97.5)) %>%
-  # Transform into volume backscattering strength (dB)
-  mutate(Sv_median = 10 * log10(sv_lin_median_areayear), 
-         Sv_q2.5 = 10 * log10(sv_lin_q2.5_areayear),
-         Sv_q97.5 = 10 * log10(sv_lin_q97.5_areayear)) %>%
+
+Sv_prof_mean <- Sv_grid_laea %>% # Plot median profiles
+  group_by(depth, IHO_area) %>% # Calculate mean and median Sv profiles per area per year
+  mutate(IHO_area = factor(case_when(IHO_area == "East Arctic Ocean" ~ "EAO",
+                                     IHO_area == "West Arctic Ocean" ~ "WAO_BF",
+                                     IHO_area == "Beaufort Sea" ~ "WAO_BF",
+                                     IHO_area == "The Northwestern Passages" ~ "CAA",
+                                     IHO_area == "Baffin Bay" ~ "BB",
+                                     IHO_area == "Davis Strait" ~ "DS"),
+                           levels = c("WAO_BF", "CAA", "BB", "DS", "EAO"))) %>%
+  summarise(sv_lin_q0.05_areayear = median(sv_lin_q0.05),
+            sv_lin_q0.50_areayear = median(sv_lin_q0.50),
+            sv_lin_q0.95_areayear = median(sv_lin_q0.95)) %>%
+  mutate(Sv_q0.05_median = 10 * log10(sv_lin_q0.05_areayear), 
+         Sv_q0.50_median = 10 * log10(sv_lin_q0.50_areayear),
+         Sv_q0.95_median = 10 * log10(sv_lin_q0.95_areayear))
+
+p_Sv_grid_laea <- Sv_grid_laea %>% # Plot median profiles
+  group_by(depth, IHO_area) %>% # Calculate mean and median Sv profiles per area per year
+  mutate(IHO_area = factor(case_when(IHO_area == "East Arctic Ocean" ~ "EAO",
+                                     IHO_area == "West Arctic Ocean" ~ "WAO_BF",
+                                     IHO_area == "Beaufort Sea" ~ "WAO_BF",
+                                     IHO_area == "The Northwestern Passages" ~ "CAA",
+                                     IHO_area == "Baffin Bay" ~ "BB",
+                                     IHO_area == "Davis Strait" ~ "DS"),
+                           levels = c("WAO_BF", "CAA", "BB", "DS", "EAO"))) %>%
+  summarise(sv_lin_q0.05_areayear = median(sv_lin_q0.05),
+            sv_lin_q0.25_areayear = median(sv_lin_q0.25),
+            sv_lin_q0.50_areayear = median(sv_lin_q0.50),
+            sv_lin_q0.75_areayear = median(sv_lin_q0.75),
+            sv_lin_q0.95_areayear = median(sv_lin_q0.95)) %>%
+  mutate(Sv_q0.05_median = 10 * log10(sv_lin_q0.05_areayear), 
+         Sv_q0.25_median = 10 * log10(sv_lin_q0.25_areayear),
+         Sv_q0.50_median = 10 * log10(sv_lin_q0.50_areayear),
+         Sv_q0.25_median = 10 * log10(sv_lin_q0.25_areayear),
+         Sv_q0.75_median = 10 * log10(sv_lin_q0.75_areayear),
+         Sv_q0.95_median = 10 * log10(sv_lin_q0.95_areayear)) %>%
   ungroup() %>%
-  # Plotting details
-  # # # Remove empty water column and very low backscatter
-  # mutate(Sv_median_1 = if_else(Sv_median < -200, NaN, Sv_median),
-  #        Sv_q2.5_1 = if_else(Sv_q2.5 < -200, NaN, Sv_q2.5),
-  #        Sv_q97.5_1 = if_else(Sv_q97.5 < -105, NaN, Sv_q97.5)) %>%
-  # Remove empty water column and very low backscatter
-  mutate(Sv_q97.5_1 = if_else(Sv_q97.5 < -105, NaN, Sv_q97.5),
-         Sv_q2.5_1 = case_when(Sv_q97.5 < -105 ~ NaN,
-                               Sv_q2.5 < -105 ~ NaN,
-                               Sv_q2.5 >= -105 ~ Sv_q2.5)) %>%
-  # Replace low values by min limit for plotting continuous ribbon
-  mutate(Sv_q2.5_2 = if_else(is.na(Sv_q2.5_1) == T & is.na(Sv_q97.5_1) == F, -105,
-                             if_else(is.na(Sv_q2.5_1) == T & is.na(Sv_q97.5_1) == F, -105, 
-                                     if_else(is.na(Sv_q2.5_1) == F & Sv_q2.5_1 <= -105, -105, Sv_q2.5_1))),
-         Sv_q97.5_2 = Sv_q97.5_1) %>%
-  # mutate(Sv_median_2 = if_else(is.na(Sv_median_1) == F & Sv_median_1 <= -105, -105, Sv_median_1),
-  #        Sv_q2.5_2 = if_else(is.na(Sv_median_1) == F & is.na(Sv_q2.5_1) == T & is.na(Sv_q97.5_1) == F, -105,
-  #                    if_else(is.na(Sv_median_1) == T & is.na(Sv_q2.5_1) == T & is.na(Sv_q97.5_1) == F, -105, 
-  #                    if_else(is.na(Sv_q2.5_1) == F & Sv_q2.5_1 <= -105, -105, Sv_q2.5_1))),
-  #        Sv_q97.5_2 = Sv_q97.5_1) %>%
-  arrange(year, area, depth) %>%
-  # filter(area == "BF_CAA") %>%
-  # mutate(area=factor(case_when(area == "BF_CAA" ~ "Beaufort Sea &\nCan. Arctic Archipelago",
-  #                              area == "BB" ~ "Baffin Bay",
-  #                              area == "SV" ~ "Svalbard"),
-  #                    levels = c("Beaufort Sea &\nCan. Arctic Archipelago", "Baffin Bay", "Svalbard"))) %>%
+  # Plotting details for allowing geom_ribbon to work
+  mutate(Sv_q0.05_median = case_when(Sv_q0.05_median == -999 ~ NaN,
+                                     Sv_q0.05_median > -999 & Sv_q0.05_median <= -105 ~ -105,
+                                     Sv_q0.05_median > -105 ~ Sv_q0.05_median),
+         Sv_q0.25_median = case_when(Sv_q0.25_median == -999 ~ NaN,
+                                     Sv_q0.25_median > -999 & Sv_q0.25_median <= -105 ~ -105,
+                                     Sv_q0.25_median > -105 ~ Sv_q0.25_median),
+         Sv_q0.50_median = case_when(Sv_q0.50_median == -999 ~ NaN,
+                                     Sv_q0.50_median > -999 & Sv_q0.50_median <= -105 ~ -105,
+                                     Sv_q0.50_median > -105 ~ Sv_q0.50_median),
+         Sv_q0.75_median = case_when(Sv_q0.75_median == -999 ~ NaN,
+                                     Sv_q0.75_median > -999 & Sv_q0.75_median <= -105 ~ -105,
+                                     Sv_q0.75_median > -105 ~ Sv_q0.75_median),
+         Sv_q0.95_median = case_when(Sv_q0.95_median == -999 ~ NaN,
+                                     Sv_q0.95_median > -999 & Sv_q0.95_median <= -105 ~ -105,
+                                     Sv_q0.95_median > -105 ~ Sv_q0.95_median)) %>%
+  arrange(IHO_area, depth) %>%
   # Plot
   ggplot() +
   geom_vline(xintercept = 200, lty = 2, col = "grey20") +
-  # geom_ribbon(aes(x = depth, ymin = Sv_q2.5_2, ymax = Sv_q97.5_2, fill = as.factor(year), group = year), alpha = 0.2) +
-  # geom_line(aes(x = depth, y = Sv_median_2, col = as.factor(year), group = year)) +
-  geom_ribbon(aes(x = depth, ymin = Sv_q2.5, ymax = Sv_q97.5, fill = as.factor(year), group = year), alpha = 0.2, na.rm=T) +
-  geom_line(aes(x = depth, y = Sv_median, col = as.factor(year), group = year)) +
+  # geom_ribbon(aes(x = depth, ymin = Sv_q0.05_median, ymax = Sv_q0.95_median, fill = as.factor(year), group = year),
+  #             alpha = 0.2, na.rm = T) +
+  geom_ribbon(aes(x = depth, ymin = Sv_q0.05_median, ymax = Sv_q0.95_median), alpha = 0.2, na.rm = T) +
+  geom_line(aes(x = depth, y = Sv_q0.50_median), na.rm = T) +
+  # geom_line(aes(x = depth, y = Sv_q0.50_median, col = as.factor(year), group = year), na.rm = T) +
   scale_x_reverse("Depth (m)", breaks = seq(0, 1000, 200)) +
-  # geom_hline(yintercept = -105, col = "white") +
-  # coord_cartesian(ylim = c(-105, -65)) +
-  # scale_y_continuous(expression("S"[V]*" (dB re 1 m"^-1*")"), breaks = seq(-200, 0, 10), limits = c(-105, -65), expand = c(0, 0)) +
+  geom_hline(yintercept = -105, col = "white") +
+  scale_y_continuous(expression("S"[V]*" (dB re 1 m"^-1*")"), breaks = seq(-200, 0, 10), expand = c(0, 0)) +
   scale_color_manual(values = col_pal) +
   scale_fill_manual(values = col_pal) +
-  coord_flip(ylim = c(-100, -65)) +
-  facet_grid( ~ area) +
-  theme(legend.title = element_blank(), legend.position = c(0.94, 0.275), legend.background = element_blank(),
-        legend.key = element_blank(),panel.border = element_blank(), axis.line = element_line())
-Sv_area_year
+  coord_flip(ylim = c(-105, -65)) +
+  facet_grid(~ IHO_area) +
+  theme(legend.title = element_blank(),
+        legend.position = c(0.94, 0.275),
+        legend.background = element_blank(),
+        legend.key = element_blank(), 
+        panel.border = element_blank(),
+        axis.line = element_line())
+# ggsave("plots/Fig2_Sv_profiles_area_year.png", p_Sv_grid_laea, height = 3, width = 6.5, dpi = 600, units = "in")
+p_Sv_grid_laea
 ```
+
+<img src="PanArctic_DSL_figures_files/figure-gfm/fig2-Sv-profiles-area-year-1.png" style="display: block; margin: auto;" />
+
+### Lines
+
+``` r
+# wesanderson::wes_palette("Darjeeling1", type = "discrete") 1st and 5th colours are inverted
+col_pal <- c("#5BBCD6", "#00A08A", "#F2AD00", "#F98400", "#FF0000")
+
+# Calculate median Sv profile for each grid cell
+Sv_prof <- Sv_grid_laea %>% 
+    mutate(IHO_area = factor(case_when(IHO_area == "East Arctic Ocean" ~ "East Arctic Ocean",
+                                     IHO_area == "West Arctic Ocean" ~ "West Arctic Ocean\n& Beaufort Sea",
+                                     IHO_area == "Beaufort Sea" ~ "West Arctic Ocean\n& Beaufort Sea",
+                                     IHO_area == "The Northwestern Passages" ~ "Canadian Arctic\nArchipelago",
+                                     IHO_area == "Baffin Bay" ~ "Baffin Bay",
+                                     IHO_area == "Davis Strait" ~ "Davis Strait"),
+                           levels = c("West Arctic Ocean\n& Beaufort Sea", "Canadian Arctic\nArchipelago",
+                                      "Baffin Bay", "Davis Strait", "East Arctic Ocean"))) %>%
+  mutate(depth_round = rounder(depth, -10)) %>% # round down to nearest 10
+  group_by(depth_round, IHO_area, xc, yc, year) %>%
+  summarise(sv_lin50 = median(sv_lin_q0.50)) %>% 
+  ungroup() %>%
+  mutate(Sv_median = 10 * log10(sv_lin50),
+         year = as.factor(year)) %>%
+  unite(ID, xc, yc, year)
+
+# Calculate median Sv profile 
+Sv_prof_median <- Sv_grid_laea %>%
+    mutate(IHO_area = factor(case_when(IHO_area == "East Arctic Ocean" ~ "East Arctic Ocean",
+                                     IHO_area == "West Arctic Ocean" ~ "West Arctic Ocean\n& Beaufort Sea",
+                                     IHO_area == "Beaufort Sea" ~ "West Arctic Ocean\n& Beaufort Sea",
+                                     IHO_area == "The Northwestern Passages" ~ "Canadian Arctic\nArchipelago",
+                                     IHO_area == "Baffin Bay" ~ "Baffin Bay",
+                                     IHO_area == "Davis Strait" ~ "Davis Strait"),
+                           levels = c("West Arctic Ocean\n& Beaufort Sea", "Canadian Arctic\nArchipelago",
+                                      "Baffin Bay", "Davis Strait", "East Arctic Ocean"))) %>%
+  mutate(depth_round = rounder(depth, -10)) %>% # round down to nearest 20
+  group_by(depth_round, IHO_area) %>%
+  summarise(sv_lin50 = median(sv_lin_q0.50)) %>% 
+  ungroup() %>%
+  mutate(Sv_median = 10 * log10(sv_lin50))
+
+# Plot
+p_Sv_prof_lines <- Sv_prof_median %>%
+  ggplot() +
+  geom_line(data = Sv_prof, aes(x = depth_round, y = Sv_median, group = ID), col = "grey80", na.rm = T) +
+  geom_vline(xintercept = 200, lty = 2) +
+  geom_line(aes(x = depth_round, y = Sv_median, col = IHO_area), na.rm = T, size = 1) +
+  scale_x_reverse("Depth (m)", breaks = seq(0, 1000, 100)) + 
+  scale_y_continuous(expression("S"[V]*" (dB re 1 m"^-1*")"), breaks = seq(-200, 0, 10)) +
+  coord_flip(ylim = c(-105, -70), xlim = c(800, 20)) +
+  scale_colour_manual(values = col_pal) +
+  facet_rep_grid(~ IHO_area) +
+  guides(colour = "none") +
+  theme(panel.border = element_blank(),
+        axis.line = element_line(),
+        panel.spacing = unit(0, "in"),
+        plot.margin = unit(c(0, 0.1, 0, 0), "in"))
+ggsave("plots/Fig2_Sv_profiles_lines.png", p_Sv_prof_lines, height = 4.5, width = 7, dpi = 600, units = "in")
+p_Sv_prof_lines
+```
+
+![](PanArctic_DSL_figures_files/figure-gfm/unnamed-chunk-2-1.png)<!-- -->
+
+### Points
+
+``` r
+p_Sv_prof_points <- Sv_grid_laea %>%
+  mutate(IHO_area = factor(case_when(IHO_area == "East Arctic Ocean" ~ "East Arctic Ocean",
+                                     IHO_area == "West Arctic Ocean" ~ "West Arctic Ocean\n& Beaufort Sea",
+                                     IHO_area == "Beaufort Sea" ~ "West Arctic Ocean\n& Beaufort Sea",
+                                     IHO_area == "The Northwestern Passages" ~ "Canadian Arctic\nArchipelago",
+                                     IHO_area == "Baffin Bay" ~ "Baffin Bay",
+                                     IHO_area == "Davis Strait" ~ "Davis Strait"),
+                           levels = c("West Arctic Ocean\n& Beaufort Sea", "Canadian Arctic\nArchipelago",
+                                      "Baffin Bay", "Davis Strait", "East Arctic Ocean"))) %>%
+  mutate(depth_round = rounder(depth, -20)) %>% # round down to nearest 20
+  group_by(depth_round, IHO_area, year, xc, yc) %>%
+  summarise(sv_lin = median(sv_lin_q0.50)) %>%
+  ungroup() %>%
+  mutate(Sv_median = 10*log10(sv_lin)) %>%
+  filter(Sv_median != -999) %>%
+  ggplot() +
+  geom_vline(xintercept = 200, col = "red", lty = 2) +
+  geom_pointrange(mapping = aes(y = Sv_median, x = depth_round, col = depth_round < 200),
+                  stat = "summary", fun = median, fun.min = function(z) {quantile(z, 0.05)}, 
+                  fun.max = function(z) {quantile(z, 0.95)}, size = 0.2) + 
+  scale_x_reverse("Depth (m)", breaks = seq(0, 1000, 100)) + 
+  scale_y_continuous(expression("S"[V]*" (dB re 1 m"^-1*")"), breaks = seq(-200, 0, 20)) +
+  scale_colour_manual(values = c("black", "grey60")) + 
+  coord_flip(ylim = c(-110, -60), xlim = c(800, 20)) +
+  facet_rep_grid(~ IHO_area) +
+  guides(colour = "none") +
+  theme(panel.border = element_blank(),
+        axis.line = element_line(),
+        panel.spacing = unit(0, "in"),
+        plot.margin = unit(c(0, 0.1, 0, 0), "in"))
+ggsave("plots/Fig2_Sv_profiles_points.png", p_Sv_prof_points, height = 4.5, width = 7, dpi = 600, units = "in")
+p_Sv_prof_points
+```
+
+![](PanArctic_DSL_figures_files/figure-gfm/Fig2-plot-1.png)<!-- -->
+
+### Boxplots
+
+``` r
+p_Sv_prof_boxplot <- Sv_grid_laea %>%
+  filter(depth <= 800) %>%
+  mutate(IHO_area = factor(case_when(IHO_area == "East Arctic Ocean" ~ "East Arctic Ocean",
+                                     IHO_area == "West Arctic Ocean" ~ "West Arctic Ocean\n& Beaufort Sea",
+                                     IHO_area == "Beaufort Sea" ~ "West Arctic Ocean\n& Beaufort Sea",
+                                     IHO_area == "The Northwestern Passages" ~ "Canadian Arctic\nArchipelago",
+                                     IHO_area == "Baffin Bay" ~ "Baffin Bay",
+                                     IHO_area == "Davis Strait" ~ "Davis Strait"),
+                           levels = c("West Arctic Ocean\n& Beaufort Sea", "Canadian Arctic\nArchipelago",
+                                      "Baffin Bay", "Davis Strait", "East Arctic Ocean"))) %>%
+  mutate(depth_round = rounder(depth, -25)) %>% # round down to nearest 20
+  group_by(depth_round, IHO_area, year, xc, yc) %>%
+  summarise(sv_lin = median(sv_lin_q0.50)) %>%
+  ungroup() %>%
+  mutate(Sv_median = 10*log10(sv_lin), 
+         depth = factor(depth_round)) %>%
+  filter(Sv_median != -999) %>%
+  ggplot() +
+  geom_vline(xintercept = 200, col = "red", lty = 2) +
+  geom_boxplot(aes(x = depth, y = Sv_median, col = depth_round < 200), 
+               outlier.size = 0.5, size = 0.5) + 
+  scale_x_discrete("Depth (m)", breaks = seq(0, 1000, 100), limits = rev) +
+  scale_y_continuous(expression("S"[V]*" (dB re 1 m"^-1*")"), breaks = seq(-200, 0, 20)) +
+  scale_colour_manual(values = c("black", "grey60")) +
+  coord_flip(ylim = c(-110, -60)) +
+  facet_rep_wrap(~ IHO_area, nrow = 1) +
+  guides(colour = "none") +
+  theme(panel.border = element_blank(),
+        axis.line = element_line(),
+        panel.spacing = unit(0, "in"),
+        plot.margin = unit(c(0, 0.1, 0, 0), "in"))
+ggsave("plots/Fig2_Sv_profiles_boxplots.png", p_Sv_prof_boxplot, height = 4.5, width = 6.5, dpi = 600, units = "in")
+p_Sv_prof_boxplot
+```
+
+![](PanArctic_DSL_figures_files/figure-gfm/unnamed-chunk-3-1.png)<!-- -->
 
 ## Figure 3. Map of mesopelagic backscatter hotspots
 
@@ -454,14 +627,15 @@ SA_grid_laea %>%
   ggplot() +
   # Plot bathy
   geom_raster(data = bathy_laea, aes(x = xc, y = yc, fill = depth_d)) +
-  # scale_fill_grey(start = 0.8, end = 0.2, alpha = 0.6) +
-  scale_fill_cmocean("Depth (m)", name = "deep", discrete = T, na.value = NA, alpha = 0.5) +
+  scale_fill_cmocean("Depth (m)", name = "deep", discrete = T, na.value = NA, alpha = 0.3) +
+  # scale_fill_brewer("Depth (m)", type = "seq", palette = "Greys") +
   guides(fill = "none") + # Remove legend
   new_scale_fill() +
+  geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), fill = "grey30") +
   # Plot backscatter anomalies
-  geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), fill = "grey70") +
   geom_tile(aes(x = xc, y = yc, fill = NASC_anomaly_d), color = "grey30", size = 0.15) +
   scale_fill_manual("Normalized sA anomaly", values = rev(brewer.pal(n = 5, name = "BrBG"))) +
+  # scale_fill_manual("Normalized sA anomaly", values = rev(brewer.pal(n = 5, name = "RdBu"))) +
   facet_wrap(~ year, ncol = 3) +
   coord_fixed(xlim = c(-2600, 1100), ylim = c(-1800, 1900), expand = F) +
   guides(fill = guide_legend(keywidth = 0.2, keyheight = 0.2, default.unit = "in"), color = "none") +
