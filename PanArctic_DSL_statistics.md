@@ -1,7 +1,7 @@
 PanArctic DSL - Statistics
 ================
 [Pierre Priou](mailto:pierre.priou@mi.mun.ca)
-2022/04/27 at 15:49
+2022/05/01 at 22:32
 
 # Package loading
 
@@ -24,6 +24,32 @@ library(ggcorrplot)   # Correlation plots
 
 ``` r
 library(kableExtra)   # Pretty tables
+library(mgcv)         # Fit GAM
+library(gratia)       # Visualise GAM
+library(visreg)       # Visualise GAM
+```
+
+    ## Warning: package 'visreg' was built under R version 4.1.3
+
+``` r
+library(tidymv)       # Predict GAM
+```
+
+    ## Warning: package 'tidymv' was built under R version 4.1.3
+
+``` r
+library(MuMIn)        # AIC weights
+```
+
+    ## Warning: package 'MuMIn' was built under R version 4.1.3
+
+``` r
+library(DT)           # Interactive table
+```
+
+    ## Warning: package 'DT' was built under R version 4.1.3
+
+``` r
 # Custom figure theme
 theme_set(theme_bw())
 theme_update(axis.text = element_text(size = 9),
@@ -47,7 +73,7 @@ WGS84 or the EASE-Grid 2.0 North.
 
 ``` r
 # Map projections
-cell_res <- 100 # Cell resolution in km
+cell_res <- 50 # Cell resolution in km
 arctic_laea <- raster(extent(-2700, 2700, -2700, 2700), crs = "EPSG:6931") # Seaice projection
 projection(arctic_laea) <- gsub("units=m", "units=km", projection(arctic_laea)) # Convert proj unit from m to km
 res(arctic_laea) <- c(cell_res, cell_res) # Define the 100 km cell resolution
@@ -57,11 +83,6 @@ arctic_latlon <- raster(extent(-155, 35, 66, 85), # Base projection for acoustic
                         res = c(2, 1)) # cells of 2 degree longitude per 1 degree latitude
 
 # Coastline shapefiles
-# coast_10m_latlon <- readOGR("data/bathy/ne_10m_land.shp", verbose = F) %>% # Coastline in latlon
-#   spTransform(CRSobj = crs(arctic_latlon)) %>% # Make sure that the shapefile is in the right projection
-#   crop(extent(-180, 180, 0, 90)) %>% # Crop shapefile
-#   fortify() %>% # Convert to a dataframe for ggplot
-#   rename(lon = long)
 coast_10m_laea <- readOGR("data/bathy/ne_10m_land.shp", verbose = F) %>% # Coastline in laea
   spTransform(CRSobj = crs(arctic_latlon)) %>% # Make sure that the shapefile is in the right projection
   crop(extent(-180, 180, 0, 90)) %>% # Crop shapefile
@@ -70,21 +91,40 @@ coast_10m_laea <- readOGR("data/bathy/ne_10m_land.shp", verbose = F) %>% # Coast
   rename(xc = long, yc = lat)
 
 # IHO regions
-# IHO_latlon <- readOGR("data/arctic_regions/World_Seas_IHO_v3.shp", verbose = F) %>% # Coastline in latlon
-#   spTransform(CRSobj = crs(arctic_latlon)) %>% # Make sure that the shapefile is in the right projection
-#   crop(extent(-180, 180, 0, 90)) %>% # Crop shapefile
-#   fortify() %>% # Convert to dataframe for ggplot
-#   rename(xc = long, yc = lat)
-# IHO_laea <- readOGR("data/arctic_regions/World_Seas_IHO_v3.shp", verbose = F) %>% # Coastline in latlon
-#   spTransform(CRSobj = crs(arctic_latlon)) %>% # Make sure that the shapefile is in the right projection
-#   crop(extent(-180, 180, 0, 90)) %>% # Crop shapefile
-#   spTransform(CRSobj = crs(arctic_laea)) %>% # Project shapefile in laea
-#   fortify() %>% # Convert to dataframe for ggplot
-#   rename(xc = long, yc = lat)
+IHO_EAO <- readOGR("data/arctic_regions/iho_eastern_arctic_ocean.shp", verbose = F) %>% # Eastern Arctic Ocean
+  spTransform(CRSobj = crs(arctic_latlon)) %>% # Make sure that the shapefile is in the right projection
+  spTransform(CRSobj = crs(arctic_laea)) %>% # Project shapefile in laea
+  fortify() %>% # Convert to dataframe for ggplot
+  rename(xc = long, yc = lat)
+IHO_WAO <- readOGR("data/arctic_regions/iho_western_arctic_ocean.shp", verbose = F) %>% # Western Arctic Ocean
+  spTransform(CRSobj = crs(arctic_latlon)) %>% # Make sure that the shapefile is in the right projection
+  spTransform(CRSobj = crs(arctic_laea)) %>% # Project shapefile in laea
+  fortify() %>% # Convert to dataframe for ggplot
+  rename(xc = long, yc = lat)
+IHO_BF <- readOGR("data/arctic_regions/iho_beaufort_sea.shp", verbose = F) %>% # Eastern Arctic Ocean
+  spTransform(CRSobj = crs(arctic_latlon)) %>% # Make sure that the shapefile is in the right projection
+  spTransform(CRSobj = crs(arctic_laea)) %>% # Project shapefile in laea
+  fortify() %>% # Convert to dataframe for ggplot
+  rename(xc = long, yc = lat)
+IHO_NWP <- readOGR("data/arctic_regions/iho_northwestern_passages.shp", verbose = F) %>% # Eastern Arctic Ocean
+  spTransform(CRSobj = crs(arctic_latlon)) %>% # Make sure that the shapefile is in the right projection
+  spTransform(CRSobj = crs(arctic_laea)) %>% # Project shapefile in laea
+  fortify() %>% # Convert to dataframe for ggplot
+  rename(xc = long, yc = lat)
+IHO_BB <- readOGR("data/arctic_regions/iho_baffin_bay.shp", verbose = F) %>% # Eastern Arctic Ocean
+  spTransform(CRSobj = crs(arctic_latlon)) %>% # Make sure that the shapefile is in the right projection
+  spTransform(CRSobj = crs(arctic_laea)) %>% # Project shapefile in laea
+  fortify() %>% # Convert to dataframe for ggplot
+  rename(xc = long, yc = lat)
+IHO_DF <- readOGR("data/arctic_regions/iho_davis_strait.shp", verbose = F) %>% # Eastern Arctic Ocean
+  spTransform(CRSobj = crs(arctic_latlon)) %>% # Make sure that the shapefile is in the right projection
+  spTransform(CRSobj = crs(arctic_laea)) %>% # Project shapefile in laea
+  fortify() %>% # Convert to dataframe for ggplot
+  rename(xc = long, yc = lat)
+IHO_regions <- bind_rows(IHO_EAO, IHO_WAO, IHO_BF, IHO_NWP, IHO_BB, IHO_DF) # Combine IHO definitions
 
 # Gridded acoustic, CTD, and sea ice data
 load("data/acoustics/SA_grids.RData") # Acoustic data
-# load("data/CTD/CTD_grids.RData") # CTD data
 load("data/remote_sensing/physics_grids.RData") # Modelled physics data 
 load("data/remote_sensing/seaice_grids.RData") # Remote sensing sea ice data
 ```
@@ -130,23 +170,39 @@ stat_laea <- left_join(SA_laea, phy_laea, by = c("year", "area", "xc", "yc", "ce
                                                                                 openwater_duration),
                                                                            na.rm = T),
                                       openwater_duration),
-         seaice_duration = if_else(is.na(seaice_duration) == T, mean(pull(subset(seaice_grid_laea,
-                                                                                 xc >= xc_na - 50 &
-                                                                                   xc <= xc_na + 50 & 
-                                                                                   yc >= yc_na - 50 & 
-                                                                                   yc <= yc_na + 50 & 
-                                                                                   year == year_na,
-                                                                                 select = seaice_duration),
-                                                                          seaice_duration),
-                                                                     na.rm = T),
-                                   seaice_duration)) %>%
+         ice_break = if_else(is.na(ice_break) == T, mean(pull(subset(seaice_grid_laea,
+                                                                     xc >= xc_na - 50 &
+                                                                       xc <= xc_na + 50 & 
+                                                                       yc >= yc_na - 50 & 
+                                                                       yc <= yc_na + 50 & 
+                                                                       year == year_na,
+                                                                     select = ice_break),
+                                                              ice_break),
+                                                         na.rm = T),
+                             ice_break),
+         ice_week = if_else(is.na(ice_week) == T, mean(pull(subset(seaice_grid_laea,
+                                                                   xc >= xc_na - 50 &
+                                                                     xc <= xc_na + 50 & 
+                                                                     yc >= yc_na - 50 & 
+                                                                     yc <= yc_na + 50 & 
+                                                                     year == year_na,
+                                                                   select = ice_week),
+                                                            ice_week),
+                                                       na.rm = T),
+                            ice_week)) %>%
   filter(depth == 380) %>% # Select data at 380 m depth
-  mutate(SA_int = 10 * log10(NASC_int)) %>%
-  group_by(area) %>%
-  mutate(SA_int_n = (SA_int - min(SA_int)) / (max(SA_int - min(SA_int)))) %>% # SA_int_n per area
+  mutate(SA_int = 10 * log10(NASC_int),
+         IHO_area = factor(case_when(IHO_area == "East Arctic Ocean" ~ "EAO",
+                                     IHO_area == "West Arctic Ocean" ~ "WAO_BF",
+                                     IHO_area == "Beaufort Sea" ~ "WAO_BF",
+                                     IHO_area == "The Northwestern Passages" ~ "CAA",
+                                     IHO_area == "Baffin Bay" ~ "BB",
+                                     IHO_area == "Davis Strait" ~ "DS"),
+                            levels = c("WAO_BF", "CAA", "BB", "DS", "EAO"))) %>%
   ungroup() %>%
   dplyr::select(-mean_NASC_area_year, -sd_NASC_area_year, -NASC_anomaly_d, -cell_res, -vxo, -vyo,
-                -mean_temp_area_depth, -mean_velo_area_depth, -xc_na, -yc_na, -year_na)
+                -mean_temp_area_depth, -mean_velo_area_depth, -xc_na, -yc_na, -year_na, -siconc, -sithick,
+                -temp_anomaly, -velocity_anomaly)
 ```
 
 # Data exploration
@@ -154,13 +210,11 @@ stat_laea <- left_join(SA_laea, phy_laea, by = c("year", "area", "xc", "yc", "ce
 Maps of all variables.
 
 ``` r
-stat_laea %>% # Backscatter
+stat_laea %>% 
   ggplot(aes(x = xc,  y = yc)) +
   geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), fill = "grey80") +
-  geom_tile(aes(fill = SA_int_n), color = "grey30") +
-  scale_fill_viridis_c("SA int (dB)", option = "turbo", na.value = "red") +
-  facet_wrap(~ year, ncol = 3) +
-  ggtitle("Integrated SA") +
+  geom_point(aes(col = IHO_area)) +
+  ggtitle("regions") +
   coord_fixed(xlim = c(-2600, 1100), ylim = c(-1800, 1900), expand = F) + 
   theme(axis.text = element_blank(), axis.ticks = element_blank(), axis.title = element_blank())
 ```
@@ -168,24 +222,66 @@ stat_laea %>% # Backscatter
 ![](PanArctic_DSL_statistics_files/figure-gfm/map-SA-int-1.png)<!-- -->
 
 ``` r
-stat_laea %>% # Backscatter anomaly
+stat_laea %>% # Ice concentration
   ggplot(aes(x = xc,  y = yc)) +
   geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), fill = "grey80") +
-  geom_tile(aes(fill = openwater_duration), color = "grey30") +
-  scale_fill_viridis_c("Anomaly sA", option = "plasma", na.value = "red") +
+  geom_tile(aes(fill = mean_ice_conc)) +
+  scale_fill_cmocean("Ice (%)", name = "ice", na.value = "red") +
   facet_wrap(~ year, ncol = 3) +
-  ggtitle("SA ano") +
+  ggtitle("Sea ice concentration") +
   coord_fixed(xlim = c(-2600, 1100), ylim = c(-1800, 1900), expand = F) + 
   theme(axis.text = element_blank(), axis.ticks = element_blank(), axis.title = element_blank())
 ```
 
-![](PanArctic_DSL_statistics_files/figure-gfm/map-SA-ano-1.png)<!-- -->
+![](PanArctic_DSL_statistics_files/figure-gfm/map-siconc-1.png)<!-- -->
+
+``` r
+stat_laea %>% # Openwater duration
+  ggplot(aes(x = xc,  y = yc)) +
+  geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), fill = "grey80") +
+  geom_tile(aes(fill = openwater_duration)) +
+  scale_fill_viridis_c("Day", option = "plasma", na.value = "red") +
+  facet_wrap(~ year, ncol = 3) +
+  ggtitle("Openwater duration") +
+  coord_fixed(xlim = c(-2600, 1100), ylim = c(-1800, 1900), expand = F) + 
+  theme(axis.text = element_blank(), axis.ticks = element_blank(), axis.title = element_blank())
+```
+
+![](PanArctic_DSL_statistics_files/figure-gfm/map-ow-1.png)<!-- -->
+
+``` r
+stat_laea %>% # Openwater duration
+  ggplot(aes(x = xc,  y = yc)) +
+  geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), fill = "grey80") +
+  geom_tile(aes(fill = ice_break)) +
+  scale_fill_viridis_c("Day", option = "viridis", na.value = "red") +
+  facet_wrap(~ year, ncol = 3) +
+  ggtitle("Day ice breakup") +
+  coord_fixed(xlim = c(-2600, 1100), ylim = c(-1800, 1900), expand = F) + 
+  theme(axis.text = element_blank(), axis.ticks = element_blank(), axis.title = element_blank())
+```
+
+![](PanArctic_DSL_statistics_files/figure-gfm/map-ice-day-1.png)<!-- -->
+
+``` r
+stat_laea %>% # Openwater duration
+  ggplot(aes(x = xc,  y = yc)) +
+  geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), fill = "grey80") +
+  geom_tile(aes(fill = ice_week)) +
+  scale_fill_viridis_c("Week", option = "viridis", na.value = "red") +
+  facet_wrap(~ year, ncol = 3) +
+  ggtitle("Week ice breakup") +
+  coord_fixed(xlim = c(-2600, 1100), ylim = c(-1800, 1900), expand = F) + 
+  theme(axis.text = element_blank(), axis.ticks = element_blank(), axis.title = element_blank())
+```
+
+![](PanArctic_DSL_statistics_files/figure-gfm/map-ice-week-1.png)<!-- -->
 
 ``` r
 stat_laea %>% # Temperature
   ggplot(aes(x = xc,  y = yc)) +
   geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), fill = "grey80") +
-  geom_tile(aes(fill = thetao), color = "grey30") +
+  geom_tile(aes(fill = thetao)) +
   scale_fill_cmocean("Temp (dC)", name = "thermal", na.value = "red") +
   facet_wrap(~ year, ncol = 3) +
   ggtitle("Temperature at 380 m depth") +
@@ -199,7 +295,7 @@ stat_laea %>% # Temperature
 stat_laea %>% # Salinity
   ggplot(aes(x = xc,  y = yc)) +
   geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), fill = "grey80") +
-  geom_tile(aes(fill = so), color = "grey30") +
+  geom_tile(aes(fill = so)) +
   scale_fill_cmocean("Sal (psu)", name = "haline", na.value = "red") +
   facet_wrap(~ year, ncol = 3) +
   ggtitle("Salinity at 380 m depth") +
@@ -213,7 +309,7 @@ stat_laea %>% # Salinity
 stat_laea %>% # Ice concentration
   ggplot(aes(x = xc,  y = yc)) +
   geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), fill = "grey80") +
-  geom_tile(aes(fill = velocity), color = "grey30") +
+  geom_tile(aes(fill = velocity)) +
   scale_fill_cmocean("velo (m/s)", name = "speed", na.value = "red") +
   facet_wrap(~ year, ncol = 3) +
   ggtitle("Current velocity at 380 m depth") +
@@ -227,7 +323,7 @@ stat_laea %>% # Ice concentration
 stat_laea %>% # Mixed layer depth
   ggplot(aes(x = xc,  y = yc)) +
   geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), fill = "grey80") +
-  geom_tile(aes(fill = mlotst), color = "grey30") +
+  geom_tile(aes(fill = mlotst)) +
   scale_fill_viridis_c("depth (m)", option = "plasma", direction = -1, na.value = "red") +
   facet_wrap(~ year, ncol = 3) +
   ggtitle("Mixed layer depth") +
@@ -237,428 +333,499 @@ stat_laea %>% # Mixed layer depth
 
 ![](PanArctic_DSL_statistics_files/figure-gfm/map-mld-1.png)<!-- -->
 
-``` r
-stat_laea %>% # Ice thickness
-  ggplot(aes(x = xc,  y = yc)) +
-  geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), fill = "grey80") +
-  geom_tile(aes(fill = sithick), color = "grey30") +
-  scale_fill_cmocean("Thick (m)", name = "ice", na.value = "red") +
-  facet_wrap(~ year, ncol = 3) +
-  ggtitle("Sea ice thickness") +
-  coord_fixed(xlim = c(-2600, 1100), ylim = c(-1800, 1900), expand = F) + 
-  theme(axis.text = element_blank(), axis.ticks = element_blank(), axis.title = element_blank())
-```
-
-![](PanArctic_DSL_statistics_files/figure-gfm/map-sithick-1.png)<!-- -->
-
-``` r
-stat_laea %>% # Ice concentration
-  ggplot(aes(x = xc,  y = yc)) +
-  geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), fill = "grey80") +
-  geom_tile(aes(fill = siconc), color = "grey30") +
-  scale_fill_cmocean("Conc (%)", name = "ice", na.value = "red") +
-  facet_wrap(~ year, ncol = 3) +
-  ggtitle("Sea ice concentration") +
-  coord_fixed(xlim = c(-2600, 1100), ylim = c(-1800, 1900), expand = F) + 
-  theme(axis.text = element_blank(), axis.ticks = element_blank(), axis.title = element_blank())
-```
-
-![](PanArctic_DSL_statistics_files/figure-gfm/map-siconc-1.png)<!-- -->
-
-# Linear mixed model
+# HGAM
 
 ## Data preparation
 
-I require the following packages to fit GLMM.
-
-``` r
-library(lme4)
-library(MASS)
-library(vcdExtra)
-```
-
-    ## Warning: package 'vcdExtra' was built under R version 4.1.3
-
-    ## Warning: package 'vcd' was built under R version 4.1.3
-
-    ## Warning: package 'gnm' was built under R version 4.1.3
-
-``` r
-library(bbmle)
-```
-
-    ## Warning: package 'bbmle' was built under R version 4.1.3
-
-``` r
-library(MuMIn)
-```
-
-    ## Warning: package 'MuMIn' was built under R version 4.1.3
-
-``` r
-library(ggplot2)
-library(DescTools)
-```
-
-    ## Warning: package 'DescTools' was built under R version 4.1.3
-
-``` r
-library(remotes)
-library(gridExtra)
-library(lattice)
-```
-
-Select the variables of interest, SA\_int\_n (per area), velocity,
-temperature anomaly, and openwater\_duration.
+Because I am interested in the environmental drivers of mesopelagic
+backscatter within each area, I run a linear model for each area. First,
+I prepare the dataset and standardize each environmental variable per
+area.
 
 ``` r
 SA_df <- stat_laea %>%
-  dplyr::select(year, xc, yc, area, SA_int, velocity, temp_anomaly, thetao, openwater_duration)
+  dplyr::select(year, xc, yc, area, IHO_area_large, IHO_area, SA_int, velocity, thetao, openwater_duration, ice_week) %>%
+  group_by(IHO_area) %>%
+  mutate(year = factor(year),
+         SA_int_n = (SA_int - min(SA_int)) / (max(SA_int) - min(SA_int)),
+         v_n = (velocity - min(velocity)) / (max(velocity) - min(velocity)),
+         t_n = (thetao - min(thetao)) / (max(thetao) - min(thetao)),
+         o_n = (openwater_duration - min(openwater_duration)) / (max(openwater_duration) - min(openwater_duration)),
+         s_n = (ice_week - min(ice_week)) / (max(ice_week) - min(ice_week))) %>%
+  ungroup() %>%
+  rename(IHO = IHO_area, 
+         v = velocity,
+         t = thetao,
+         o = openwater_duration,
+         s = ice_week)
 ```
 
-Summary of data. The dataset is not perfectly balanced.
-
-``` r
-table(SA_df[, c("area", "year")])
-```
-
-    ##         year
-    ## area     2015 2016 2017
-    ##   BF_CAA   14   10   10
-    ##   BB        9   34   27
-    ##   SV        7    3   18
-
-Scatterplot of responses of covariates.
-
-``` r
-plot_grid(SA_df %>%
-            ggplot(aes(x = velocity, y = SA_int, col = area)) + 
-            geom_point(),
-          SA_df %>%
-            ggplot(aes(x = thetao, y = SA_int, col = area)) + 
-            geom_point(),
-          SA_df %>%
-            ggplot(aes(x = openwater_duration, y = SA_int, col = area)) + 
-            geom_point())
-```
-
-![](PanArctic_DSL_statistics_files/figure-gfm/scatterplot-df-1.png)<!-- -->
-
-Distribution of continuous variables.
+Plot data.
 
 ``` r
 plot_grid(SA_df %>%
-            ggplot(aes(x = SA_int)) + 
-            geom_histogram(),
+            ggplot(aes(x = v_n, y = SA_int_n, col = IHO_area_large)) +
+            geom_point() +
+            geom_smooth(method = "lm", se = F, col = "grey20") +
+            facet_grid(~ IHO) +
+            theme(legend.position = "none"),
           SA_df %>%
-            ggplot(aes(x = velocity)) + 
-            geom_histogram(),
+            ggplot(aes(x = t_n, y = SA_int_n, col = IHO_area_large)) +
+            geom_point() +
+            geom_smooth(method = "lm", se = F, col = "grey20") +
+            facet_grid(~ IHO) +
+            theme(legend.position = "none"),
           SA_df %>%
-            ggplot(aes(x = thetao)) + 
-            geom_histogram(),
+            ggplot(aes(x = o_n, y = SA_int_n, col = IHO_area_large)) +
+            geom_point() +
+            geom_smooth(method = "lm", se = F, col = "grey20") +
+            facet_grid(~ IHO) +
+            theme(legend.position = "none"),
           SA_df %>%
-            ggplot(aes(x = openwater_duration)) + 
-            geom_histogram())
+            ggplot(aes(x = s_n, y = SA_int_n, col = IHO_area_large)) +
+            geom_point() +
+            geom_smooth(method = "lm", se = F, col = "grey20") +
+            facet_grid(~ IHO) +
+            theme(legend.position = "none"),
+          ncol = 1)
 ```
 
-![](PanArctic_DSL_statistics_files/figure-gfm/hist-df-1.png)<!-- -->
-
-Check colinearity.
+![](PanArctic_DSL_statistics_files/figure-gfm/plot-data-area-1.png)<!-- -->
 
 ``` r
-corr <- SA_df %>% # Compute Spearman correlation matrix
-  dplyr::select(-year, -xc, -yc, -area) %>%
+plot_grid(SA_df %>%
+            ggplot(aes(x = v_n, fill = IHO_area_large)) +
+            geom_histogram() +
+            facet_grid(~ IHO) +
+            theme(legend.position = "none"),
+          SA_df %>%
+            ggplot(aes(x = t_n, fill = IHO_area_large)) +
+            geom_histogram() +
+            facet_grid(~ IHO) +
+            theme(legend.position = "none"),
+          SA_df %>%
+            ggplot(aes(x = o_n, fill = IHO_area_large)) +
+            geom_histogram() +
+            facet_grid(~ IHO) +
+            theme(legend.position = "none"),
+          SA_df %>%
+            ggplot(aes(x = s_n, fill = IHO_area_large)) +
+            geom_histogram() +
+            facet_grid(~ IHO) +
+            theme(legend.position = "none"),
+          ncol = 1)
+```
+
+![](PanArctic_DSL_statistics_files/figure-gfm/plot-distribution-1.png)<!-- -->
+
+Check correlations.
+
+``` r
+corr_EAO <- SA_df %>% # Compute Spearman correlation matrix
+  filter(IHO == "EAO") %>%
+  dplyr::select(-year, -xc, -yc, -IHO_area_large, -IHO, -area, -SA_int_n, -v_n, -t_n, -o_n, -s_n) %>%
   cor(., method = "spearman") %>%
   round(., 2)
-ggcorrplot(corr, type = "lower", lab = T)
+ggcorrplot(corr_EAO, type = "lower", lab = T, title = "corr EAO")
 ```
 
-![](PanArctic_DSL_statistics_files/figure-gfm/colinearity-1.png)<!-- -->
-
-Scale data per area.
+![](PanArctic_DSL_statistics_files/figure-gfm/corr-area-1.png)<!-- -->
 
 ``` r
-SA_df <- SA_df %>%
-  # group_by(area) %>%
-  mutate(SA_int_n = (SA_int - min(SA_int)) / (max(SA_int) - min(SA_int)),
-         velo_n = (velocity - min(velocity)) / (max(velocity) - min(velocity)),
-         temp_n = (thetao - min(thetao)) / (max(thetao) - min(thetao)),
-         ow_n = (openwater_duration - min(openwater_duration)) / (max(openwater_duration) - min(openwater_duration))) %>%
-  ungroup()
+corr_BB <- SA_df %>% # Compute Spearman correlation matrix
+  filter(IHO == "BB") %>%
+  dplyr::select(-year, -xc, -yc, -IHO_area_large, -IHO, -area, -SA_int_n, -v_n, -t_n, -o_n, -s_n) %>%
+  cor(., method = "spearman") %>%
+  round(., 2)
+ggcorrplot(corr_BB, type = "lower", lab = T, title = "corr BB")
 ```
+
+![](PanArctic_DSL_statistics_files/figure-gfm/corr-area-2.png)<!-- -->
+
+``` r
+corr_DS <- SA_df %>% # Compute Spearman correlation matrix
+  filter(IHO == "DS") %>%
+  dplyr::select(-year, -xc, -yc, -IHO_area_large, -IHO, -area, -SA_int_n, -v_n, -t_n, -o_n, -s_n) %>%
+  cor(., method = "spearman") %>%
+  round(., 2)
+ggcorrplot(corr_DS, type = "lower", lab = T, title = "corr BB")
+```
+
+![](PanArctic_DSL_statistics_files/figure-gfm/corr-area-3.png)<!-- -->
+
+``` r
+corr_WAO <- SA_df %>% # Compute Spearman correlation matrix
+  filter(IHO == "WAO_BF") %>%
+  dplyr::select(-year, -xc, -yc, -IHO_area_large, -IHO, -area, -SA_int_n, -v_n, -t_n, -o_n, -s_n) %>%
+  cor(., method = "spearman") %>%
+  round(., 2)
+ggcorrplot(corr_WAO, type = "lower", lab = T, title = "corr WAO")
+```
+
+![](PanArctic_DSL_statistics_files/figure-gfm/corr-area-4.png)<!-- -->
+
+``` r
+corr_CAA <- SA_df %>% # Compute Spearman correlation matrix
+  filter(IHO == "CAA") %>%
+  dplyr::select(-year, -xc, -yc, -IHO_area_large, -IHO, -area, -SA_int_n, -v_n, -t_n, -o_n, -s_n) %>%
+  cor(., method = "spearman") %>%
+  round(., 2)
+ggcorrplot(corr_CAA, type = "lower", lab = T, title = "corr CAA")
+```
+
+![](PanArctic_DSL_statistics_files/figure-gfm/corr-area-5.png)<!-- -->
 
 ## Model fitting
 
-Fit a linear model.
+I decided to fit hierarchical generalized additive model due to their
+flexibility in modelling non linear relationships. I fit several models
+with different structures (random intercept, random “slope”) and
+different covariates.
 
 ``` r
-lm_test <- lm(SA_int_n ~ velo_n + temp_n + ow_n, data = SA_df) # Fit model
-lm_test_resid <- rstandard(lm_test) # Calculate residuals
+# Fit models
+GAM1 <- gam(SA_int_n ~ s(v_n, k = 5, bs = "tp") + s(t_n, k = 5, bs = "tp") + s(o_n, k = 5, bs = "tp"),
+            data = SA_df, family = "gaussian", method = "REML")
+GAM2 <- gam(SA_int_n ~ s(v_n, k = 5, bs = "tp") + s(t_n, k = 5, bs = "tp"), 
+            data = SA_df, family = "gaussian", method = "REML")
+GAM3 <- gam(SA_int_n ~ s(v_n, k = 5, bs = "tp") + s(o_n, k = 5, bs = "tp"),
+            data = SA_df, family = "gaussian", method = "REML")
+GAM4 <- gam(SA_int_n ~ s(t_n, k = 5, bs = "tp") + s(o_n, k = 5, bs = "tp"),
+            data = SA_df, family = "gaussian", method = "REML")
+GAM5 <- gam(SA_int_n ~ s(v_n, k = 5, bs = "tp"), data = SA_df, family = "gaussian", method = "REML")
+GAM6 <- gam(SA_int_n ~ s(t_n, k = 5, bs = "tp"), data = SA_df, family = "gaussian", method = "REML")
+GAM7 <- gam(SA_int_n ~ s(o_n, k = 5, bs = "tp"), data = SA_df, family = "gaussian", method = "REML")
+# Model S
+GAM8 <- gam(SA_int_n ~ s(v_n, IHO, bs = "fs", k = 5, m = 2) + s(t_n, IHO, bs = "fs", k = 5, m = 2) + s(o_n, IHO, bs = "fs", k = 5, m = 2), 
+            data = SA_df, family = "gaussian", method = "REML")
 ```
 
-Plot residuals.
+    ## Warning in gam.side(sm, X, tol = .Machine$double.eps^0.5): model has repeated 1-
+    ## d smooths of same variable.
 
 ``` r
-par(mfrow = c(1, 2))
-plot(lm_test_resid ~ as.factor(SA_df$area), xlab = "Area", ylab = "Standardized residuals")
-abline(0, 0, lty = 2)
-plot(lm_test_resid ~ as.factor(SA_df$year), xlab = "Year", ylab = "Standardized residuals")
-abline(0, 0, lty = 2)
+GAM9 <- gam(SA_int_n ~ s(v_n, IHO, bs = "fs", k = 5, m = 2) + s(t_n, IHO, bs = "fs", k = 5, m = 2),
+            data = SA_df, family = "gaussian", method = "REML")
 ```
 
-![](PanArctic_DSL_statistics_files/figure-gfm/lm-test-resids-1.png)<!-- -->
-
-There is residual variance that could be explained by area but not so
-much by the year. So I fit a linear mixed model.
+    ## Warning in gam.side(sm, X, tol = .Machine$double.eps^0.5): model has repeated 1-
+    ## d smooths of same variable.
 
 ``` r
-lmer(SA_int_n ~ velo_n + temp_n + ow_n + (1 | area), data = SA_df, REML = TRUE)
+GAM10 <- gam(SA_int_n ~ s(v_n, IHO, bs = "fs", k = 5, m = 2) + s(o_n, IHO, bs = "fs", k = 5, m = 2),
+             data = SA_df, family = "gaussian", method = "REML")
 ```
 
-    ## Linear mixed model fit by REML ['lmerMod']
-    ## Formula: SA_int_n ~ velo_n + temp_n + ow_n + (1 | area)
-    ##    Data: SA_df
-    ## REML criterion at convergence: -124.3102
-    ## Random effects:
-    ##  Groups   Name        Std.Dev.
-    ##  area     (Intercept) 0.06064 
-    ##  Residual             0.14111 
-    ## Number of obs: 132, groups:  area, 3
-    ## Fixed Effects:
-    ## (Intercept)       velo_n       temp_n         ow_n  
-    ##      0.3549      -0.1199      -0.1368       0.4405
-
-Incorporate different model sturctures (random intercepts and random
-slopes).
+    ## Warning in gam.side(sm, X, tol = .Machine$double.eps^0.5): model has repeated 1-
+    ## d smooths of same variable.
 
 ``` r
-# Note that REML = FALSE in order to compare with the basic linear model where estimation method = ML
-# Basic linear model / Linear model with no random effects
-M0 <- lm(SA_int_n ~ velo_n + temp_n + ow_n,
-          data = SA_df)
-# Full model with varying intercepts
-M1 <- lmer(SA_int_n ~ velo_n + temp_n + ow_n + (1 | area) + (1 | year), 
-           data = SA_df, REML = T)
-# Full model with varying intercepts and slopes
-M2 <- lmer(SA_int_n ~ velo_n + temp_n + ow_n +
-             (1 + velo_n | area) + (1 + temp_n | area) + (1 + ow_n | area) +
-             (1 + velo_n | year) + (1 + temp_n | year) + (1 + ow_n | year),
-           data = SA_df, REML = FALSE)
+GAM11 <- gam(SA_int_n ~ s(t_n, IHO, bs = "fs", k = 5, m = 2) + s(o_n, IHO, bs = "fs", k = 5, m = 2),
+             data = SA_df, family = "gaussian", method = "REML")
 ```
 
-    ## boundary (singular) fit: see help('isSingular')
+    ## Warning in gam.side(sm, X, tol = .Machine$double.eps^0.5): model has repeated 1-
+    ## d smooths of same variable.
 
 ``` r
-# No year varying intercepts only
-M3 <- lmer(SA_int_n ~ velo_n + temp_n + ow_n + (1 | area), 
-           data = SA_df, REML = FALSE)
-# No area varying intercepts only
-M4 <- lmer(SA_int_n ~ velo_n + temp_n + ow_n + (1 | year), 
-           data = SA_df, REML = FALSE)
-# No year, varying intercepts and slopes
-M5 <- lmer(SA_int_n ~ velo_n + temp_n + ow_n + 
-             (1 + velo_n | area) + (1 + temp_n | area) + (1 + ow_n | area),
-           data = SA_df, REML = FALSE)
+GAM12 <- gam(SA_int_n ~ s(v_n, IHO, bs = "fs", k = 5, m = 2),
+             data = SA_df, family = "gaussian", method = "REML")
+GAM13 <- gam(SA_int_n ~ s(t_n, IHO, bs = "fs", k = 5, m = 2), 
+             data = SA_df, family = "gaussian", method = "REML")
+GAM14 <- gam(SA_int_n ~ s(o_n, IHO, bs = "fs", k = 5, m = 2),
+             data = SA_df, family = "gaussian", method = "REML")
+# Model I
+GAM15 <- gam(SA_int_n ~ s(IHO, bs = "re") + s(v_n, by = IHO, k = 5, bs = "tp") +
+               s(t_n, by = IHO, k = 5, bs = "tp") + s(o_n, by = IHO, k = 5, bs = "tp"),
+            data = SA_df, family = "gaussian", method = "REML")
+GAM16 <- gam(SA_int_n ~ s(IHO, bs = "re") + s(v_n, by = IHO, k = 5, bs = "tp") + s(t_n, by = IHO, k = 5, bs = "tp"),
+            data = SA_df, family = "gaussian", method = "REML")
+GAM17 <- gam(SA_int_n ~ s(IHO, bs = "re") + s(v_n, by = IHO, k = 5, bs = "tp") + s(o_n, by = IHO, k = 5, bs = "tp"),
+             data = SA_df, family = "gaussian", method = "REML")
+GAM18 <- gam(SA_int_n ~ s(IHO, bs = "re") + s(t_n, by = IHO, k = 5, bs = "tp") + s(o_n, by = IHO, k = 5, bs = "tp"),
+             data = SA_df, family = "gaussian", method = "REML")
+GAM19 <- gam(SA_int_n ~ s(IHO, bs = "re") + s(v_n, by = IHO, k = 5, bs = "tp"),
+             data = SA_df, family = "gaussian", method = "REML")
+GAM20 <- gam(SA_int_n ~ s(IHO, bs = "re") + s(t_n, by = IHO, k = 5, bs = "tp"),
+             data = SA_df, family = "gaussian", method = "REML")
+GAM21 <- gam(SA_int_n ~ s(IHO, bs = "re", k = 5) + s(o_n, by = IHO, k = 5, bs = "tp"),
+             data = SA_df, family = "gaussian", method = "REML")
+# Model GS
+# GAM15 <- gam(SA_int_n ~ s(v_n, k = 5, m = 2) + s(t_n, k = 5, m = 2) + s(o_n, k = 5, m = 2) + 
+#                s(v_n, IHO, bs = "fs", k = 5, m = 2) + s(t_n, IHO, bs = "fs", k = 5, m = 2) + s(o_n, IHO, bs = "fs", k = 5, m = 2), 
+#             data = SA_df, family = "gaussian", method = "REML")
+# GAM16 <- gam(SA_int_n ~ s(v_n, k = 5, m = 2) + s(t_n, k = 5, m = 2) +
+#                s(v_n, IHO, bs = "fs", k = 5, m = 2) + s(t_n, IHO, bs = "fs", k = 5, m = 2),
+#             data = SA_df, family = "gaussian", method = "REML")
+# GAM17 <- gam(SA_int_n ~ s(v_n, k = 5, m = 2) + s(o_n, k = 5, m = 2) + 
+#                s(v_n, IHO, bs = "fs", k = 5, m = 2) + s(o_n, IHO, bs = "fs", k = 5, m = 2),
+#              data = SA_df, family = "gaussian", method = "REML")
+# GAM18 <- gam(SA_int_n ~ s(t_n, k = 5, m = 2) + s(o_n, k = 5, m = 2) + 
+#                s(t_n, IHO, bs = "fs", k = 5, m = 2) + s(o_n, IHO, bs = "fs", k = 5, m = 2),
+#              data = SA_df, family = "gaussian", method = "REML")
+# GAM19 <- gam(SA_int_n ~ s(v_n, IHO, bs = "fs", k = 5, m = 2),
+#              data = SA_df, family = "gaussian", method = "REML")
+# GAM20 <- gam(SA_int_n ~ s(t_n, IHO, bs = "fs", k = 5, m = 2), 
+#              data = SA_df, family = "gaussian", method = "REML")
+# GAM21 <- gam(SA_int_n ~ s(o_n, IHO, bs = "fs", k = 5, m = 2),
+#              data = SA_df, family = "gaussian", method = "REML")
+
+GAM_AIC <- AIC(GAM1, GAM2, GAM3, GAM4, GAM5, GAM6, GAM7, GAM8, GAM9, GAM10, GAM11, GAM12,
+               GAM13, GAM14, GAM15, GAM16, GAM17, GAM18, GAM19, GAM20, GAM21) %>% 
+  rownames_to_column() %>%
+  rename(model = rowname,
+         df = )
+# Metrics data frame
+summ_GAM <- data.frame(model = c("GAM1", "GAM2", "GAM3", "GAM4", "GAM5", "GAM6", "GAM7", "GAM8",
+                                 "GAM9", "GAM10", "GAM11", "GAM12", "GAM13", "GAM14", "GAM15",
+                                 "GAM16", "GAM17", "GAM18", "GAM19", "GAM20", "GAM21"),
+                       reml = round(c(GAM1$gcv.ubre, GAM2$gcv.ubre, GAM3$gcv.ubre, GAM4$gcv.ubre, GAM5$gcv.ubre,
+                                      GAM6$gcv.ubre, GAM7$gcv.ubre, GAM8$gcv.ubre, GAM9$gcv.ubre, GAM10$gcv.ubre,
+                                      GAM11$gcv.ubre, GAM12$gcv.ubre, GAM13$gcv.ubre, GAM14$gcv.ubre, GAM15$gcv.ubre,
+                                      GAM16$gcv.ubre, GAM17$gcv.ubre, GAM18$gcv.ubre, GAM19$gcv.ubre, GAM20$gcv.ubre, 
+                                      GAM21$gcv.ubre), 2), 
+                       dev_expl = round(c((1 - (GAM1$deviance / GAM1$null.deviance)) * 100,
+                                          (1 - (GAM2$deviance / GAM2$null.deviance)) * 100,
+                                          (1 - (GAM3$deviance / GAM3$null.deviance)) * 100,
+                                          (1 - (GAM4$deviance / GAM4$null.deviance)) * 100,
+                                          (1 - (GAM5$deviance / GAM5$null.deviance)) * 100,
+                                          (1 - (GAM6$deviance / GAM6$null.deviance)) * 100,
+                                          (1 - (GAM7$deviance / GAM7$null.deviance)) * 100,
+                                          (1 - (GAM8$deviance / GAM8$null.deviance)) * 100,
+                                          (1 - (GAM9$deviance / GAM9$null.deviance)) * 100,
+                                          (1 - (GAM10$deviance / GAM10$null.deviance)) * 100,
+                                          (1 - (GAM11$deviance / GAM11$null.deviance)) * 100,
+                                          (1 - (GAM12$deviance / GAM12$null.deviance)) * 100,
+                                          (1 - (GAM13$deviance / GAM13$null.deviance)) * 100,
+                                          (1 - (GAM14$deviance / GAM14$null.deviance)) * 100,
+                                          (1 - (GAM15$deviance / GAM15$null.deviance)) * 100,
+                                          (1 - (GAM16$deviance / GAM16$null.deviance)) * 100,
+                                          (1 - (GAM17$deviance / GAM17$null.deviance)) * 100,
+                                          (1 - (GAM18$deviance / GAM18$null.deviance)) * 100,
+                                          (1 - (GAM19$deviance / GAM19$null.deviance)) * 100,
+                                          (1 - (GAM20$deviance / GAM20$null.deviance)) * 100,
+                                          (1 - (GAM21$deviance / GAM21$null.deviance)) * 100), 2),
+                       r2 = round(c(summary(GAM1)$r.sq, summary(GAM2)$r.sq, summary(GAM3)$r.sq, summary(GAM4)$r.sq, 
+                                    summary(GAM5)$r.sq, summary(GAM6)$r.sq, summary(GAM7)$r.sq, summary(GAM8)$r.sq, 
+                                    summary(GAM9)$r.sq, summary(GAM10)$r.sq, summary(GAM11)$r.sq, summary(GAM12)$r.sq, 
+                                    summary(GAM13)$r.sq, summary(GAM14)$r.sq, summary(GAM15)$r.sq, summary(GAM16)$r.sq,
+                                    summary(GAM17)$r.sq, summary(GAM18)$r.sq, summary(GAM19)$r.sq, summary(GAM20)$r.sq,
+                                    summary(GAM21)$r.sq), 2)) %>%
+  full_join(., GAM_AIC, by = "model") %>%
+  mutate(df = round(df, 3),
+         AIC = round(AIC, 3),
+         dAIC = AIC - min(AIC),
+         w_AIC = round(Weights(AIC), 10)) %>%
+  dplyr::select(model, df, dev_expl, r2, reml, AIC, dAIC, w_AIC) %>%
+  arrange(dAIC) %>% 
+  datatable(class = "cell-border stribe", rownames = F)
+summ_GAM
 ```
 
-    ## boundary (singular) fit: see help('isSingular')
+![](PanArctic_DSL_statistics_files/figure-gfm/HGAM-fit-1.png)<!-- -->
+
+`GAM15` seems to perform pretty well for all metrics (AIC and REML
+scores, and deviance explained), so I select this model.
 
 ``` r
-# No area, varying intercepts and slopes
-M6 <- lmer(SA_int_n ~ velo_n + temp_n + ow_n +
-             (1 + velo_n | year) + (1 + temp_n | year) + (1 + ow_n | year),
-           data = SA_df, REML = FALSE)
+summary(GAM15)
 ```
 
-    ## boundary (singular) fit: see help('isSingular')
-
-``` r
-# Full model with varying intercepts and slopes only varying by area
-M7 <- lmer(SA_int_n ~ velo_n + temp_n + ow_n + (1 | year) +
-             (1 + velo_n | area) + (1 + temp_n | area) + (1 + ow_n | area),
-           data = SA_df, REML = FALSE)
-```
-
-    ## boundary (singular) fit: see help('isSingular')
-
-``` r
-# Full model with varying intercepts and slopes only varying by year
-M8 <- lmer(SA_int_n ~ velo_n + temp_n + ow_n + (1 | area) +
-             (1 + velo_n | year) + (1 + temp_n | year) + (1 + ow_n | year),
-           data = SA_df, REML = FALSE)
-```
-
-    ## boundary (singular) fit: see help('isSingular')
-
-Compare models.
-
-``` r
-# To group all AICc values into a single table, we can use MuMIn::model.sel() to calculate AICc for each model
-MuMIn::model.sel(M0, M1, M2, M3, M4, M5, M6, M7, M8)[, c("df", "logLik", "AICc", "delta")] 
-```
-
-    ##    df   logLik       AICc     delta
-    ## M3  6 70.12756 -127.58312  0.000000
-    ## M0  5 68.11737 -125.75856  1.824564
-    ## M4  6 68.23901 -123.80602  3.777099
-    ## M1  7 62.19094 -109.47865 18.104469
-    ## M5 14 70.50732 -109.42489 18.158227
-    ## M7 15 70.50732 -106.87671 20.706415
-    ## M8 15 70.28538 -106.43284 21.150284
-    ## M6 14 69.00959 -106.42943 21.153689
-    ## M2 23 71.06867  -85.91512 41.668005
-
-M3, the model which does not include a year effect is the best model. I
-therefore refit M3 with REML for further analyses.
-
-``` r
-# No year varying intercepts only
-M3_bis <- lmer(SA_int_n ~ velo_n + temp_n + ow_n + (1 | area), 
-               data = SA_df, REML = TRUE)
-```
-
-## Model validation
-
-Check homogeneity of variance.
-
-``` r
-MX <- M3_bis
-# Plot predicted values vs residual values
-par(mar = c(4, 4, 0.5, 0.5))
-plot(resid(MX) ~ fitted(MX), xlab = "Predicted values", ylab = "Normalized residuals")
-abline(h = 0, lty = 2)
-```
-
-![](PanArctic_DSL_statistics_files/figure-gfm/variance-homogeneity-1.png)<!-- -->
-
-Assumption is met.
-
-Check independence of model residuals with each covariate. First I plot
-the residuals vs each covariate.
-
-``` r
-MX <- M3_bis
-# In order to check the independence of the model residuals we need to plot residuals vs each covariate of the model
-par(mfrow = c(1, 5), mar = c(4, 4, 0.5, 0.5))
-plot(resid(MX) ~ SA_df$velo_n, xlab = "Velocity normalized", ylab = "Normalized residuals")
-abline(h = 0, lty = 2)
-plot(resid(MX) ~ SA_df$temp_n, xlab = "Temperature normalized", ylab = "Normalized residuals")
-abline(h = 0, lty = 2)
-plot(resid(MX) ~ SA_df$ow_n, xlab = "Openwater normalized", ylab = "Normalized residuals")
-abline(h = 0, lty = 2)
-boxplot(resid(MX) ~ area, data = SA_df, xlab = "Area", ylab = "Normalized residuals")
-abline(h = 0, lty = 2)
-boxplot(resid(MX) ~ year, data = SA_df, xlab = "Year", ylab = "Normalized residuals")
-abline(h = 0, lty = 2)
-```
-
-![](PanArctic_DSL_statistics_files/figure-gfm/unnamed-chunk-4-1.png)<!-- -->
-
-Check normality of residuals.
-
-``` r
-qqnorm(resid(M3_bis))
-qqline(resid(M3_bis))
-```
-
-![](PanArctic_DSL_statistics_files/figure-gfm/normality-1.png)<!-- -->
-
-Residuals are pretty normal except for two outliers.
-
-## Model interpretation and visualisation
-
-Check the summary of our model.
-
-``` r
-summary(M3_bis)
-```
-
-    ## Linear mixed model fit by REML ['lmerMod']
-    ## Formula: SA_int_n ~ velo_n + temp_n + ow_n + (1 | area)
-    ##    Data: SA_df
     ## 
-    ## REML criterion at convergence: -124.3
+    ## Family: gaussian 
+    ## Link function: identity 
     ## 
-    ## Scaled residuals: 
-    ##     Min      1Q  Median      3Q     Max 
-    ## -2.2023 -0.5584 -0.0205  0.5282  4.7638 
+    ## Formula:
+    ## SA_int_n ~ s(IHO, bs = "re") + s(v_n, by = IHO, k = 5, bs = "tp") + 
+    ##     s(t_n, by = IHO, k = 5, bs = "tp") + s(o_n, by = IHO, k = 5, 
+    ##     bs = "tp")
     ## 
-    ## Random effects:
-    ##  Groups   Name        Variance Std.Dev.
-    ##  area     (Intercept) 0.003677 0.06064 
-    ##  Residual             0.019911 0.14111 
-    ## Number of obs: 132, groups:  area, 3
+    ## Parametric coefficients:
+    ##             Estimate Std. Error t value Pr(>|t|)    
+    ## (Intercept)  0.43352    0.03047   14.23   <2e-16 ***
+    ## ---
+    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
     ## 
-    ## Fixed effects:
-    ##             Estimate Std. Error t value
-    ## (Intercept)  0.35486    0.05185   6.844
-    ## velo_n      -0.11992    0.06237  -1.923
-    ## temp_n      -0.13684    0.07025  -1.948
-    ## ow_n         0.44054    0.06924   6.363
+    ## Approximate significance of smooth terms:
+    ##                    edf Ref.df      F  p-value    
+    ## s(IHO)           1.504  4.000  0.722 0.108500    
+    ## s(v_n):IHOWAO_BF 1.000  1.000  4.594 0.034328 *  
+    ## s(v_n):IHOCAA    1.000  1.000  0.762 0.384637    
+    ## s(v_n):IHOBB     1.000  1.000  8.658 0.003986 ** 
+    ## s(v_n):IHODS     1.000  1.000  4.199 0.042865 *  
+    ## s(v_n):IHOEAO    1.000  1.000  0.098 0.754692    
+    ## s(t_n):IHOWAO_BF 1.000  1.000 15.207 0.000168 ***
+    ## s(t_n):IHOCAA    1.000  1.000  2.855 0.093989 .  
+    ## s(t_n):IHOBB     3.557  3.871  6.826 0.000446 ***
+    ## s(t_n):IHODS     1.889  2.370  2.212 0.103570    
+    ## s(t_n):IHOEAO    1.000  1.000  3.309 0.071655 .  
+    ## s(o_n):IHOWAO_BF 2.107  2.525  5.205 0.007454 ** 
+    ## s(o_n):IHOCAA    3.027  3.369  8.335  1.6e-05 ***
+    ## s(o_n):IHOBB     1.000  1.000 34.692  < 2e-16 ***
+    ## s(o_n):IHODS     1.000  1.000  1.003 0.318741    
+    ## s(o_n):IHOEAO    1.000  1.000  4.558 0.035036 *  
+    ## ---
+    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
     ## 
-    ## Correlation of Fixed Effects:
-    ##        (Intr) velo_n temp_n
-    ## velo_n -0.375              
-    ## temp_n -0.540  0.187       
-    ## ow_n   -0.066 -0.282 -0.325
+    ## R-sq.(adj) =  0.543   Deviance explained = 62.3%
+    ## -REML = -0.64242  Scale est. = 0.032455  n = 132
 
 ``` r
-# Calculate confidence interval for parameter
-CI_velo <- c(0.06237 * 1.96 - 0.11992, 0.06237 * 1.96 + 0.11992) # velocity, significantly different from 0
-CI_velo
+appraise(GAM15)
 ```
 
-    ## [1] 0.0023252 0.2421652
+![](PanArctic_DSL_statistics_files/figure-gfm/residuals-covariates-1.png)<!-- -->
 
 ``` r
-CI_temp <- c(0.07025 * 1.96 - 0.13684, 0.07025 * 1.96 + 0.13684) # temperature, significantly different from 0
-CI_temp
+resid_GAM <- bind_cols(SA_df, residuals.gam(GAM15)) %>%
+  rename(resid = "...17")
+plot_grid(resid_GAM %>%
+            ggplot(aes(x = v_n, y = resid)) + 
+            geom_hline(yintercept = 0, col = "red") +
+            geom_point(), 
+          resid_GAM %>%
+            ggplot(aes(x = t_n, y = resid)) + 
+            geom_hline(yintercept = 0, col = "red") +
+            geom_point(), 
+          resid_GAM %>%
+            ggplot(aes(x = o_n, y = resid)) + 
+            geom_hline(yintercept = 0, col = "red") +
+            geom_point(), 
+          resid_GAM %>%
+            ggplot(aes(x = IHO, y = resid)) + 
+            geom_hline(yintercept = 0, col = "red") +
+            geom_boxplot(fill = NA), 
+          resid_GAM %>%
+            ggplot(aes(x = year, y = resid)) + 
+            geom_hline(yintercept = 0, col = "red") +
+            geom_boxplot(fill = NA))
 ```
 
-    ## [1] 0.00085 0.27453
+![](PanArctic_DSL_statistics_files/figure-gfm/residuals-covariates-2.png)<!-- -->
+
+The residuals look great.
 
 ``` r
-CI_ow <- c(0.06924 * 1.96 - 0.44054, 0.06924 * 1.96 + 0.44054) # openwater, NOT significantly different from 0
-CI_ow
+par(mfrow = c(1, 2), mar = c(4, 4, 4, 0.5))
+acf(resid(GAM15), lag.max = 36, main = "ACF")
+pacf(resid(GAM15), lag.max = 36, main = "pACF")
 ```
 
-    ## [1] -0.3048296  0.5762504
-
-Plot results
+![](PanArctic_DSL_statistics_files/figure-gfm/acf-pacf-1.png)<!-- -->
 
 ``` r
-area_coef <- coef(M3_bis)$area
+visreg(GAM15, "v_n", "IHO", overlay = F, scale = "response", band = F, partial = T)
+```
 
-SA_df %>%
+![](PanArctic_DSL_statistics_files/figure-gfm/plot-GAM15-1.png)<!-- -->
+
+``` r
+visreg(GAM15, "t_n", "IHO", overlay = F, scale = "response", band = F, partial = T)
+```
+
+![](PanArctic_DSL_statistics_files/figure-gfm/plot-GAM15-2.png)<!-- -->
+
+``` r
+visreg(GAM15, "o_n", "IHO", overlay = F, scale = "response", band = F, partial = T)
+```
+
+![](PanArctic_DSL_statistics_files/figure-gfm/plot-GAM15-3.png)<!-- -->
+
+Now I predict the model for plotting
+
+``` r
+pred_vn <- get_gam_predictions(GAM15, series = v_n, .comparison = IHO, series_length = 50) %>%
+  rename(idx = ".idx",
+         v_SA = SA_int_n,
+         v_SE = SE,
+         v_CI_upper = CI_upper,
+         v_CI_lower = CI_lower) %>%
+  mutate(v_signif = case_when(IHO == "WAO_BF" ~  0.05, # Significance level
+                              IHO == "CAA" ~ 1,
+                              IHO == "BB" ~ 0.01,
+                              IHO == "DS" ~ 0.05,
+                              IHO == "EAO" ~ 1),
+         v_group = factor(if_else(v_signif > 0.1, F, T)))
+pred_tn <- get_gam_predictions(GAM15, series = t_n, .comparison = IHO, series_length = 50) %>%
+  rename(t_IHO = IHO,
+         t_idx = ".idx",
+         t_SA = SA_int_n,
+         t_SE = SE,
+         t_CI_upper = CI_upper,
+         t_CI_lower = CI_lower) %>%
+  mutate(t_signif = case_when(t_IHO == "WAO_BF" ~ 0.001, # significance level
+                              t_IHO == "CAA" ~ 0.1,
+                              t_IHO == "BB" ~ 0.001,
+                              t_IHO == "DS" ~ 1,
+                              t_IHO == "EAO" ~ 0.1),
+         t_group = factor(if_else(t_signif > 0.1, F, T)))
+pred_on <- get_gam_predictions(GAM15, series = o_n, .comparison = IHO, series_length = 50) %>%
+  rename(o_IHO = IHO,
+         o_idx = ".idx",
+         o_SA = SA_int_n,
+         o_SE = SE,
+         o_CI_upper = CI_upper,
+         o_CI_lower = CI_lower) %>%
+  mutate(o_signif = case_when(o_IHO == "WAO_BF" ~ 0.01, # significance level
+                              o_IHO == "CAA" ~ 0.001,
+                              o_IHO == "BB" ~ 0.001,
+                              o_IHO == "DS" ~ 1,
+                              o_IHO == "EAO" ~ 0.05),
+         o_group = factor(if_else(o_signif > 0.1, F, T)))
+
+pred_GAM15 <- bind_cols(pred_vn, pred_tn, pred_on) %>%
+  dplyr::select(-t_IHO, -t_idx, -o_IHO, -o_idx)
+```
+
+``` r
+col_pal <- c("#5BBCD6", "#00A08A", "#F2AD00", "#F98400", "#FF0000")# wesanderson::wes_palette("Darjeeling1", type = "discrete") 
+
+pred_GAM15 %>%
+  mutate(group = factor(if_else(v_signif > 0.1, F, T))) %>%
   ggplot() +
-  geom_point(aes(x = velo_n, y = SA_int_n, col = factor(area)), size = 4) + 
-  geom_abline(intercept = area_coef[1, 1], slope = area_coef[1, 2], col = "coral2", size = 1) +
-  geom_abline(intercept = area_coef[2, 1], slope = area_coef[2, 2], col = "green4", size = 1) +
-  geom_abline(intercept = area_coef[3, 1], slope = area_coef[3, 2], col = "blue1", size = 1)
+  geom_line(aes(x = v_n, y = v_SA, col = IHO, linetype = group), size = 0.7) +
+  geom_ribbon(aes(x = v_n, ymin = v_CI_lower, ymax = v_CI_upper, fill = IHO), alpha = 0.1) +
+  scale_colour_manual(values = col_pal) + 
+  scale_fill_manual(values = col_pal) +
+  scale_linetype_manual(values = c(2, 1)) +
+  guides(linetype = F)
 ```
 
-![](PanArctic_DSL_statistics_files/figure-gfm/plot-m3-1.png)<!-- -->
+    ## Warning: `guides(<scale> = FALSE)` is deprecated. Please use `guides(<scale> =
+    ## "none")` instead.
+
+![](PanArctic_DSL_statistics_files/figure-gfm/ggplot-gam-1.png)<!-- -->
 
 ``` r
-SA_df %>%
+pred_GAM15 %>%
+  mutate(group = factor(if_else(t_signif > 0.1, F, T))) %>%
   ggplot() +
-  geom_point(aes(x = temp_n, y = SA_int_n, col = factor(area)), size = 4) + 
-  geom_abline(intercept = area_coef[1, 1], slope = area_coef[1, 3], col = "coral2", size = 1) +
-  geom_abline(intercept = area_coef[2, 1], slope = area_coef[2, 3], col = "green4", size = 1) +
-  geom_abline(intercept = area_coef[3, 1], slope = area_coef[3, 3], col = "blue1", size = 1)
+  geom_line(aes(x = t_n, y = t_SA, col = IHO, linetype = group), size = 0.7) +
+  # geom_ribbon(aes(x = v_n, ymin = v_CI_lower, ymax = v_CI_upper, fill = IHO), alpha = 0.1) +
+  scale_colour_manual(values = col_pal) + 
+  scale_fill_manual(values = col_pal) +
+  scale_linetype_manual(values = c(2, 1)) +
+  guides(linetype = F)
 ```
 
-![](PanArctic_DSL_statistics_files/figure-gfm/plot-m3-2.png)<!-- -->
+    ## Warning: `guides(<scale> = FALSE)` is deprecated. Please use `guides(<scale> =
+    ## "none")` instead.
+
+![](PanArctic_DSL_statistics_files/figure-gfm/ggplot-gam-2.png)<!-- -->
 
 ``` r
-SA_df %>%
+pred_GAM15 %>%
+  mutate(group = factor(if_else(o_signif > 0.1, F, T))) %>%
   ggplot() +
-  geom_point(aes(x = ow_n, y = SA_int_n, col = factor(area)), size = 4) + 
-  geom_abline(intercept = area_coef[1, 1], slope = area_coef[1, 4], col = "coral2", size = 1) +
-  geom_abline(intercept = area_coef[2, 1], slope = area_coef[2, 4], col = "green4", size = 1) +
-  geom_abline(intercept = area_coef[3, 1], slope = area_coef[3, 4], col = "blue1", size = 1)
+  geom_line(aes(x = o_n, y = o_SA, col = IHO, linetype = group), size = 0.7) +
+  # geom_ribbon(aes(x = v_n, ymin = v_CI_lower, ymax = v_CI_upper, fill = IHO), alpha = 0.1) +
+  scale_colour_manual(values = col_pal) + 
+  scale_fill_manual(values = col_pal) +
+  scale_linetype_manual(values = c(2, 1)) +
+  guides(linetype = F)
 ```
 
-![](PanArctic_DSL_statistics_files/figure-gfm/plot-m3-3.png)<!-- -->
+    ## Warning: `guides(<scale> = FALSE)` is deprecated. Please use `guides(<scale> =
+    ## "none")` instead.
 
-I am not too convinced so I fit a hierarchical gam.
+![](PanArctic_DSL_statistics_files/figure-gfm/ggplot-gam-3.png)<!-- -->
