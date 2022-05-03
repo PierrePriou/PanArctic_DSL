@@ -258,9 +258,6 @@ stat_laea %>% # Mixed layer depth
 
 ## Data preparation
 
-Because I am interested in the environmental drivers of mesopelagic backscatter within each area, I run a linear model for each 
-area. First, I prepare the dataset and standardize each environmental variable per area.
-
 ```{r lm-prep}
 SA_df <- stat_laea %>%
   dplyr::select(year, xc, yc, area, IHO_area_large, IHO_area, SA_int, velocity, thetao, openwater_duration, ice_week) %>%
@@ -283,25 +280,25 @@ Plot data.
 
 ```{r plot-data-area, fig.height=8, fig.width=10, message=FALSE}
 plot_grid(SA_df %>%
-            ggplot(aes(x = v_n, y = SA_int_n, col = IHO_area_large)) +
+            ggplot(aes(x = v, y = SA_int, col = IHO_area_large)) +
             geom_point() +
             geom_smooth(method = "lm", se = F, col = "grey20") +
             facet_grid(~ IHO) +
             theme(legend.position = "none"),
           SA_df %>%
-            ggplot(aes(x = t_n, y = SA_int_n, col = IHO_area_large)) +
+            ggplot(aes(x = t, y = SA_int, col = IHO_area_large)) +
             geom_point() +
             geom_smooth(method = "lm", se = F, col = "grey20") +
             facet_grid(~ IHO) +
             theme(legend.position = "none"),
           SA_df %>%
-            ggplot(aes(x = o_n, y = SA_int_n, col = IHO_area_large)) +
+            ggplot(aes(x = o, y = SA_int, col = IHO_area_large)) +
             geom_point() +
             geom_smooth(method = "lm", se = F, col = "grey20") +
             facet_grid(~ IHO) +
             theme(legend.position = "none"),
           SA_df %>%
-            ggplot(aes(x = s_n, y = SA_int_n, col = IHO_area_large)) +
+            ggplot(aes(x = s, y = SA_int, col = IHO_area_large)) +
             geom_point() +
             geom_smooth(method = "lm", se = F, col = "grey20") +
             facet_grid(~ IHO) +
@@ -311,22 +308,22 @@ plot_grid(SA_df %>%
 
 ```{r plot-distribution, fig.height=8, fig.width=10, message=FALSE}
 plot_grid(SA_df %>%
-            ggplot(aes(x = v_n, fill = IHO_area_large)) +
+            ggplot(aes(x = v, fill = IHO_area_large)) +
             geom_histogram() +
             facet_grid(~ IHO) +
             theme(legend.position = "none"),
           SA_df %>%
-            ggplot(aes(x = t_n, fill = IHO_area_large)) +
+            ggplot(aes(x = t, fill = IHO_area_large)) +
             geom_histogram() +
             facet_grid(~ IHO) +
             theme(legend.position = "none"),
           SA_df %>%
-            ggplot(aes(x = o_n, fill = IHO_area_large)) +
+            ggplot(aes(x = o, fill = IHO_area_large)) +
             geom_histogram() +
             facet_grid(~ IHO) +
             theme(legend.position = "none"),
           SA_df %>%
-            ggplot(aes(x = s_n, fill = IHO_area_large)) +
+            ggplot(aes(x = s, fill = IHO_area_large)) +
             geom_histogram() +
             facet_grid(~ IHO) +
             theme(legend.position = "none"),
@@ -378,22 +375,22 @@ I decided to fit hierarchical generalized additive model due to their flexibilit
 
 ```{r HGAM-fit}
 # Model G
-GAM1 <- gam(SA_int_n ~ s(v_n, k = 5, bs = "tp") + s(t_n, k = 5, bs = "tp") + s(o_n, k = 5, bs = "tp"),
+GAM1 <- gam(SA_int ~ s(v, k = 5, bs = "tp") + s(t, k = 5, bs = "tp") + s(o, k = 5, bs = "tp"),
             data = SA_df, family = "gaussian", method = "REML")
 # Model S
-GAM2 <- gam(SA_int_n ~ s(v_n, IHO, bs = "fs", k = 5) + s(t_n, IHO, bs = "fs", k = 5) + s(o_n, IHO, bs = "fs", k = 5), 
+GAM2 <- gam(SA_int ~ s(v, IHO, bs = "fs", k = 5) + s(t, IHO, bs = "fs", k = 5) + s(o, IHO, bs = "fs", k = 5), 
             data = SA_df, family = "gaussian", method = "REML")
 # Model I
-GAM3 <- gam(SA_int_n ~ s(v_n, by = IHO, k = 5, bs = "tp") + s(t_n, by = IHO, k = 5, bs = "tp") + 
-              s(o_n, by = IHO, k = 5, bs = "tp") + s(IHO, bs = "re"),
+GAM3 <- gam(SA_int ~ s(v, by = IHO, k = 5, bs = "tp") + s(t, by = IHO, k = 5, bs = "tp") + 
+              s(o, by = IHO, k = 5, bs = "tp") + s(IHO, bs = "re"),
             data = SA_df, family = "gaussian", method = "REML")
 # Model GS
-GAM4 <- gam(SA_int_n ~ s(v_n, k = 5) + s(t_n, k = 5) + s(o_n, k = 5) + s(v_n, IHO, bs = "fs", k = 5) + 
+GAM4 <- gam(SA_int ~ s(v, k = 5) + s(t, k = 5) + s(o, k = 5) + s(v, IHO, bs = "fs", k = 5) + 
               s(t_n, IHO, bs = "fs", k = 5) + s(o_n, IHO, bs = "fs", k = 5),
             data = SA_df, family = "gaussian", method = "REML")
 # Model GI
-GAM5 <- gam(SA_int_n ~ s(v_n, k = 5) + s(t_n, k = 5) + s(o_n, k = 5) + s(v_n, by = IHO, k = 5, bs = "tp") + 
-              s(t_n, by = IHO, k = 5, bs = "tp") + s(o_n, by = IHO, k = 5, bs = "tp") + s(IHO, bs = "re"),
+GAM5 <- gam(SA_int ~ s(v, k = 5) + s(t, k = 5) + s(o, k = 5) + s(v, by = IHO, k = 5, bs = "tp") + 
+              s(t, by = IHO, k = 5, bs = "tp") + s(o, by = IHO, k = 5, bs = "tp") + s(IHO, bs = "re"),
             data = SA_df, family = "gaussian", method = "REML")
 
 # Summary metrics
@@ -442,19 +439,19 @@ Check residuals versus covariates.
 resid_GAM <- bind_cols(SA_df, residuals.gam(GAM3)) %>%
   rename(resid = "...17")
 plot_grid(resid_GAM %>%
-            ggplot(aes(x = v_n, y = resid)) + 
+            ggplot(aes(x = v, y = resid)) + 
             geom_hline(yintercept = 0, col = "red") +
-            labs(x = "velocity normalized") +
+            labs(x = "velocity") +
             geom_point(), 
           resid_GAM %>%
-            ggplot(aes(x = t_n, y = resid)) + 
+            ggplot(aes(x = t, y = resid)) + 
             geom_hline(yintercept = 0, col = "red") +
-            labs(x = "temperature normalized") +
+            labs(x = "temperature") +
             geom_point(), 
           resid_GAM %>%
-            ggplot(aes(x = o_n, y = resid)) + 
+            ggplot(aes(x = o, y = resid)) + 
             geom_hline(yintercept = 0, col = "red") +
-            labs(x = "open water normalized") +
+            labs(x = "open water") +
             geom_point(), 
           resid_GAM %>%
             ggplot(aes(x = IHO, y = resid)) + 
@@ -481,31 +478,31 @@ pacf(resid(GAM3), lag.max = 36, main = "pACF")
 I turn on the double penalty (`select = TRUE`) and check the covariates that has been shrunk. All covariates are imporant in the model. 
 
 ```{r GAM-selection}
-GAM3_p <- gam(SA_int_n ~ s(v_n, by = IHO, k = 5, bs = "tp") + s(t_n, by = IHO, k = 5, bs = "tp") + 
-                s(o_n, by = IHO, k = 5, bs = "tp") + s(IHO, bs = "re"),
+GAM3_p <- gam(SA_int ~ s(v, by = IHO, k = 5, bs = "tp") + s(t, by = IHO, k = 5, bs = "tp") + 
+                s(o, by = IHO, k = 5, bs = "tp") + s(IHO, bs = "re"),
               data = SA_df, family = "gaussian", method = "REML", select = TRUE)
 summary(GAM3_p)
 ```
 
 ```{r fig.height=10}
-draw(GAM3_p, scales = "fixed")
+draw(GAM3_p, scales = "free")
 ```
 
 ## Model visualization
 
 Quick plots using `visreg`.
 
-```{r plot-GAM15}
-visreg(GAM3, "v_n", "IHO", overlay = F, scale = "response", band = F, partial = T)
-visreg(GAM3, "t_n", "IHO", overlay = F, scale = "response", band = F, partial = T)
-visreg(GAM3, "o_n", "IHO", overlay = F, scale = "response", band = F, partial = T)
+```{r plot-GAM3}
+visreg(GAM3, "v", "IHO", overlay = F, scale = "response", band = F, partial = T)
+visreg(GAM3, "t", "IHO", overlay = F, scale = "response", band = F, partial = T)
+visreg(GAM3, "o", "IHO", overlay = F, scale = "response", band = F, partial = T)
 ```
 
 I predict the data and then use that dataframe to plot it in a "clean" way with `ggplot`.
 
-```{r predict-GAM15}
-pred_vn <- get_gam_predictions(GAM3, series = v_n, .comparison = IHO, series_length = 50) %>% 
-  mutate(var = "v_n",
+```{r predict-GAM3}
+pred_v <- get_gam_predictions(GAM3, series = v, .comparison = IHO, series_length = 50) %>% 
+  mutate(var = "v",
          signif = case_when(IHO == "WAO_BF" ~  0.05, # Significance level
                             IHO == "CAA" ~ 1,
                             IHO == "BB" ~ 0.01,
@@ -513,10 +510,10 @@ pred_vn <- get_gam_predictions(GAM3, series = v_n, .comparison = IHO, series_len
                             IHO == "EAO" ~ 1),
          signif_group = factor(if_else(signif > 0.1, F, T))) %>%
   rename(idx = ".idx",
-         fit = SA_int_n,
-         value = v_n)
-pred_tn <- get_gam_predictions(GAM3, series = t_n, .comparison = IHO, series_length = 50) %>%
-  mutate(var = "t_n",
+         fit = SA_int,
+         value = v)
+pred_t <- get_gam_predictions(GAM3, series = t, .comparison = IHO, series_length = 50) %>%
+  mutate(var = "t",
          signif = case_when(IHO == "WAO_BF" ~ 0.001, # significance level
                             IHO == "CAA" ~ 0.1,
                             IHO == "BB" ~ 0.001,
@@ -524,10 +521,10 @@ pred_tn <- get_gam_predictions(GAM3, series = t_n, .comparison = IHO, series_len
                             IHO == "EAO" ~ 0.1),
          signif_group = factor(if_else(signif > 0.1, F, T))) %>%
     rename(idx = ".idx",
-           fit = SA_int_n,
-           value = t_n)
-pred_on <- get_gam_predictions(GAM3, series = o_n, .comparison = IHO, series_length = 50) %>%
-  mutate(var = "o_n", 
+           fit = SA_int,
+           value = t)
+pred_o <- get_gam_predictions(GAM3, series = o, .comparison = IHO, series_length = 50) %>%
+  mutate(var = "o", 
          signif = case_when(IHO == "WAO_BF" ~ 0.01, # significance level
                             IHO == "CAA" ~ 0.001,
                             IHO == "BB" ~ 0.001,
@@ -535,10 +532,10 @@ pred_on <- get_gam_predictions(GAM3, series = o_n, .comparison = IHO, series_len
                             IHO == "EAO" ~ 0.05),
          signif_group = factor(if_else(signif > 0.1, F, T))) %>%
   rename(idx = ".idx",
-         fit = SA_int_n,
-         value = o_n)
+         fit = SA_int,
+         value = o)
 # Combine data
-pred_GAM <- bind_rows(pred_vn, pred_tn, pred_on)
+pred_GAM <- bind_rows(pred_v, pred_t, pred_o)
 
 # Save data
 save(pred_GAM, GAM3, file = "data/statistics/GAM_results.RData")
@@ -550,28 +547,31 @@ save(pred_GAM, GAM3, file = "data/statistics/GAM_results.RData")
 col_pal <- c("#5BBCD6", "#00A08A", "#F2AD00", "#F98400", "#FF0000")# wesanderson::wes_palette("Darjeeling1", type = "discrete") 
 
 plot_grid(pred_GAM %>%
-            filter(var == "v_n") %>%
+            filter(var == "v" & SE < 5) %>%
             ggplot() +
-            geom_line(aes(x = value, y = fit, col = IHO, linetype = IHO), size = 0.75) +
-            # geom_ribbon(aes(x = value, ymin = CI_lower, ymax = CI_upper, fill = IHO), alpha = 0.1) +
+            geom_line(aes(x = value, y = fit, col = IHO, linetype = IHO), size = 0.75, alpha = 0.8) +
+            geom_ribbon(aes(x = value, ymin = CI_lower, ymax = CI_upper, fill = IHO), alpha = 0.05) +
             scale_colour_manual(name = "IHO", values = col_pal) + 
-            scale_linetype_manual(name = "IHO", values = c(1, 2, 1, 1, 2)) +
-            labs(x = "Velo. 380 m normalized", y = expression("S"[A]*" normalized")),
+            scale_fill_manual(name = "IHO", values = col_pal) + 
+            scale_linetype_manual(name = "IHO", values = c(2, 2, 1, 2, 2)) +
+            labs(x = "Velo. 380 m", y = expression("S"[A]*"")),
           pred_GAM %>%
-            filter(var == "t_n") %>%
+            filter(var == "t" & SE < 5) %>%
             ggplot() +
-            geom_line(aes(x = value, y = fit, col = IHO, linetype = IHO), size = 0.75) +
-            # geom_ribbon(aes(x = value, ymin = CI_lower, ymax = CI_upper, fill = IHO), alpha = 0.1) +
+            geom_line(aes(x = value, y = fit, col = IHO, linetype = IHO), size = 0.75, alpha = 0.8) +
+            geom_ribbon(aes(x = value, ymin = CI_lower, ymax = CI_upper, fill = IHO), alpha = 0.05) +
             scale_colour_manual(name = "IHO", values = col_pal) + 
-            scale_linetype_manual(name = "IHO", values = c(1, 1, 1, 2, 1)) +
-            labs(x = "Temp. 380 m normalized", y = expression("S"[A]*" normalized")),
+            scale_fill_manual(name = "IHO", values = col_pal) + 
+            scale_linetype_manual(name = "IHO", values = c(1, 2, 1, 2, 1)) +
+            labs(x = "Temp. 380 m", y = expression("S"[A]*"")),
           pred_GAM %>%
-            filter(var == "o_n") %>%
+            filter(var == "o" & SE < 5) %>%
             ggplot() +
-            geom_line(aes(x = value, y = fit, col = IHO, linetype = IHO), size = 0.75) +
-            # geom_ribbon(aes(x = value, ymin = CI_lower, ymax = CI_upper, fill = IHO), alpha = 0.1) +
+            geom_line(aes(x = value, y = fit, col = IHO, linetype = IHO), size = 0.75, alpha = 0.8) +
+            geom_ribbon(aes(x = value, ymin = CI_lower, ymax = CI_upper, fill = IHO), alpha = 0.05) +
             scale_colour_manual(name = "IHO", values = col_pal) + 
+            scale_fill_manual(name = "IHO", values = col_pal) + 
             scale_linetype_manual(name = "IHO", values = c(1, 1, 1, 2, 1)) +
-            labs(x = "Open water normalized", y = expression("S"[A]*" normalized")))
+            labs(x = "Open water", y = expression("S"[A]*"")))
 ```
 

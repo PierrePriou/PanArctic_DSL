@@ -1,7 +1,7 @@
 PanArctic DSL - Statistics
 ================
 [Pierre Priou](mailto:pierre.priou@mi.mun.ca)
-2022/05/02 at 12:27
+2022/05/03 at 11:10
 
 # Package loading
 
@@ -280,11 +280,6 @@ stat_laea %>% # Mixed layer depth
 
 ## Data preparation
 
-Because I am interested in the environmental drivers of mesopelagic
-backscatter within each area, I run a linear model for each area. First,
-I prepare the dataset and standardize each environmental variable per
-area.
-
 ``` r
 SA_df <- stat_laea %>%
   dplyr::select(year, xc, yc, area, IHO_area_large, IHO_area, SA_int, velocity, thetao, openwater_duration, ice_week) %>%
@@ -307,25 +302,25 @@ Plot data.
 
 ``` r
 plot_grid(SA_df %>%
-            ggplot(aes(x = v_n, y = SA_int_n, col = IHO_area_large)) +
+            ggplot(aes(x = v, y = SA_int, col = IHO_area_large)) +
             geom_point() +
             geom_smooth(method = "lm", se = F, col = "grey20") +
             facet_grid(~ IHO) +
             theme(legend.position = "none"),
           SA_df %>%
-            ggplot(aes(x = t_n, y = SA_int_n, col = IHO_area_large)) +
+            ggplot(aes(x = t, y = SA_int, col = IHO_area_large)) +
             geom_point() +
             geom_smooth(method = "lm", se = F, col = "grey20") +
             facet_grid(~ IHO) +
             theme(legend.position = "none"),
           SA_df %>%
-            ggplot(aes(x = o_n, y = SA_int_n, col = IHO_area_large)) +
+            ggplot(aes(x = o, y = SA_int, col = IHO_area_large)) +
             geom_point() +
             geom_smooth(method = "lm", se = F, col = "grey20") +
             facet_grid(~ IHO) +
             theme(legend.position = "none"),
           SA_df %>%
-            ggplot(aes(x = s_n, y = SA_int_n, col = IHO_area_large)) +
+            ggplot(aes(x = s, y = SA_int, col = IHO_area_large)) +
             geom_point() +
             geom_smooth(method = "lm", se = F, col = "grey20") +
             facet_grid(~ IHO) +
@@ -337,22 +332,22 @@ plot_grid(SA_df %>%
 
 ``` r
 plot_grid(SA_df %>%
-            ggplot(aes(x = v_n, fill = IHO_area_large)) +
+            ggplot(aes(x = v, fill = IHO_area_large)) +
             geom_histogram() +
             facet_grid(~ IHO) +
             theme(legend.position = "none"),
           SA_df %>%
-            ggplot(aes(x = t_n, fill = IHO_area_large)) +
+            ggplot(aes(x = t, fill = IHO_area_large)) +
             geom_histogram() +
             facet_grid(~ IHO) +
             theme(legend.position = "none"),
           SA_df %>%
-            ggplot(aes(x = o_n, fill = IHO_area_large)) +
+            ggplot(aes(x = o, fill = IHO_area_large)) +
             geom_histogram() +
             facet_grid(~ IHO) +
             theme(legend.position = "none"),
           SA_df %>%
-            ggplot(aes(x = s_n, fill = IHO_area_large)) +
+            ggplot(aes(x = s, fill = IHO_area_large)) +
             geom_histogram() +
             facet_grid(~ IHO) +
             theme(legend.position = "none"),
@@ -427,10 +422,10 @@ Pedersen et al. 2019.
 
 ``` r
 # Model G
-GAM1 <- gam(SA_int_n ~ s(v_n, k = 5, bs = "tp") + s(t_n, k = 5, bs = "tp") + s(o_n, k = 5, bs = "tp"),
+GAM1 <- gam(SA_int ~ s(v, k = 5, bs = "tp") + s(t, k = 5, bs = "tp") + s(o, k = 5, bs = "tp"),
             data = SA_df, family = "gaussian", method = "REML")
 # Model S
-GAM2 <- gam(SA_int_n ~ s(v_n, IHO, bs = "fs", k = 5) + s(t_n, IHO, bs = "fs", k = 5) + s(o_n, IHO, bs = "fs", k = 5), 
+GAM2 <- gam(SA_int ~ s(v, IHO, bs = "fs", k = 5) + s(t, IHO, bs = "fs", k = 5) + s(o, IHO, bs = "fs", k = 5), 
             data = SA_df, family = "gaussian", method = "REML")
 ```
 
@@ -439,11 +434,11 @@ GAM2 <- gam(SA_int_n ~ s(v_n, IHO, bs = "fs", k = 5) + s(t_n, IHO, bs = "fs", k 
 
 ``` r
 # Model I
-GAM3 <- gam(SA_int_n ~ s(v_n, by = IHO, k = 5, bs = "tp") + s(t_n, by = IHO, k = 5, bs = "tp") + 
-              s(o_n, by = IHO, k = 5, bs = "tp") + s(IHO, bs = "re"),
+GAM3 <- gam(SA_int ~ s(v, by = IHO, k = 5, bs = "tp") + s(t, by = IHO, k = 5, bs = "tp") + 
+              s(o, by = IHO, k = 5, bs = "tp") + s(IHO, bs = "re"),
             data = SA_df, family = "gaussian", method = "REML")
 # Model GS
-GAM4 <- gam(SA_int_n ~ s(v_n, k = 5) + s(t_n, k = 5) + s(o_n, k = 5) + s(v_n, IHO, bs = "fs", k = 5) + 
+GAM4 <- gam(SA_int ~ s(v, k = 5) + s(t, k = 5) + s(o, k = 5) + s(v, IHO, bs = "fs", k = 5) + 
               s(t_n, IHO, bs = "fs", k = 5) + s(o_n, IHO, bs = "fs", k = 5),
             data = SA_df, family = "gaussian", method = "REML")
 ```
@@ -453,8 +448,8 @@ GAM4 <- gam(SA_int_n ~ s(v_n, k = 5) + s(t_n, k = 5) + s(o_n, k = 5) + s(v_n, IH
 
 ``` r
 # Model GI
-GAM5 <- gam(SA_int_n ~ s(v_n, k = 5) + s(t_n, k = 5) + s(o_n, k = 5) + s(v_n, by = IHO, k = 5, bs = "tp") + 
-              s(t_n, by = IHO, k = 5, bs = "tp") + s(o_n, by = IHO, k = 5, bs = "tp") + s(IHO, bs = "re"),
+GAM5 <- gam(SA_int ~ s(v, k = 5) + s(t, k = 5) + s(o, k = 5) + s(v, by = IHO, k = 5, bs = "tp") + 
+              s(t, by = IHO, k = 5, bs = "tp") + s(o, by = IHO, k = 5, bs = "tp") + s(IHO, bs = "re"),
             data = SA_df, family = "gaussian", method = "REML")
 
 # Summary metrics
@@ -496,39 +491,38 @@ summary(GAM3)
     ## Link function: identity 
     ## 
     ## Formula:
-    ## SA_int_n ~ s(v_n, by = IHO, k = 5, bs = "tp") + s(t_n, by = IHO, 
-    ##     k = 5, bs = "tp") + s(o_n, by = IHO, k = 5, bs = "tp") + 
-    ##     s(IHO, bs = "re")
+    ## SA_int ~ s(v, by = IHO, k = 5, bs = "tp") + s(t, by = IHO, k = 5, 
+    ##     bs = "tp") + s(o, by = IHO, k = 5, bs = "tp") + s(IHO, bs = "re")
     ## 
     ## Parametric coefficients:
     ##             Estimate Std. Error t value Pr(>|t|)    
-    ## (Intercept)  0.43352    0.03047   14.23   <2e-16 ***
+    ## (Intercept)   18.562      1.741   10.66   <2e-16 ***
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
     ## 
     ## Approximate significance of smooth terms:
-    ##                    edf Ref.df      F  p-value    
-    ## s(v_n):IHOWAO_BF 1.000  1.000  4.594 0.034328 *  
-    ## s(v_n):IHOCAA    1.000  1.000  0.762 0.384637    
-    ## s(v_n):IHOBB     1.000  1.000  8.658 0.003986 ** 
-    ## s(v_n):IHODS     1.000  1.000  4.199 0.042865 *  
-    ## s(v_n):IHOEAO    1.000  1.000  0.098 0.754692    
-    ## s(t_n):IHOWAO_BF 1.000  1.000 15.207 0.000168 ***
-    ## s(t_n):IHOCAA    1.000  1.000  2.855 0.093989 .  
-    ## s(t_n):IHOBB     3.557  3.871  6.826 0.000446 ***
-    ## s(t_n):IHODS     1.889  2.370  2.212 0.103570    
-    ## s(t_n):IHOEAO    1.000  1.000  3.309 0.071655 .  
-    ## s(o_n):IHOWAO_BF 2.107  2.525  5.205 0.007454 ** 
-    ## s(o_n):IHOCAA    3.027  3.369  8.335  1.6e-05 ***
-    ## s(o_n):IHOBB     1.000  1.000 34.692  < 2e-16 ***
-    ## s(o_n):IHODS     1.000  1.000  1.003 0.318741    
-    ## s(o_n):IHOEAO    1.000  1.000  4.558 0.035036 *  
-    ## s(IHO)           1.504  4.000  0.722 0.108500    
+    ##                   edf Ref.df      F  p-value    
+    ## s(v):IHOWAO_BF 1.0000  1.000  0.485  0.48770    
+    ## s(v):IHOCAA    1.0000  1.000  0.243  0.62327    
+    ## s(v):IHOBB     1.0004  1.001  6.195  0.01430 *  
+    ## s(v):IHODS     1.0000  1.000  1.302  0.25629    
+    ## s(v):IHOEAO    1.0001  1.000  0.755  0.38671    
+    ## s(t):IHOWAO_BF 1.7901  1.961  5.536  0.01183 *  
+    ## s(t):IHOCAA    1.0000  1.000  0.265  0.60790    
+    ## s(t):IHOBB     3.0982  3.524  3.188  0.01363 *  
+    ## s(t):IHODS     1.0000  1.000  0.007  0.93573    
+    ## s(t):IHOEAO    1.0000  1.000  7.031  0.00919 ** 
+    ## s(o):IHOWAO_BF 1.0002  1.000  3.896  0.05087 .  
+    ## s(o):IHOCAA    2.5439  2.925  4.709  0.00245 ** 
+    ## s(o):IHOBB     1.0000  1.000 18.966 3.04e-05 ***
+    ## s(o):IHODS     1.0001  1.000  0.045  0.83216    
+    ## s(o):IHOEAO    1.2179  1.369  5.655  0.04707 *  
+    ## s(IHO)         0.9169  4.000  0.497  0.09668 .  
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
     ## 
-    ## R-sq.(adj) =  0.543   Deviance explained = 62.3%
-    ## -REML = -0.64242  Scale est. = 0.032455  n = 132
+    ## R-sq.(adj) =   0.44   Deviance explained = 52.8%
+    ## -REML = 409.83  Scale est. = 42.286    n = 132
 
 ## Model checking
 
@@ -544,32 +538,32 @@ gam.check(GAM3, rep = 500)
 
     ## 
     ## Method: REML   Optimizer: outer newton
-    ## full convergence after 17 iterations.
-    ## Gradient range [-6.175042e-07,9.344677e-07]
-    ## (score -0.6424195 & scale 0.03245465).
-    ## Hessian positive definite, eigenvalue range [1.183306e-08,58.06505].
+    ## full convergence after 13 iterations.
+    ## Gradient range [-0.0001038437,0.0003489404]
+    ## (score 409.8302 & scale 42.2863).
+    ## Hessian positive definite, eigenvalue range [5.778968e-06,58.03567].
     ## Model rank =  66 / 66 
     ## 
     ## Basis dimension (k) checking results. Low p-value (k-index<1) may
     ## indicate that k is too low, especially if edf is close to k'.
     ## 
-    ##                    k'  edf k-index p-value
-    ## s(v_n):IHOWAO_BF 4.00 1.00    1.01    0.55
-    ## s(v_n):IHOCAA    4.00 1.00    1.01    0.52
-    ## s(v_n):IHOBB     4.00 1.00    1.01    0.54
-    ## s(v_n):IHODS     4.00 1.00    1.01    0.54
-    ## s(v_n):IHOEAO    4.00 1.00    1.01    0.52
-    ## s(t_n):IHOWAO_BF 4.00 1.00    1.17    0.98
-    ## s(t_n):IHOCAA    4.00 1.00    1.17    0.98
-    ## s(t_n):IHOBB     4.00 3.56    1.17    0.99
-    ## s(t_n):IHODS     4.00 1.89    1.17    0.97
-    ## s(t_n):IHOEAO    4.00 1.00    1.17    0.96
-    ## s(o_n):IHOWAO_BF 4.00 2.11    0.96    0.32
-    ## s(o_n):IHOCAA    4.00 3.03    0.96    0.32
-    ## s(o_n):IHOBB     4.00 1.00    0.96    0.29
-    ## s(o_n):IHODS     4.00 1.00    0.96    0.34
-    ## s(o_n):IHOEAO    4.00 1.00    0.96    0.33
-    ## s(IHO)           5.00 1.50      NA      NA
+    ##                   k'   edf k-index p-value
+    ## s(v):IHOWAO_BF 4.000 1.000    1.06    0.76
+    ## s(v):IHOCAA    4.000 1.000    1.06    0.74
+    ## s(v):IHOBB     4.000 1.000    1.06    0.70
+    ## s(v):IHODS     4.000 1.000    1.06    0.73
+    ## s(v):IHOEAO    4.000 1.000    1.06    0.71
+    ## s(t):IHOWAO_BF 4.000 1.790    1.12    0.88
+    ## s(t):IHOCAA    4.000 1.000    1.12    0.85
+    ## s(t):IHOBB     4.000 3.098    1.12    0.90
+    ## s(t):IHODS     4.000 1.000    1.12    0.92
+    ## s(t):IHOEAO    4.000 1.000    1.12    0.90
+    ## s(o):IHOWAO_BF 4.000 1.000    1.02    0.61
+    ## s(o):IHOCAA    4.000 2.544    1.02    0.54
+    ## s(o):IHOBB     4.000 1.000    1.02    0.59
+    ## s(o):IHODS     4.000 1.000    1.02    0.61
+    ## s(o):IHOEAO    4.000 1.218    1.02    0.66
+    ## s(IHO)         5.000 0.917      NA      NA
 
 Check residuals versus covariates.
 
@@ -577,19 +571,19 @@ Check residuals versus covariates.
 resid_GAM <- bind_cols(SA_df, residuals.gam(GAM3)) %>%
   rename(resid = "...17")
 plot_grid(resid_GAM %>%
-            ggplot(aes(x = v_n, y = resid)) + 
+            ggplot(aes(x = v, y = resid)) + 
             geom_hline(yintercept = 0, col = "red") +
-            labs(x = "velocity normalized") +
+            labs(x = "velocity") +
             geom_point(), 
           resid_GAM %>%
-            ggplot(aes(x = t_n, y = resid)) + 
+            ggplot(aes(x = t, y = resid)) + 
             geom_hline(yintercept = 0, col = "red") +
-            labs(x = "temperature normalized") +
+            labs(x = "temperature") +
             geom_point(), 
           resid_GAM %>%
-            ggplot(aes(x = o_n, y = resid)) + 
+            ggplot(aes(x = o, y = resid)) + 
             geom_hline(yintercept = 0, col = "red") +
-            labs(x = "open water normalized") +
+            labs(x = "open water") +
             geom_point(), 
           resid_GAM %>%
             ggplot(aes(x = IHO, y = resid)) + 
@@ -621,8 +615,8 @@ I turn on the double penalty (`select = TRUE`) and check the covariates
 that has been shrunk. All covariates are imporant in the model.
 
 ``` r
-GAM3_p <- gam(SA_int_n ~ s(v_n, by = IHO, k = 5, bs = "tp") + s(t_n, by = IHO, k = 5, bs = "tp") + 
-                s(o_n, by = IHO, k = 5, bs = "tp") + s(IHO, bs = "re"),
+GAM3_p <- gam(SA_int ~ s(v, by = IHO, k = 5, bs = "tp") + s(t, by = IHO, k = 5, bs = "tp") + 
+                s(o, by = IHO, k = 5, bs = "tp") + s(IHO, bs = "re"),
               data = SA_df, family = "gaussian", method = "REML", select = TRUE)
 summary(GAM3_p)
 ```
@@ -632,42 +626,41 @@ summary(GAM3_p)
     ## Link function: identity 
     ## 
     ## Formula:
-    ## SA_int_n ~ s(v_n, by = IHO, k = 5, bs = "tp") + s(t_n, by = IHO, 
-    ##     k = 5, bs = "tp") + s(o_n, by = IHO, k = 5, bs = "tp") + 
-    ##     s(IHO, bs = "re")
+    ## SA_int ~ s(v, by = IHO, k = 5, bs = "tp") + s(t, by = IHO, k = 5, 
+    ##     bs = "tp") + s(o, by = IHO, k = 5, bs = "tp") + s(IHO, bs = "re")
     ## 
     ## Parametric coefficients:
     ##             Estimate Std. Error t value Pr(>|t|)    
-    ## (Intercept)   0.4464     0.0265   16.85   <2e-16 ***
+    ## (Intercept)  17.8786     0.6966   25.67   <2e-16 ***
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
     ## 
     ## Approximate significance of smooth terms:
-    ##                        edf Ref.df     F  p-value    
-    ## s(v_n):IHOWAO_BF 6.907e-01      4 0.573 0.063597 .  
-    ## s(v_n):IHOCAA    1.264e-06      4 0.000 0.695289    
-    ## s(v_n):IHOBB     1.894e+00      4 3.539 0.000505 ***
-    ## s(v_n):IHODS     6.100e-01      4 0.440 0.105909    
-    ## s(v_n):IHOEAO    2.006e-06      4 0.000 0.889638    
-    ## s(t_n):IHOWAO_BF 1.630e+00      4 3.722 0.000482 ***
-    ## s(t_n):IHOCAA    4.978e-01      4 0.306 0.137883    
-    ## s(t_n):IHOBB     8.250e-01      4 1.193 0.017458 *  
-    ## s(t_n):IHODS     1.360e+00      4 1.325 0.024698 *  
-    ## s(t_n):IHOEAO    4.614e-01      4 0.216 0.151816    
-    ## s(o_n):IHOWAO_BF 1.539e+00      4 1.953 0.005010 ** 
-    ## s(o_n):IHOCAA    2.661e+00      4 8.476 5.43e-07 ***
-    ## s(o_n):IHOBB     9.474e-01      4 5.184 2.14e-05 ***
-    ## s(o_n):IHODS     1.718e-06      4 0.000 0.892963    
-    ## s(o_n):IHOEAO    8.629e-01      4 1.857 0.002619 ** 
-    ## s(IHO)           1.246e+00      4 0.557 0.101212    
+    ##                      edf Ref.df     F  p-value    
+    ## s(v):IHOWAO_BF 4.376e-05      4 0.000 0.895751    
+    ## s(v):IHOCAA    1.086e-04      4 0.000 0.419790    
+    ## s(v):IHOBB     1.700e+00      4 2.283 0.003999 ** 
+    ## s(v):IHODS     3.321e-01      4 0.105 0.266644    
+    ## s(v):IHOEAO    1.377e-01      4 0.040 0.265774    
+    ## s(t):IHOWAO_BF 1.157e+00      4 4.612 1.96e-05 ***
+    ## s(t):IHOCAA    3.546e-05      4 0.000 0.462514    
+    ## s(t):IHOBB     6.828e-01      4 0.538 0.074136 .  
+    ## s(t):IHODS     1.032e-05      4 0.000 0.461164    
+    ## s(t):IHOEAO    7.918e-01      4 0.950 0.027320 *  
+    ## s(o):IHOWAO_BF 7.902e-01      4 0.942 0.030198 *  
+    ## s(o):IHOCAA    1.879e+00      4 3.465 0.000585 ***
+    ## s(o):IHOBB     9.027e-01      4 2.316 0.001407 ** 
+    ## s(o):IHODS     2.100e-05      4 0.000 0.589685    
+    ## s(o):IHOEAO    9.237e-01      4 3.028 0.000176 ***
+    ## s(IHO)         1.410e-05      4 0.000 0.490977    
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
     ## 
-    ## R-sq.(adj) =  0.495   Deviance explained = 55.4%
-    ## -REML = -11.759  Scale est. = 0.035837  n = 132
+    ## R-sq.(adj) =  0.406   Deviance explained = 44.8%
+    ## -REML = 448.81  Scale est. = 44.824    n = 132
 
 ``` r
-draw(GAM3_p, scales = "fixed")
+draw(GAM3_p, scales = "free")
 ```
 
 ![](PanArctic_DSL_statistics_files/figure-gfm/unnamed-chunk-1-1.png)<!-- -->
@@ -677,29 +670,29 @@ draw(GAM3_p, scales = "fixed")
 Quick plots using `visreg`.
 
 ``` r
-visreg(GAM3, "v_n", "IHO", overlay = F, scale = "response", band = F, partial = T)
+visreg(GAM3, "v", "IHO", overlay = F, scale = "response", band = F, partial = T)
 ```
 
-![](PanArctic_DSL_statistics_files/figure-gfm/plot-GAM15-1.png)<!-- -->
+![](PanArctic_DSL_statistics_files/figure-gfm/plot-GAM3-1.png)<!-- -->
 
 ``` r
-visreg(GAM3, "t_n", "IHO", overlay = F, scale = "response", band = F, partial = T)
+visreg(GAM3, "t", "IHO", overlay = F, scale = "response", band = F, partial = T)
 ```
 
-![](PanArctic_DSL_statistics_files/figure-gfm/plot-GAM15-2.png)<!-- -->
+![](PanArctic_DSL_statistics_files/figure-gfm/plot-GAM3-2.png)<!-- -->
 
 ``` r
-visreg(GAM3, "o_n", "IHO", overlay = F, scale = "response", band = F, partial = T)
+visreg(GAM3, "o", "IHO", overlay = F, scale = "response", band = F, partial = T)
 ```
 
-![](PanArctic_DSL_statistics_files/figure-gfm/plot-GAM15-3.png)<!-- -->
+![](PanArctic_DSL_statistics_files/figure-gfm/plot-GAM3-3.png)<!-- -->
 
 I predict the data and then use that dataframe to plot it in a “clean”
 way with `ggplot`.
 
 ``` r
-pred_vn <- get_gam_predictions(GAM3, series = v_n, .comparison = IHO, series_length = 50) %>% 
-  mutate(var = "v_n",
+pred_v <- get_gam_predictions(GAM3, series = v, .comparison = IHO, series_length = 50) %>% 
+  mutate(var = "v",
          signif = case_when(IHO == "WAO_BF" ~  0.05, # Significance level
                             IHO == "CAA" ~ 1,
                             IHO == "BB" ~ 0.01,
@@ -707,10 +700,10 @@ pred_vn <- get_gam_predictions(GAM3, series = v_n, .comparison = IHO, series_len
                             IHO == "EAO" ~ 1),
          signif_group = factor(if_else(signif > 0.1, F, T))) %>%
   rename(idx = ".idx",
-         fit = SA_int_n,
-         value = v_n)
-pred_tn <- get_gam_predictions(GAM3, series = t_n, .comparison = IHO, series_length = 50) %>%
-  mutate(var = "t_n",
+         fit = SA_int,
+         value = v)
+pred_t <- get_gam_predictions(GAM3, series = t, .comparison = IHO, series_length = 50) %>%
+  mutate(var = "t",
          signif = case_when(IHO == "WAO_BF" ~ 0.001, # significance level
                             IHO == "CAA" ~ 0.1,
                             IHO == "BB" ~ 0.001,
@@ -718,10 +711,10 @@ pred_tn <- get_gam_predictions(GAM3, series = t_n, .comparison = IHO, series_len
                             IHO == "EAO" ~ 0.1),
          signif_group = factor(if_else(signif > 0.1, F, T))) %>%
     rename(idx = ".idx",
-           fit = SA_int_n,
-           value = t_n)
-pred_on <- get_gam_predictions(GAM3, series = o_n, .comparison = IHO, series_length = 50) %>%
-  mutate(var = "o_n", 
+           fit = SA_int,
+           value = t)
+pred_o <- get_gam_predictions(GAM3, series = o, .comparison = IHO, series_length = 50) %>%
+  mutate(var = "o", 
          signif = case_when(IHO == "WAO_BF" ~ 0.01, # significance level
                             IHO == "CAA" ~ 0.001,
                             IHO == "BB" ~ 0.001,
@@ -729,10 +722,10 @@ pred_on <- get_gam_predictions(GAM3, series = o_n, .comparison = IHO, series_len
                             IHO == "EAO" ~ 0.05),
          signif_group = factor(if_else(signif > 0.1, F, T))) %>%
   rename(idx = ".idx",
-         fit = SA_int_n,
-         value = o_n)
+         fit = SA_int,
+         value = o)
 # Combine data
-pred_GAM <- bind_rows(pred_vn, pred_tn, pred_on)
+pred_GAM <- bind_rows(pred_v, pred_t, pred_o)
 
 # Save data
 save(pred_GAM, GAM3, file = "data/statistics/GAM_results.RData")
@@ -744,29 +737,32 @@ save(pred_GAM, GAM3, file = "data/statistics/GAM_results.RData")
 col_pal <- c("#5BBCD6", "#00A08A", "#F2AD00", "#F98400", "#FF0000")# wesanderson::wes_palette("Darjeeling1", type = "discrete") 
 
 plot_grid(pred_GAM %>%
-            filter(var == "v_n") %>%
+            filter(var == "v" & SE < 5) %>%
             ggplot() +
-            geom_line(aes(x = value, y = fit, col = IHO, linetype = IHO), size = 0.75) +
-            # geom_ribbon(aes(x = value, ymin = CI_lower, ymax = CI_upper, fill = IHO), alpha = 0.1) +
+            geom_line(aes(x = value, y = fit, col = IHO, linetype = IHO), size = 0.75, alpha = 0.8) +
+            geom_ribbon(aes(x = value, ymin = CI_lower, ymax = CI_upper, fill = IHO), alpha = 0.05) +
             scale_colour_manual(name = "IHO", values = col_pal) + 
-            scale_linetype_manual(name = "IHO", values = c(1, 2, 1, 1, 2)) +
-            labs(x = "Velo. 380 m normalized", y = expression("S"[A]*" normalized")),
+            scale_fill_manual(name = "IHO", values = col_pal) + 
+            scale_linetype_manual(name = "IHO", values = c(2, 2, 1, 2, 2)) +
+            labs(x = "Velo. 380 m", y = expression("S"[A]*"")),
           pred_GAM %>%
-            filter(var == "t_n") %>%
+            filter(var == "t" & SE < 5) %>%
             ggplot() +
-            geom_line(aes(x = value, y = fit, col = IHO, linetype = IHO), size = 0.75) +
-            # geom_ribbon(aes(x = value, ymin = CI_lower, ymax = CI_upper, fill = IHO), alpha = 0.1) +
+            geom_line(aes(x = value, y = fit, col = IHO, linetype = IHO), size = 0.75, alpha = 0.8) +
+            geom_ribbon(aes(x = value, ymin = CI_lower, ymax = CI_upper, fill = IHO), alpha = 0.05) +
             scale_colour_manual(name = "IHO", values = col_pal) + 
-            scale_linetype_manual(name = "IHO", values = c(1, 1, 1, 2, 1)) +
-            labs(x = "Temp. 380 m normalized", y = expression("S"[A]*" normalized")),
+            scale_fill_manual(name = "IHO", values = col_pal) + 
+            scale_linetype_manual(name = "IHO", values = c(1, 2, 1, 2, 1)) +
+            labs(x = "Temp. 380 m", y = expression("S"[A]*"")),
           pred_GAM %>%
-            filter(var == "o_n") %>%
+            filter(var == "o" & SE < 5) %>%
             ggplot() +
-            geom_line(aes(x = value, y = fit, col = IHO, linetype = IHO), size = 0.75) +
-            # geom_ribbon(aes(x = value, ymin = CI_lower, ymax = CI_upper, fill = IHO), alpha = 0.1) +
+            geom_line(aes(x = value, y = fit, col = IHO, linetype = IHO), size = 0.75, alpha = 0.8) +
+            geom_ribbon(aes(x = value, ymin = CI_lower, ymax = CI_upper, fill = IHO), alpha = 0.05) +
             scale_colour_manual(name = "IHO", values = col_pal) + 
+            scale_fill_manual(name = "IHO", values = col_pal) + 
             scale_linetype_manual(name = "IHO", values = c(1, 1, 1, 2, 1)) +
-            labs(x = "Open water normalized", y = expression("S"[A]*" normalized")))
+            labs(x = "Open water", y = expression("S"[A]*"")))
 ```
 
 ![](PanArctic_DSL_statistics_files/figure-gfm/ggplot-gam-1.png)<!-- -->
