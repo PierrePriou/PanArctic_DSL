@@ -28,6 +28,7 @@ library(visreg)       # Visualise GAM
 library(tidymv)       # Predict GAM
 library(MuMIn)        # AIC weights
 library(DT)           # Interactive table
+library(rstatix)      # Pipe-friendly stats
 # Custom figure theme
 theme_set(theme_bw())
 theme_update(axis.text = element_text(size = 9),
@@ -65,6 +66,8 @@ coast_10m_laea <- readOGR("data/bathy/ne_10m_land.shp", verbose = F) %>% # Coast
 
 # Gridded acoustic, CTD, and sea ice data
 load("data/acoustics/SA_grids.RData") # Acoustic data
+SA_grid_laea <- SA_grid_laea %>%
+  mutate(SA_int = 10 * log10(NASC_int))
 load("data/remote_sensing/physics_grids.RData") # Modelled physics data 
 load("data/remote_sensing/seaice_grids.RData") # Remote sensing sea ice data
 ```
@@ -84,11 +87,11 @@ seaice_laea <- seaice_grid_laea %>%
 stat_laea <- left_join(SA_laea, phy_laea, by = c("year", "area", "xc", "yc", "cell_res")) %>% # Join acoustic and physics
   left_join(., seaice_laea, by = c("year", "area", "xc", "yc", "cell_res")) %>%
   # For cells that have NaN, get the mean of the surrounding cells
-   rowwise() %>%
-   mutate(xc_na = if_else(is.na(mean_ice_conc) == T, xc, NaN),
-          yc_na = if_else(is.na(mean_ice_conc) == T, yc, NaN),
-          year_na = if_else(is.na(mean_ice_conc) == T, year, NaN), 
-          mean_ice_conc = if_else(is.na(mean_ice_conc) == T, mean(pull(subset(seaice_grid_laea,
+  rowwise() %>%
+  mutate(xc_na = if_else(is.na(mean_ice_conc) == T, xc, NaN),
+         yc_na = if_else(is.na(mean_ice_conc) == T, yc, NaN),
+         year_na = if_else(is.na(mean_ice_conc) == T, year, NaN), 
+         mean_ice_conc = if_else(is.na(mean_ice_conc) == T, mean(pull(subset(seaice_grid_laea,
                                                                              xc >= xc_na - 50 &
                                                                                xc <= xc_na + 50 & 
                                                                                yc >= yc_na - 50 & 
@@ -130,6 +133,7 @@ stat_laea <- left_join(SA_laea, phy_laea, by = c("year", "area", "xc", "yc", "ce
                             ice_week)) %>%
   filter(depth == 380) %>% # Select data at 380 m depth
   mutate(SA_int = 10 * log10(NASC_int),
+         velocity = velocity * 100, # Convert to cm/s
          IHO_area = factor(case_when(IHO_area == "East Arctic Ocean" ~ "EAO",
                                      IHO_area == "West Arctic Ocean" ~ "WAO_BF",
                                      IHO_area == "Beaufort Sea" ~ "WAO_BF",
@@ -235,7 +239,7 @@ stat_laea %>% # Ice concentration
   ggplot(aes(x = xc,  y = yc)) +
   geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), fill = "grey80") +
   geom_tile(aes(fill = velocity)) +
-  scale_fill_cmocean("velo (m/s)", name = "speed", na.value = "red") +
+  scale_fill_cmocean("velo (cm/s)", name = "speed", na.value = "red") +
   facet_wrap(~ year, ncol = 3) +
   ggtitle("Current velocity at 380 m depth") +
   coord_fixed(xlim = c(-2600, 1100), ylim = c(-1800, 1900), expand = F) + 
@@ -253,6 +257,90 @@ stat_laea %>% # Mixed layer depth
   coord_fixed(xlim = c(-2600, 1100), ylim = c(-1800, 1900), expand = F) + 
   theme(axis.text = element_blank(), axis.ticks = element_blank(), axis.title = element_blank())
 ```
+
+# Spatial and interannual variability
+
+```{r prep-diff}
+SA_diff <- stat_laea %>%
+  dplyr::select(year, IHO_area, SA_int, NASC_int, CM) %>%
+  mutate(year = factor(year))
+```
+
+## All areas
+
+I check whether there are inter-annual and spatial variability in S~A~ and the centre of mass across years and areas.
+
+```{r all-interannual-spatial-prep}
+# Visualize data
+plot_grid(SA_diff %>% 
+            ggplot() +
+            geom_boxplot(aes(x = year, y = SA_int)),
+          SA_diff %>% 
+            ggplot() +
+            geom_boxplot(aes(x = year, y = CM)))
+
+# Check assumptions
+## Outliers
+SA_diff %>%
+  group_by(year) %>%
+  identify_outliers(SA_int) 
+# There are no extreme outlier in CAA
+SA_diff %>%
+  group_by(year) %>%
+  identify_outliers(CM) 
+# There are no extreme outliers
+SA_diff %>%
+  group_by(IHO_area) %>%
+  identify_outliers(SA_int) 
+# There are no extreme outlier in CAA
+SA_diff %>%
+  group_by(IHO_area) %>%
+  identify_outliers(CM) 
+# There are no extreme outliers
+
+## Normality: Checked by looking at the anova residuals with QQ plot
+ggqqplot(SA_diff, "SA_int", facet.by = "year")
+ggqqplot(SA_diff, "CM", facet.by = "year")
+ggqqplot(SA_diff, "SA_int", facet.by = "IHO_area")
+ggqqplot(SA_diff, "CM", facet.by = "IHO_area")
+# Data is fully normal
+
+## Homogeneity of variance
+plot(lm(SA_int ~ year, data = SA_diff), 1)
+plot(lm(CM ~ year, data = SA_diff), 1)
+plot(lm(SA_int ~ IHO_area, data = SA_diff), 1)
+plot(lm(CM ~ IHO_area, data = SA_diff), 1)
+SA_diff %>%
+  levene_test(SA_int ~ year)
+# Not homogenous
+```
+
+I used a non parametric Kruskal-Wallis test to test for interannual and spatial variability because the variance is not homogenous and not very normal.
+
+```{r all-kruskal-wallis}
+SA_diff %>% # Kruskal wallis interannual difference SA
+  kruskal_test(SA_int ~ year)
+SA_diff %>% # Kruskal wallis interannual difference CM
+  kruskal_test(CM ~ year)
+SA_diff %>% # Kruskal wallis interannual difference SA
+  kruskal_test(SA_int ~ IHO_area)
+SA_diff %>% # Kruskal wallis interannual difference CM
+  kruskal_test(CM ~ IHO_area)
+```
+
+The center of mass did not vary significantly between years (H = 1.652899, p = 0.438) but varied significantly among areas (*H* = 57.8495, *p* < 0.001). Mesopelagic backscatter S~A~ varied significantly between areas (*H* = 26.19394, *p* < 0.001) but not years (*H* = 8.6464, *p* = 0.013). Thus, in the S~A~ HGAM a random effect for change in S~A~ per area is likely needed.
+
+## Within areas
+
+I check whether there are inter-annual variability in S~A~ across years within areas. This will be used to decide whether a random effect is needed in the GAM. I used a non parametric Kruskal-Wallis test to test for interannual variability within areas.
+
+```{r area-kruskal-wallis}
+SA_diff %>% # Kruskal wallis interannual difference SA within group
+  group_by(IHO_area) %>%
+  kruskal_test(SA_int ~ year)
+```
+
+There was no interannual differences in SA within each region (WAO_BF - H = 4.8395483, *p* = 0.0889; CAA - H = 6.9278752, *p* = 0.0313; BB - H = 0.0968, *p* = 0.0889; DS - H = 0.9470, *p* = 0.0889; EAO - H = 5.0263899, *p* = 0.0810). Therefore, there seems to be no need for a random effect for interannual variability within years.
 
 # HGAM
 
@@ -550,7 +638,7 @@ plot_grid(pred_GAM %>%
             filter(var == "v" & SE < 5) %>%
             ggplot() +
             geom_line(aes(x = value, y = fit, col = IHO, linetype = IHO), size = 0.75, alpha = 0.8) +
-            geom_ribbon(aes(x = value, ymin = CI_lower, ymax = CI_upper, fill = IHO), alpha = 0.05) +
+            # geom_ribbon(aes(x = value, ymin = CI_lower, ymax = CI_upper, fill = IHO), alpha = 0.1) +
             scale_colour_manual(name = "IHO", values = col_pal) + 
             scale_fill_manual(name = "IHO", values = col_pal) + 
             scale_linetype_manual(name = "IHO", values = c(2, 2, 1, 2, 2)) +
@@ -559,7 +647,7 @@ plot_grid(pred_GAM %>%
             filter(var == "t" & SE < 5) %>%
             ggplot() +
             geom_line(aes(x = value, y = fit, col = IHO, linetype = IHO), size = 0.75, alpha = 0.8) +
-            geom_ribbon(aes(x = value, ymin = CI_lower, ymax = CI_upper, fill = IHO), alpha = 0.05) +
+            # geom_ribbon(aes(x = value, ymin = CI_lower, ymax = CI_upper, fill = IHO), alpha = 0.1) +
             scale_colour_manual(name = "IHO", values = col_pal) + 
             scale_fill_manual(name = "IHO", values = col_pal) + 
             scale_linetype_manual(name = "IHO", values = c(1, 2, 1, 2, 1)) +
@@ -568,10 +656,10 @@ plot_grid(pred_GAM %>%
             filter(var == "o" & SE < 5) %>%
             ggplot() +
             geom_line(aes(x = value, y = fit, col = IHO, linetype = IHO), size = 0.75, alpha = 0.8) +
-            geom_ribbon(aes(x = value, ymin = CI_lower, ymax = CI_upper, fill = IHO), alpha = 0.05) +
+            # geom_ribbon(aes(x = value, ymin = CI_lower, ymax = CI_upper, fill = IHO), alpha = 0.1) +
             scale_colour_manual(name = "IHO", values = col_pal) + 
             scale_fill_manual(name = "IHO", values = col_pal) + 
             scale_linetype_manual(name = "IHO", values = c(1, 1, 1, 2, 1)) +
-            labs(x = "Open water", y = expression("S"[A]*"")))
+            labs(x = "Open water days", y = expression("S"[A]*"")))
 ```
 

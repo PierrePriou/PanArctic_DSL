@@ -1,7 +1,7 @@
 PanArctic DSL - Statistics
 ================
 [Pierre Priou](mailto:pierre.priou@mi.mun.ca)
-2022/05/03 at 11:10
+2022/05/03 at 15:13
 
 # Package loading
 
@@ -25,6 +25,7 @@ library(visreg)       # Visualise GAM
 library(tidymv)       # Predict GAM
 library(MuMIn)        # AIC weights
 library(DT)           # Interactive table
+library(rstatix)      # Pipe-friendly stats
 # Custom figure theme
 theme_set(theme_bw())
 theme_update(axis.text = element_text(size = 9),
@@ -67,6 +68,8 @@ coast_10m_laea <- readOGR("data/bathy/ne_10m_land.shp", verbose = F) %>% # Coast
 
 # Gridded acoustic, CTD, and sea ice data
 load("data/acoustics/SA_grids.RData") # Acoustic data
+SA_grid_laea <- SA_grid_laea %>%
+  mutate(SA_int = 10 * log10(NASC_int))
 load("data/remote_sensing/physics_grids.RData") # Modelled physics data 
 load("data/remote_sensing/seaice_grids.RData") # Remote sensing sea ice data
 ```
@@ -89,11 +92,11 @@ seaice_laea <- seaice_grid_laea %>%
 stat_laea <- left_join(SA_laea, phy_laea, by = c("year", "area", "xc", "yc", "cell_res")) %>% # Join acoustic and physics
   left_join(., seaice_laea, by = c("year", "area", "xc", "yc", "cell_res")) %>%
   # For cells that have NaN, get the mean of the surrounding cells
-   rowwise() %>%
-   mutate(xc_na = if_else(is.na(mean_ice_conc) == T, xc, NaN),
-          yc_na = if_else(is.na(mean_ice_conc) == T, yc, NaN),
-          year_na = if_else(is.na(mean_ice_conc) == T, year, NaN), 
-          mean_ice_conc = if_else(is.na(mean_ice_conc) == T, mean(pull(subset(seaice_grid_laea,
+  rowwise() %>%
+  mutate(xc_na = if_else(is.na(mean_ice_conc) == T, xc, NaN),
+         yc_na = if_else(is.na(mean_ice_conc) == T, yc, NaN),
+         year_na = if_else(is.na(mean_ice_conc) == T, year, NaN), 
+         mean_ice_conc = if_else(is.na(mean_ice_conc) == T, mean(pull(subset(seaice_grid_laea,
                                                                              xc >= xc_na - 50 &
                                                                                xc <= xc_na + 50 & 
                                                                                yc >= yc_na - 50 & 
@@ -135,6 +138,7 @@ stat_laea <- left_join(SA_laea, phy_laea, by = c("year", "area", "xc", "yc", "ce
                             ice_week)) %>%
   filter(depth == 380) %>% # Select data at 380 m depth
   mutate(SA_int = 10 * log10(NASC_int),
+         velocity = velocity * 100, # Convert to cm/s
          IHO_area = factor(case_when(IHO_area == "East Arctic Ocean" ~ "EAO",
                                      IHO_area == "West Arctic Ocean" ~ "WAO_BF",
                                      IHO_area == "Beaufort Sea" ~ "WAO_BF",
@@ -253,7 +257,7 @@ stat_laea %>% # Ice concentration
   ggplot(aes(x = xc,  y = yc)) +
   geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), fill = "grey80") +
   geom_tile(aes(fill = velocity)) +
-  scale_fill_cmocean("velo (m/s)", name = "speed", na.value = "red") +
+  scale_fill_cmocean("velo (cm/s)", name = "speed", na.value = "red") +
   facet_wrap(~ year, ncol = 3) +
   ggtitle("Current velocity at 380 m depth") +
   coord_fixed(xlim = c(-2600, 1100), ylim = c(-1800, 1900), expand = F) + 
@@ -275,6 +279,241 @@ stat_laea %>% # Mixed layer depth
 ```
 
 ![](PanArctic_DSL_statistics_files/figure-gfm/map-mld-1.png)<!-- -->
+
+# Spatial and interannual variability
+
+``` r
+SA_diff <- stat_laea %>%
+  dplyr::select(year, IHO_area, SA_int, NASC_int, CM) %>%
+  mutate(year = factor(year))
+```
+
+## All areas
+
+I check whether there are inter-annual and spatial variability in
+S<sub>A</sub> and the centre of mass across years and areas.
+
+``` r
+# Visualize data
+plot_grid(SA_diff %>% 
+            ggplot() +
+            geom_boxplot(aes(x = year, y = SA_int)),
+          SA_diff %>% 
+            ggplot() +
+            geom_boxplot(aes(x = year, y = CM)))
+```
+
+![](PanArctic_DSL_statistics_files/figure-gfm/all-interannual-spatial-prep-1.png)<!-- -->
+
+``` r
+# Check assumptions
+## Outliers
+SA_diff %>%
+  group_by(year) %>%
+  identify_outliers(SA_int) 
+```
+
+    ## # A tibble: 2 x 7
+    ##   year  IHO_area SA_int NASC_int    CM is.outlier is.extreme
+    ##   <fct> <fct>     <dbl>    <dbl> <dbl> <lgl>      <lgl>     
+    ## 1 2017  EAO        41.6   14296.  412. TRUE       FALSE     
+    ## 2 2017  EAO        48.3   67316.  392. TRUE       FALSE
+
+``` r
+# There are no extreme outlier in CAA
+SA_diff %>%
+  group_by(year) %>%
+  identify_outliers(CM) 
+```
+
+    ## # A tibble: 5 x 7
+    ##   year  IHO_area SA_int NASC_int    CM is.outlier is.extreme
+    ##   <fct> <fct>     <dbl>    <dbl> <dbl> <lgl>      <lgl>     
+    ## 1 2015  WAO_BF    -3.85    0.412  601. TRUE       FALSE     
+    ## 2 2015  WAO_BF     8.88    7.72   591. TRUE       FALSE     
+    ## 3 2015  WAO_BF    -2.63    0.545  564. TRUE       FALSE     
+    ## 4 2015  WAO_BF     7.62    5.78   572. TRUE       FALSE     
+    ## 5 2015  WAO_BF    -1.13    0.770  581. TRUE       FALSE
+
+``` r
+# There are no extreme outliers
+SA_diff %>%
+  group_by(IHO_area) %>%
+  identify_outliers(SA_int) 
+```
+
+    ## # A tibble: 6 x 7
+    ##   IHO_area year  SA_int NASC_int    CM is.outlier is.extreme
+    ##   <fct>    <fct>  <dbl>    <dbl> <dbl> <lgl>      <lgl>     
+    ## 1 BB       2016    1.98     1.58  295. TRUE       FALSE     
+    ## 2 BB       2016    3.58     2.28  354. TRUE       FALSE     
+    ## 3 BB       2017    4.26     2.67  302. TRUE       FALSE     
+    ## 4 DS       2016   30.4   1101.    367. TRUE       FALSE     
+    ## 5 EAO      2017   41.6  14296.    412. TRUE       FALSE     
+    ## 6 EAO      2017   48.3  67316.    392. TRUE       FALSE
+
+``` r
+# There are no extreme outlier in CAA
+SA_diff %>%
+  group_by(IHO_area) %>%
+  identify_outliers(CM) 
+```
+
+    ## # A tibble: 5 x 7
+    ##   IHO_area year  SA_int NASC_int    CM is.outlier is.extreme
+    ##   <fct>    <fct>  <dbl>    <dbl> <dbl> <lgl>      <lgl>     
+    ## 1 BB       2015    14.6     28.8  415. TRUE       FALSE     
+    ## 2 BB       2016    13.9     24.7  393. TRUE       FALSE     
+    ## 3 BB       2016    16.8     48.0  427. TRUE       FALSE     
+    ## 4 BB       2016    16.8     47.4  401. TRUE       FALSE     
+    ## 5 BB       2017    13.2     20.8  265. TRUE       FALSE
+
+``` r
+# There are no extreme outliers
+
+## Normality: Checked by looking at the anova residuals with QQ plot
+ggqqplot(SA_diff, "SA_int", facet.by = "year")
+```
+
+![](PanArctic_DSL_statistics_files/figure-gfm/all-interannual-spatial-prep-2.png)<!-- -->
+
+``` r
+ggqqplot(SA_diff, "CM", facet.by = "year")
+```
+
+![](PanArctic_DSL_statistics_files/figure-gfm/all-interannual-spatial-prep-3.png)<!-- -->
+
+``` r
+ggqqplot(SA_diff, "SA_int", facet.by = "IHO_area")
+```
+
+![](PanArctic_DSL_statistics_files/figure-gfm/all-interannual-spatial-prep-4.png)<!-- -->
+
+``` r
+ggqqplot(SA_diff, "CM", facet.by = "IHO_area")
+```
+
+![](PanArctic_DSL_statistics_files/figure-gfm/all-interannual-spatial-prep-5.png)<!-- -->
+
+``` r
+# Data is fully normal
+
+## Homogeneity of variance
+plot(lm(SA_int ~ year, data = SA_diff), 1)
+```
+
+![](PanArctic_DSL_statistics_files/figure-gfm/all-interannual-spatial-prep-6.png)<!-- -->
+
+``` r
+plot(lm(CM ~ year, data = SA_diff), 1)
+```
+
+![](PanArctic_DSL_statistics_files/figure-gfm/all-interannual-spatial-prep-7.png)<!-- -->
+
+``` r
+plot(lm(SA_int ~ IHO_area, data = SA_diff), 1)
+```
+
+![](PanArctic_DSL_statistics_files/figure-gfm/all-interannual-spatial-prep-8.png)<!-- -->
+
+``` r
+plot(lm(CM ~ IHO_area, data = SA_diff), 1)
+```
+
+![](PanArctic_DSL_statistics_files/figure-gfm/all-interannual-spatial-prep-9.png)<!-- -->
+
+``` r
+SA_diff %>%
+  levene_test(SA_int ~ year)
+```
+
+    ## # A tibble: 1 x 4
+    ##     df1   df2 statistic     p
+    ##   <int> <int>     <dbl> <dbl>
+    ## 1     2   129     0.333 0.718
+
+``` r
+# Not homogenous
+```
+
+I used a non parametric Kruskal-Wallis test to test for interannual and
+spatial variability because the variance is not homogenous and not very
+normal.
+
+``` r
+SA_diff %>% # Kruskal wallis interannual difference SA
+  kruskal_test(SA_int ~ year)
+```
+
+    ## # A tibble: 1 x 6
+    ##   .y.        n statistic    df      p method        
+    ## * <chr>  <int>     <dbl> <int>  <dbl> <chr>         
+    ## 1 SA_int   132      8.65     2 0.0133 Kruskal-Wallis
+
+``` r
+SA_diff %>% # Kruskal wallis interannual difference CM
+  kruskal_test(CM ~ year)
+```
+
+    ## # A tibble: 1 x 6
+    ##   .y.       n statistic    df     p method        
+    ## * <chr> <int>     <dbl> <int> <dbl> <chr>         
+    ## 1 CM      132      1.65     2 0.438 Kruskal-Wallis
+
+``` r
+SA_diff %>% # Kruskal wallis interannual difference SA
+  kruskal_test(SA_int ~ IHO_area)
+```
+
+    ## # A tibble: 1 x 6
+    ##   .y.        n statistic    df         p method        
+    ## * <chr>  <int>     <dbl> <int>     <dbl> <chr>         
+    ## 1 SA_int   132      26.2     4 0.0000289 Kruskal-Wallis
+
+``` r
+SA_diff %>% # Kruskal wallis interannual difference CM
+  kruskal_test(CM ~ IHO_area)
+```
+
+    ## # A tibble: 1 x 6
+    ##   .y.       n statistic    df        p method        
+    ## * <chr> <int>     <dbl> <int>    <dbl> <chr>         
+    ## 1 CM      132      57.8     4 8.21e-12 Kruskal-Wallis
+
+The center of mass did not vary significantly between years (H =
+1.652899, p = 0.438) but varied significantly among areas (*H* =
+57.8495, *p* &lt; 0.001). Mesopelagic backscatter S<sub>A</sub> varied
+significantly between areas (*H* = 26.19394, *p* &lt; 0.001) but not
+years (*H* = 8.6464, *p* = 0.013). Thus, in the S<sub>A</sub> HGAM a
+random effect for change in S<sub>A</sub> per area is likely needed.
+
+## Within areas
+
+I check whether there are inter-annual variability in S<sub>A</sub>
+across years within areas. This will be used to decide whether a random
+effect is needed in the GAM. I used a non parametric Kruskal-Wallis test
+to test for interannual variability within areas.
+
+``` r
+SA_diff %>% # Kruskal wallis interannual difference SA within group
+  group_by(IHO_area) %>%
+  kruskal_test(SA_int ~ year)
+```
+
+    ## # A tibble: 5 x 7
+    ##   IHO_area .y.        n statistic    df      p method        
+    ## * <fct>    <chr>  <int>     <dbl> <int>  <dbl> <chr>         
+    ## 1 WAO_BF   SA_int    16     4.84      2 0.0889 Kruskal-Wallis
+    ## 2 CAA      SA_int    18     6.93      2 0.0313 Kruskal-Wallis
+    ## 3 BB       SA_int    46     4.67      2 0.0968 Kruskal-Wallis
+    ## 4 DS       SA_int    24     0.108     2 0.947  Kruskal-Wallis
+    ## 5 EAO      SA_int    28     5.03      2 0.081  Kruskal-Wallis
+
+There was no interannual differences in SA within each region (WAO\_BF -
+H = 4.8395483, *p* = 0.0889; CAA - H = 6.9278752, *p* = 0.0313; BB - H =
+0.0968, *p* = 0.0889; DS - H = 0.9470, *p* = 0.0889; EAO - H =
+5.0263899, *p* = 0.0810). Therefore, there seems to be no need for a
+random effect for interannual variability within years.
 
 # HGAM
 
@@ -548,21 +787,21 @@ gam.check(GAM3, rep = 500)
     ## indicate that k is too low, especially if edf is close to k'.
     ## 
     ##                   k'   edf k-index p-value
-    ## s(v):IHOWAO_BF 4.000 1.000    1.06    0.76
-    ## s(v):IHOCAA    4.000 1.000    1.06    0.74
-    ## s(v):IHOBB     4.000 1.000    1.06    0.70
-    ## s(v):IHODS     4.000 1.000    1.06    0.73
-    ## s(v):IHOEAO    4.000 1.000    1.06    0.71
+    ## s(v):IHOWAO_BF 4.000 1.000    1.06    0.72
+    ## s(v):IHOCAA    4.000 1.000    1.06    0.73
+    ## s(v):IHOBB     4.000 1.000    1.06    0.76
+    ## s(v):IHODS     4.000 1.000    1.06    0.72
+    ## s(v):IHOEAO    4.000 1.000    1.06    0.75
     ## s(t):IHOWAO_BF 4.000 1.790    1.12    0.88
-    ## s(t):IHOCAA    4.000 1.000    1.12    0.85
-    ## s(t):IHOBB     4.000 3.098    1.12    0.90
+    ## s(t):IHOCAA    4.000 1.000    1.12    0.89
+    ## s(t):IHOBB     4.000 3.098    1.12    0.94
     ## s(t):IHODS     4.000 1.000    1.12    0.92
-    ## s(t):IHOEAO    4.000 1.000    1.12    0.90
-    ## s(o):IHOWAO_BF 4.000 1.000    1.02    0.61
-    ## s(o):IHOCAA    4.000 2.544    1.02    0.54
-    ## s(o):IHOBB     4.000 1.000    1.02    0.59
-    ## s(o):IHODS     4.000 1.000    1.02    0.61
-    ## s(o):IHOEAO    4.000 1.218    1.02    0.66
+    ## s(t):IHOEAO    4.000 1.000    1.12    0.88
+    ## s(o):IHOWAO_BF 4.000 1.000    1.02    0.51
+    ## s(o):IHOCAA    4.000 2.544    1.02    0.55
+    ## s(o):IHOBB     4.000 1.000    1.02    0.58
+    ## s(o):IHODS     4.000 1.000    1.02    0.59
+    ## s(o):IHOEAO    4.000 1.218    1.02    0.54
     ## s(IHO)         5.000 0.917      NA      NA
 
 Check residuals versus covariates.
@@ -740,7 +979,7 @@ plot_grid(pred_GAM %>%
             filter(var == "v" & SE < 5) %>%
             ggplot() +
             geom_line(aes(x = value, y = fit, col = IHO, linetype = IHO), size = 0.75, alpha = 0.8) +
-            geom_ribbon(aes(x = value, ymin = CI_lower, ymax = CI_upper, fill = IHO), alpha = 0.05) +
+            # geom_ribbon(aes(x = value, ymin = CI_lower, ymax = CI_upper, fill = IHO), alpha = 0.1) +
             scale_colour_manual(name = "IHO", values = col_pal) + 
             scale_fill_manual(name = "IHO", values = col_pal) + 
             scale_linetype_manual(name = "IHO", values = c(2, 2, 1, 2, 2)) +
@@ -749,7 +988,7 @@ plot_grid(pred_GAM %>%
             filter(var == "t" & SE < 5) %>%
             ggplot() +
             geom_line(aes(x = value, y = fit, col = IHO, linetype = IHO), size = 0.75, alpha = 0.8) +
-            geom_ribbon(aes(x = value, ymin = CI_lower, ymax = CI_upper, fill = IHO), alpha = 0.05) +
+            # geom_ribbon(aes(x = value, ymin = CI_lower, ymax = CI_upper, fill = IHO), alpha = 0.1) +
             scale_colour_manual(name = "IHO", values = col_pal) + 
             scale_fill_manual(name = "IHO", values = col_pal) + 
             scale_linetype_manual(name = "IHO", values = c(1, 2, 1, 2, 1)) +
@@ -758,11 +997,11 @@ plot_grid(pred_GAM %>%
             filter(var == "o" & SE < 5) %>%
             ggplot() +
             geom_line(aes(x = value, y = fit, col = IHO, linetype = IHO), size = 0.75, alpha = 0.8) +
-            geom_ribbon(aes(x = value, ymin = CI_lower, ymax = CI_upper, fill = IHO), alpha = 0.05) +
+            # geom_ribbon(aes(x = value, ymin = CI_lower, ymax = CI_upper, fill = IHO), alpha = 0.1) +
             scale_colour_manual(name = "IHO", values = col_pal) + 
             scale_fill_manual(name = "IHO", values = col_pal) + 
             scale_linetype_manual(name = "IHO", values = c(1, 1, 1, 2, 1)) +
-            labs(x = "Open water", y = expression("S"[A]*"")))
+            labs(x = "Open water days", y = expression("S"[A]*"")))
 ```
 
 ![](PanArctic_DSL_statistics_files/figure-gfm/ggplot-gam-1.png)<!-- -->
