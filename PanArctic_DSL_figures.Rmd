@@ -381,9 +381,10 @@ p_Sv_grid_laea
 
 ### Lines
 
-```{r, fig.width=7, fig.height=4.5}
+```{r, fig.width=7, fig.height=4}
 # wesanderson::wes_palette("Darjeeling1", type = "discrete") 1st and 5th colours are inverted
-col_pal <- c("#5BBCD6", "#00A08A", "#F2AD00", "#F98400", "#FF0000")
+# col_pal <- c("#5BBCD6", "#00A08A", "#F2AD00", "#F98400", "#FF0000")
+col_pal <- c("#5BBCD6", "#F2AD00", "#FF0000", "black")
 
 # Calculate median Sv profile for each grid cell
 Sv_prof <- Sv_grid_laea %>% 
@@ -404,6 +405,21 @@ Sv_prof <- Sv_grid_laea %>%
   unite(ID, xc, yc, year)
 
 # Calculate median Sv profile 
+Sv_prof_median_year <- Sv_grid_laea %>%
+    mutate(IHO_area = factor(case_when(IHO_area == "East Arctic Ocean" ~ "East Arctic Ocean",
+                                     IHO_area == "West Arctic Ocean" ~ "West Arctic Ocean\n& Beaufort Sea",
+                                     IHO_area == "Beaufort Sea" ~ "West Arctic Ocean\n& Beaufort Sea",
+                                     IHO_area == "The Northwestern Passages" ~ "Canadian Arctic\nArchipelago",
+                                     IHO_area == "Baffin Bay" ~ "Baffin Bay",
+                                     IHO_area == "Davis Strait" ~ "Davis Strait"),
+                           levels = c("West Arctic Ocean\n& Beaufort Sea", "Canadian Arctic\nArchipelago",
+                                      "Baffin Bay", "Davis Strait", "East Arctic Ocean"))) %>%
+  mutate(depth_round = rounder(depth, -10)) %>% # round down to nearest 20
+  group_by(depth_round, IHO_area, year) %>%
+  summarise(sv_lin50 = median(sv_lin_q0.50)) %>% 
+  ungroup() %>%
+  mutate(Sv_median = 10 * log10(sv_lin50),
+         year = as.character(year))
 Sv_prof_median <- Sv_grid_laea %>%
     mutate(IHO_area = factor(case_when(IHO_area == "East Arctic Ocean" ~ "East Arctic Ocean",
                                      IHO_area == "West Arctic Ocean" ~ "West Arctic Ocean\n& Beaufort Sea",
@@ -417,25 +433,40 @@ Sv_prof_median <- Sv_grid_laea %>%
   group_by(depth_round, IHO_area) %>%
   summarise(sv_lin50 = median(sv_lin_q0.50)) %>% 
   ungroup() %>%
-  mutate(Sv_median = 10 * log10(sv_lin50))
+  mutate(Sv_median = 10 * log10(sv_lin50),
+         year = "Median") %>%
+  bind_rows(., Sv_prof_median_year) %>%
+  mutate(year = factor(year, levels = c("2015", "2016", "2017", "Median")))
+
+# Calculate center of mass
+CM_prof <- Sv_prof_median %>%
+  filter(depth_round >= 200) %>%
+  group_by(IHO_area) %>%
+  summarise(CM = sum(depth_round * sv_lin50) / sum(sv_lin50)) %>% # center of mass in meters 
+  ungroup() %>%
+  mutate(CM_round = as.character(round(CM, 0))) 
 
 # Plot
 p_Sv_prof_lines <- Sv_prof_median %>%
   ggplot() +
-  geom_line(data = Sv_prof, aes(x = depth_round, y = Sv_median, group = ID), col = "grey80", na.rm = T) +
-  geom_vline(xintercept = 200, lty = 2) +
-  geom_line(aes(x = depth_round, y = Sv_median, col = IHO_area), na.rm = T, size = 1) +
+  # geom_line(data = Sv_prof, aes(x = depth_round, y = Sv_median, group = ID), col = "grey80", na.rm = T) +
+  geom_vline(xintercept = 200, lty = 3) + # Mesopelagic zone
+  geom_line(aes(x = depth_round, y = Sv_median, col = year)) + # Sv profiles per year and median
+  geom_vline(data = CM_prof, aes(xintercept = CM), lty = 2) + # Center of mass
+  geom_text(data = CM_prof, aes(x = CM -10, y = -102, label = as.character(CM_round)),
+            vjust = 0, size = 3, fontface = "italic") + # Label center of mass
   scale_x_reverse("Depth (m)", breaks = seq(0, 1000, 100)) + 
   scale_y_continuous(expression("S"[V]*" (dB re 1 m"^-1*")"), breaks = seq(-200, 0, 10)) +
-  coord_flip(ylim = c(-105, -70), xlim = c(800, 20)) +
   scale_colour_manual(values = col_pal) +
+  coord_flip(ylim = c(-105, -65), xlim = c(800, 20)) +
   facet_rep_grid(~ IHO_area) +
-  guides(colour = "none") +
   theme(panel.border = element_blank(),
         axis.line = element_line(),
+        legend.title = element_blank(), 
+        legend.position = "top",
         panel.spacing = unit(0, "in"),
         plot.margin = unit(c(0, 0.1, 0, 0), "in"))
-ggsave("plots/Fig2_Sv_profiles_lines.png", p_Sv_prof_lines, height = 4.5, width = 7, dpi = 600, units = "in")
+ggsave("plots/Fig2_Sv_profiles_lines.png", p_Sv_prof_lines, height = 3.5, width = 7, dpi = 600, units = "in")
 p_Sv_prof_lines
 ```
 
