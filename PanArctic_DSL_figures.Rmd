@@ -2,8 +2,11 @@
 title: "PanArctic DSL - Figures"
 author: "[Pierre Priou](mailto:pierre.priou@mi.mun.ca)"
 date: "`r format(Sys.time(), '%Y/%m/%d at %H:%M')`"
-output: github_document
-always_allow_html: true
+output: 
+  html_document:
+    keep_md: yes
+  github_document:
+    always_allow_html: true
 ---
 
 # Package and data loading
@@ -216,10 +219,6 @@ IHO_regions <- bind_rows(IHO_EAO, IHO_WAO, IHO_BF, IHO_CAA, IHO_BB, IHO_DS) # Co
 
 # Remove unused variable
 rm(cell_res)
-```
-
-```{r}
-
 ```
 
 

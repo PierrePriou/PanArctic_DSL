@@ -2,13 +2,16 @@
 title: "PanArctic DSL - CTD"
 author: "[Pierre Priou](mailto:pierre.priou@mi.mun.ca)"
 date: "`r format(Sys.time(), '%Y/%m/%d at %H:%M')`"
-output: github_document
-always_allow_html: true
+output: 
+  html_document:
+    keep_md: yes
+  github_document:
+    always_allow_html: true
 ---
 
 # Package loading
 
-```{r package-loading, message=FALSE}
+```{r package-loading, message=FALSE, warning=FALSE}
 # Load packages
 library(tidyverse)  # Tidy code
 library(cowplot)    # Plots on a grid

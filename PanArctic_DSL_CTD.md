@@ -1,11 +1,18 @@
-PanArctic DSL - CTD
-================
-[Pierre Priou](mailto:pierre.priou@mi.mun.ca)
-2022/04/27 at 09:31
+---
+title: "PanArctic DSL - CTD"
+author: "[Pierre Priou](mailto:pierre.priou@mi.mun.ca)"
+date: "2022/05/04 at 19:23"
+output: 
+  html_document:
+    keep_md: yes
+  github_document:
+    always_allow_html: true
+---
 
 # Package loading
 
-``` r
+
+```r
 # Load packages
 library(tidyverse)  # Tidy code
 library(cowplot)    # Plots on a grid
@@ -29,21 +36,17 @@ options(dplyr.summarise.inform = F) # Suppress summarise() warning
 
 # CTD data
 
-CTD data were collected regularly during each of the survey. To match
-CTD records with acoustic data, I rasterized CTD data on the same grid
-as the acoustic data. I tried two different grids; the WGS84 projection
-(EPSG:4326) with grid cells of 2°lon \* 1°lat, and the EASE-Grid 2.0
-North (EPSG:6931) with grid cells of 150 km \* 150 km. For each cell I
-calculated the mean conservative temperature and absolute salinity
-between 200 and 1000 m depth.
+CTD data were collected regularly during each of the survey. To match CTD records with acoustic data, I rasterized CTD data on the same grid as the acoustic data. I tried two different grids; the WGS84 projection (EPSG:4326) with grid cells of 2°lon * 1°lat, and the EASE-Grid 2.0 North (EPSG:6931) with grid cells of 150 km * 150 km. For each cell I calculated the mean conservative temperature and absolute salinity between 200 and 1000 m depth.
 
-``` r
+
+```r
 load("data/CTD/CTD_2015_2019.RData") # CTD data
 ```
 
-## EPSG:4326 - WGS84 projection
+## EPSG:4326 - WGS84 projection 
 
-``` r
+
+```r
 arctic_latlon <- raster(extent(-155, 35, 66, 85), # Base projection for acoustic and CTD data
                         crs = "EPSG:4326", 
                         res = c(2, 1)) # cells of 2 degree longitude per 1 degree latitude
@@ -82,10 +85,10 @@ for (i in seq(2015, 2017, 1)) { # Data gridding
 rm(CTD_tmp, CTD_tmp_latlon, i) # Remove temporary data
 ```
 
-Plot mean conservative temperature and absolute salinity over
-mesopelagic depths (200 - 1000 m depth) with the WGS84 projection.
+Plot mean conservative temperature and absolute salinity over mesopelagic depths (200 - 1000 m depth) with the WGS84 projection.
 
-``` r
+
+```r
 coast_10m_latlon <- readOGR("data/bathy/ne_10m_land.shp", verbose = F) %>% # Coastline in latlon
   spTransform(CRSobj = crs(arctic_latlon)) %>% # Make sure that the shapefile is in the right projection
   crop(extent(-180, 180, 0, 90)) %>% # Crop shapefile
@@ -111,14 +114,14 @@ plot_grid(CTD_grid_latlon %>% # Map conservative temperature
           ncol = 2, align = "hv", axis = "tblr")
 ```
 
-![](PanArctic_DSL_CTD_files/figure-gfm/EPSG-4326-map-CTD-1.png)<!-- -->
+![](PanArctic_DSL_CTD_files/figure-html/EPSG-4326-map-CTD-1.png)<!-- -->
 
-## EPSG:6931 - EASE-Grid 2.0 North (Lambert’s equal-area, azimuthal)
+## EPSG:6931 - EASE-Grid 2.0 North (Lambert's equal-area, azimuthal)
 
-More info on this projection can be found on the [NSIDC
-website](https://nsidc.org/data/ease/).
+More info on this projection can be found on the [NSIDC website](https://nsidc.org/data/ease/).
 
-``` r
+
+```r
 cell_res <- 50 # Cell resolution in km
 arctic_laea <- raster(extent(-2700, 2700, -2700, 2700), crs = "EPSG:6931") # Seaice projection
 projection(arctic_laea) <- gsub("units=m", "units=km", projection(arctic_laea)) # Convert proj unit from m to km
@@ -161,10 +164,10 @@ CTD_grid_laea <- CTD_grid_laea %>%
 rm(CTD_tmp, CTD_tmp_laea, i, cell_res) # Remove temporary data
 ```
 
-Plot mean conservative temperature and absolute salinity over
-mesopelagic depths (200 - 1000 m depth) with the EASE-Grid 2.0 North.
+Plot mean conservative temperature and absolute salinity over mesopelagic depths (200 - 1000 m depth) with the EASE-Grid 2.0 North. 
 
-``` r
+
+```r
 coast_10m_laea <- readOGR("data/bathy/ne_10m_land.shp", verbose = F) %>% # Coastline in laea
   spTransform(CRSobj = crs(arctic_latlon)) %>% # Make sure that the shapefile is in the right projection
   crop(extent(-180, 180, 0, 90)) %>% # Crop shapefile
@@ -193,10 +196,11 @@ plot_grid(CTD_grid_laea %>% # Map conservative temperature
           ncol = 1, align = "hv", axis = "tblr")
 ```
 
-![](PanArctic_DSL_CTD_files/figure-gfm/EPSG-6931-map-CTD-1.png)<!-- -->
+![](PanArctic_DSL_CTD_files/figure-html/EPSG-6931-map-CTD-1.png)<!-- -->
 
-# Save data
+# Save data 
 
-``` r
+
+```r
 save(CTD_grid_laea, CTD_grid_latlon, file = "data/CTD/CTD_grids.RData") # Save data
 ```

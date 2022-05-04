@@ -2,8 +2,11 @@
 title: "PanArctic DSL - Statistics"
 author: "[Pierre Priou](mailto:pierre.priou@mi.mun.ca)"
 date: "`r format(Sys.time(), '%Y/%m/%d at %H:%M')`"
-output: github_document
-always_allow_html: true
+output: 
+  html_document:
+    keep_md: yes
+  github_document:
+    always_allow_html: true
 ---
 
 # Package loading
@@ -66,8 +69,6 @@ coast_10m_laea <- readOGR("data/bathy/ne_10m_land.shp", verbose = F) %>% # Coast
 
 # Gridded acoustic, CTD, and sea ice data
 load("data/acoustics/SA_grids.RData") # Acoustic data
-SA_grid_laea <- SA_grid_laea %>%
-  mutate(SA_int = 10 * log10(NASC_int))
 load("data/remote_sensing/physics_grids.RData") # Modelled physics data 
 load("data/remote_sensing/seaice_grids.RData") # Remote sensing sea ice data
 ```
@@ -78,7 +79,8 @@ I combine data using the EASE-Grid 2.0 North (EPSG:6931) and normalize the covar
 
 ```{r combine-data}
 SA_laea <- SA_grid_laea %>%  # Tidy anomaly dataset for joining
-  dplyr::select(-lat, -lon)
+  dplyr::select(-lat, -lon) %>%
+  filter(empty == F)
 phy_laea <- phy_grid_laea %>% # Tidy remote sensing dataset for joining
   dplyr::select(-lat, -lon)
 seaice_laea <- seaice_grid_laea %>%
@@ -142,8 +144,7 @@ stat_laea <- left_join(SA_laea, phy_laea, by = c("year", "area", "xc", "yc", "ce
                                      IHO_area == "Davis Strait" ~ "DS"),
                             levels = c("WAO_BF", "CAA", "BB", "DS", "EAO"))) %>%
   ungroup() %>%
-  dplyr::select(-mean_NASC_area_year, -sd_NASC_area_year, -NASC_anomaly_d, -cell_res, -vxo, -vyo,
-                -mean_temp_area_depth, -mean_velo_area_depth, -xc_na, -yc_na, -year_na, -siconc, -sithick,
+  dplyr::select(-vxo, -vyo, -mean_temp_area_depth, -mean_velo_area_depth, -xc_na, -yc_na, -year_na, -siconc, -sithick,
                 -temp_anomaly, -velocity_anomaly)
 ```
 
@@ -172,7 +173,6 @@ stat_laea %>% # Ice concentration
   coord_fixed(xlim = c(-2600, 1100), ylim = c(-1800, 1900), expand = F) + 
   theme(axis.text = element_blank(), axis.ticks = element_blank(), axis.title = element_blank())
 ```
-
 
 ```{r map-ow, fig.height=3, fig.width=7}
 stat_laea %>% # Openwater duration
@@ -364,7 +364,7 @@ There was no interannual differences in SA within each region (WAO_BF - H = 4.83
 
 ```{r GAM-prep}
 SA_df <- stat_laea %>%
-  dplyr::select(year, xc, yc, area, IHO_area_large, IHO_area, NASC_int, SA_int, velocity, thetao, openwater_duration, ice_week) %>%
+  dplyr::select(year, xc, yc, area, IHO_area, NASC_int, SA_int, velocity, thetao, openwater_duration, ice_week) %>%
   group_by(IHO_area) %>%
   mutate(year = factor(year),
          SA_int_n = (SA_int - min(SA_int)) / (max(SA_int) - min(SA_int)),
@@ -384,25 +384,25 @@ Plot data.
 
 ```{r plot-data-area, fig.height=8, fig.width=10, message=FALSE}
 plot_grid(SA_df %>%
-            ggplot(aes(x = v, y = SA_int, col = IHO_area_large)) +
+            ggplot(aes(x = v, y = SA_int, col = IHO)) +
             geom_point() +
             geom_smooth(method = "lm", se = F, col = "grey20") +
             facet_grid(~ IHO) +
             theme(legend.position = "none"),
           SA_df %>%
-            ggplot(aes(x = t, y = SA_int, col = IHO_area_large)) +
+            ggplot(aes(x = t, y = SA_int, col = IHO)) +
             geom_point() +
             geom_smooth(method = "lm", se = F, col = "grey20") +
             facet_grid(~ IHO) +
             theme(legend.position = "none"),
           SA_df %>%
-            ggplot(aes(x = o, y = SA_int, col = IHO_area_large)) +
+            ggplot(aes(x = o, y = SA_int, col = IHO)) +
             geom_point() +
             geom_smooth(method = "lm", se = F, col = "grey20") +
             facet_grid(~ IHO) +
             theme(legend.position = "none"),
           SA_df %>%
-            ggplot(aes(x = s, y = SA_int, col = IHO_area_large)) +
+            ggplot(aes(x = s, y = SA_int, col = IHO)) +
             geom_point() +
             geom_smooth(method = "lm", se = F, col = "grey20") +
             facet_grid(~ IHO) +
@@ -412,22 +412,22 @@ plot_grid(SA_df %>%
 
 ```{r plot-distribution, fig.height=8, fig.width=10, message=FALSE}
 plot_grid(SA_df %>%
-            ggplot(aes(x = v, fill = IHO_area_large)) +
+            ggplot(aes(x = v, fill = IHO)) +
             geom_histogram() +
             facet_grid(~ IHO) +
             theme(legend.position = "none"),
           SA_df %>%
-            ggplot(aes(x = t, fill = IHO_area_large)) +
+            ggplot(aes(x = t, fill = IHO)) +
             geom_histogram() +
             facet_grid(~ IHO) +
             theme(legend.position = "none"),
           SA_df %>%
-            ggplot(aes(x = o, fill = IHO_area_large)) +
+            ggplot(aes(x = o, fill = IHO)) +
             geom_histogram() +
             facet_grid(~ IHO) +
             theme(legend.position = "none"),
           SA_df %>%
-            ggplot(aes(x = s, fill = IHO_area_large)) +
+            ggplot(aes(x = s, fill = IHO)) +
             geom_histogram() +
             facet_grid(~ IHO) +
             theme(legend.position = "none"),
@@ -439,35 +439,35 @@ Check correlations.
 ```{r corr-area}
 corr_EAO <- SA_df %>% # Compute Spearman correlation matrix
   filter(IHO == "EAO") %>%
-  dplyr::select(-year, -xc, -yc, -IHO_area_large, -IHO, -area, -SA_int_n, -v_n, -t_n, -o_n, -s_n) %>%
+  dplyr::select(-year, -xc, -yc, -IHO, -area, -SA_int_n, -v_n, -t_n, -o_n, -s_n) %>%
   cor(., method = "spearman") %>%
   round(., 2)
 ggcorrplot(corr_EAO, type = "lower", lab = T, title = "corr EAO")
 
 corr_BB <- SA_df %>% # Compute Spearman correlation matrix
   filter(IHO == "BB") %>%
-  dplyr::select(-year, -xc, -yc, -IHO_area_large, -IHO, -area, -SA_int_n, -v_n, -t_n, -o_n, -s_n) %>%
+  dplyr::select(-year, -xc, -yc, -IHO, -area, -SA_int_n, -v_n, -t_n, -o_n, -s_n) %>%
   cor(., method = "spearman") %>%
   round(., 2)
 ggcorrplot(corr_BB, type = "lower", lab = T, title = "corr BB")
 
 corr_DS <- SA_df %>% # Compute Spearman correlation matrix
   filter(IHO == "DS") %>%
-  dplyr::select(-year, -xc, -yc, -IHO_area_large, -IHO, -area, -SA_int_n, -v_n, -t_n, -o_n, -s_n) %>%
+  dplyr::select(-year, -xc, -yc, -IHO, -area, -SA_int_n, -v_n, -t_n, -o_n, -s_n) %>%
   cor(., method = "spearman") %>%
   round(., 2)
 ggcorrplot(corr_DS, type = "lower", lab = T, title = "corr BB")
 
 corr_WAO <- SA_df %>% # Compute Spearman correlation matrix
   filter(IHO == "WAO_BF") %>%
-  dplyr::select(-year, -xc, -yc, -IHO_area_large, -IHO, -area, -SA_int_n, -v_n, -t_n, -o_n, -s_n) %>%
+  dplyr::select(-year, -xc, -yc, -IHO, -area, -SA_int_n, -v_n, -t_n, -o_n, -s_n) %>%
   cor(., method = "spearman") %>%
   round(., 2)
 ggcorrplot(corr_WAO, type = "lower", lab = T, title = "corr WAO")
 
 corr_CAA <- SA_df %>% # Compute Spearman correlation matrix
   filter(IHO == "CAA") %>%
-  dplyr::select(-year, -xc, -yc, -IHO_area_large, -IHO, -area, -SA_int_n, -v_n, -t_n, -o_n, -s_n) %>%
+  dplyr::select(-year, -xc, -yc, -IHO, -area, -SA_int_n, -v_n, -t_n, -o_n, -s_n) %>%
   cor(., method = "spearman") %>%
   round(., 2)
 ggcorrplot(corr_CAA, type = "lower", lab = T, title = "corr CAA")
@@ -479,21 +479,21 @@ I decided to fit hierarchical generalized additive model due to their flexibilit
 
 ```{r HGAM-fit}
 # Model G
-GAM1 <- gam(SA_int ~ s(v, k = 5, bs = "tp") + s(t, k = 5, bs = "tp") + s(o, k = 5, bs = "tp"),
+GAM1 <- gam(SA_int_n ~ s(v, k = 5, bs = "tp") + s(t, k = 5, bs = "tp") + s(o, k = 5, bs = "tp"),
             data = SA_df, family = "gaussian", method = "REML")
 # Model S
-GAM2 <- gam(SA_int ~ s(v, IHO, bs = "fs", k = 5) + s(t, IHO, bs = "fs", k = 5) + s(o, IHO, bs = "fs", k = 5), 
+GAM2 <- gam(SA_int_n ~ s(v, IHO, bs = "fs", k = 5) + s(t, IHO, bs = "fs", k = 5) + s(o, IHO, bs = "fs", k = 5), 
             data = SA_df, family = "gaussian", method = "REML")
 # Model I
-GAM3 <- gam(SA_int ~ s(v, by = IHO, k = 5, bs = "tp") + s(t, by = IHO, k = 5, bs = "tp") + 
+GAM3 <- gam(SA_int_n ~ s(v, by = IHO, k = 5, bs = "tp") + s(t, by = IHO, k = 5, bs = "tp") + 
               s(o, by = IHO, k = 5, bs = "tp") + s(IHO, bs = "re"),
             data = SA_df, family = "gaussian", method = "REML")
 # Model GS
-GAM4 <- gam(SA_int ~ s(v, k = 5) + s(t, k = 5) + s(o, k = 5) + s(v, IHO, bs = "fs", k = 5) + 
+GAM4 <- gam(SA_int_n ~ s(v, k = 5) + s(t, k = 5) + s(o, k = 5) + s(v, IHO, bs = "fs", k = 5) + 
               s(t_n, IHO, bs = "fs", k = 5) + s(o_n, IHO, bs = "fs", k = 5),
             data = SA_df, family = "gaussian", method = "REML")
 # Model GI
-GAM5 <- gam(SA_int ~ s(v, k = 5) + s(t, k = 5) + s(o, k = 5) + s(v, by = IHO, k = 5, bs = "tp") + 
+GAM5 <- gam(SA_int_n ~ s(v, k = 5) + s(t, k = 5) + s(o, k = 5) + s(v, by = IHO, k = 5, bs = "tp") + 
               s(t, by = IHO, k = 5, bs = "tp") + s(o, by = IHO, k = 5, bs = "tp") + s(IHO, bs = "re"),
             data = SA_df, family = "gaussian", method = "REML")
 
@@ -541,7 +541,7 @@ Check residuals versus covariates.
 
 ```{r residuals-covariates, message=FALSE}
 resid_GAM <- bind_cols(SA_df, residuals.gam(GAM3)) %>%
-  rename(resid = "...18")
+  rename(resid = "...17")
 plot_grid(resid_GAM %>%
             ggplot(aes(x = v, y = resid)) + 
             geom_hline(yintercept = 0, col = "red") +
@@ -589,7 +589,7 @@ summary(GAM3_p)
 ```
 
 ```{r fig.height=10}
-draw(GAM3_p, scales = "free")
+draw(GAM3_p, scales = "fixed")
 ```
 
 ## Model visualization
@@ -614,18 +614,18 @@ pred_v <- get_gam_predictions(GAM3, series = v, .comparison = IHO, series_length
                             IHO == "EAO" ~ 1),
          signif_group = factor(if_else(signif > 0.1, F, T))) %>%
   rename(idx = ".idx",
-         fit = SA_int,
+         fit = SA_int_n,
          value = v)
 pred_t <- get_gam_predictions(GAM3, series = t, .comparison = IHO, series_length = 50) %>%
   mutate(var = "t",
          signif = case_when(IHO == "WAO_BF" ~ 0.001, # significance level
-                            IHO == "CAA" ~ 0.1,
+                            IHO == "CAA" ~ 1,
                             IHO == "BB" ~ 0.001,
                             IHO == "DS" ~ 1,
-                            IHO == "EAO" ~ 0.1),
+                            IHO == "EAO" ~ 0.01),
          signif_group = factor(if_else(signif > 0.1, F, T))) %>%
     rename(idx = ".idx",
-           fit = SA_int,
+           fit = SA_int_n,
            value = t)
 pred_o <- get_gam_predictions(GAM3, series = o, .comparison = IHO, series_length = 50) %>%
   mutate(var = "o", 
@@ -636,7 +636,7 @@ pred_o <- get_gam_predictions(GAM3, series = o, .comparison = IHO, series_length
                             IHO == "EAO" ~ 0.05),
          signif_group = factor(if_else(signif > 0.1, F, T))) %>%
   rename(idx = ".idx",
-         fit = SA_int,
+         fit = SA_int_n,
          value = o)
 # Combine data
 pred_GAM <- bind_rows(pred_v, pred_t, pred_o)
@@ -657,17 +657,18 @@ plot_grid(pred_GAM %>%
             # geom_ribbon(aes(x = value, ymin = CI_lower, ymax = CI_upper, fill = IHO), alpha = 0.1) +
             scale_colour_manual(name = "IHO", values = col_pal) + 
             scale_fill_manual(name = "IHO", values = col_pal) + 
-            scale_linetype_manual(name = "IHO", values = c(2, 2, 1, 2, 2)) +
+            scale_y_continuous(limits = c(0,1)) +
+            scale_linetype_manual(name = "IHO", values = c(2, 2, 2, 1, 1)) +
             labs(x = "Velo. 380 m", y = expression("S"[A]*"")),
           pred_GAM %>%
             filter(var == "t" & SE < 4) %>%
             ggplot() +
             geom_line(aes(x = value, y = fit, col = IHO, linetype = IHO), size = 0.75, alpha = 0.8) +
             # geom_ribbon(aes(x = value, ymin = CI_lower, ymax = CI_upper, fill = IHO), alpha = 0.1) +
-            # scale_x_continuous(limits = c(-1.5, 3)) +
             scale_colour_manual(name = "IHO", values = col_pal) + 
             scale_fill_manual(name = "IHO", values = col_pal) + 
-            scale_linetype_manual(name = "IHO", values = c(1, 2, 1, 2, 1)) +
+            scale_y_continuous(limits = c(0,1)) +
+            scale_linetype_manual(name = "IHO", values = c(2, 2, 1, 2, 2)) +
             labs(x = "Temp. 380 m", y = expression("S"[A]*"")),
           pred_GAM %>%
             filter(var == "o" & SE < 4) %>%
@@ -676,6 +677,7 @@ plot_grid(pred_GAM %>%
             # geom_ribbon(aes(x = value, ymin = CI_lower, ymax = CI_upper, fill = IHO), alpha = 0.1) +
             scale_colour_manual(name = "IHO", values = col_pal) + 
             scale_fill_manual(name = "IHO", values = col_pal) + 
-            scale_linetype_manual(name = "IHO", values = c(1, 1, 1, 2, 1)) +
+            scale_y_continuous(limits = c(0,1)) +
+            scale_linetype_manual(name = "IHO", values = c(2, 1, 2, 2, 2)) +
             labs(x = "Open water days", y = expression("S"[A]*"")))
 ```
