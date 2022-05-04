@@ -274,6 +274,9 @@ I check whether there are inter-annual and spatial variability in S~A~ and the c
 # Visualize data
 plot_grid(SA_diff %>% 
             ggplot() +
+            geom_boxplot(aes(x = year, y = NASC_int)),
+          SA_diff %>% 
+            ggplot() +
             geom_boxplot(aes(x = year, y = SA_int)),
           SA_diff %>% 
             ggplot() +
@@ -283,31 +286,37 @@ plot_grid(SA_diff %>%
 ## Outliers
 SA_diff %>%
   group_by(year) %>%
+  identify_outliers(NASC_int) 
+SA_diff %>%
+  group_by(year) %>%
   identify_outliers(SA_int) 
-# There are no extreme outlier in CAA
 SA_diff %>%
   group_by(year) %>%
   identify_outliers(CM) 
-# There are no extreme outliers
+SA_diff %>%
+  group_by(IHO_area) %>%
+  identify_outliers(NASC_int) 
 SA_diff %>%
   group_by(IHO_area) %>%
   identify_outliers(SA_int) 
-# There are no extreme outlier in CAA
 SA_diff %>%
   group_by(IHO_area) %>%
   identify_outliers(CM) 
-# There are no extreme outliers
 
 ## Normality: Checked by looking at the anova residuals with QQ plot
+ggqqplot(SA_diff, "NASC_int", facet.by = "year")
 ggqqplot(SA_diff, "SA_int", facet.by = "year")
 ggqqplot(SA_diff, "CM", facet.by = "year")
+ggqqplot(SA_diff, "NASC_int", facet.by = "IHO_area")
 ggqqplot(SA_diff, "SA_int", facet.by = "IHO_area")
 ggqqplot(SA_diff, "CM", facet.by = "IHO_area")
 # Data is fully normal
 
 ## Homogeneity of variance
+plot(lm(NASC_int ~ year, data = SA_diff), 1)
 plot(lm(SA_int ~ year, data = SA_diff), 1)
 plot(lm(CM ~ year, data = SA_diff), 1)
+plot(lm(NASC_int ~ IHO_area, data = SA_diff), 1)
 plot(lm(SA_int ~ IHO_area, data = SA_diff), 1)
 plot(lm(CM ~ IHO_area, data = SA_diff), 1)
 SA_diff %>%
@@ -319,9 +328,13 @@ I used a non parametric Kruskal-Wallis test to test for interannual and spatial 
 
 ```{r all-kruskal-wallis}
 SA_diff %>% # Kruskal wallis interannual difference SA
+  kruskal_test(NASC_int ~ year)
+SA_diff %>% # Kruskal wallis interannual difference SA
   kruskal_test(SA_int ~ year)
 SA_diff %>% # Kruskal wallis interannual difference CM
   kruskal_test(CM ~ year)
+SA_diff %>% # Kruskal wallis interannual difference SA
+  kruskal_test(NASC_int ~ IHO_area)
 SA_diff %>% # Kruskal wallis interannual difference SA
   kruskal_test(SA_int ~ IHO_area)
 SA_diff %>% # Kruskal wallis interannual difference CM
@@ -337,18 +350,21 @@ I check whether there are inter-annual variability in S~A~ across years within a
 ```{r area-kruskal-wallis}
 SA_diff %>% # Kruskal wallis interannual difference SA within group
   group_by(IHO_area) %>%
+  kruskal_test(NASC_int ~ year)
+SA_diff %>% # Kruskal wallis interannual difference SA within group
+  group_by(IHO_area) %>%
   kruskal_test(SA_int ~ year)
 ```
 
 There was no interannual differences in SA within each region (WAO_BF - H = 4.8395483, *p* = 0.0889; CAA - H = 6.9278752, *p* = 0.0313; BB - H = 0.0968, *p* = 0.0889; DS - H = 0.9470, *p* = 0.0889; EAO - H = 5.0263899, *p* = 0.0810). Therefore, there seems to be no need for a random effect for interannual variability within years.
 
-# HGAM
+# HGAM - Gaussian SA
 
 ## Data preparation
 
-```{r lm-prep}
+```{r GAM-prep}
 SA_df <- stat_laea %>%
-  dplyr::select(year, xc, yc, area, IHO_area_large, IHO_area, SA_int, velocity, thetao, openwater_duration, ice_week) %>%
+  dplyr::select(year, xc, yc, area, IHO_area_large, IHO_area, NASC_int, SA_int, velocity, thetao, openwater_duration, ice_week) %>%
   group_by(IHO_area) %>%
   mutate(year = factor(year),
          SA_int_n = (SA_int - min(SA_int)) / (max(SA_int) - min(SA_int)),
@@ -525,7 +541,7 @@ Check residuals versus covariates.
 
 ```{r residuals-covariates, message=FALSE}
 resid_GAM <- bind_cols(SA_df, residuals.gam(GAM3)) %>%
-  rename(resid = "...17")
+  rename(resid = "...18")
 plot_grid(resid_GAM %>%
             ggplot(aes(x = v, y = resid)) + 
             geom_hline(yintercept = 0, col = "red") +
@@ -581,9 +597,9 @@ draw(GAM3_p, scales = "free")
 Quick plots using `visreg`.
 
 ```{r plot-GAM3}
-visreg(GAM3, "v", "IHO", overlay = F, scale = "response", band = F, partial = T)
-visreg(GAM3, "t", "IHO", overlay = F, scale = "response", band = F, partial = T)
-visreg(GAM3, "o", "IHO", overlay = F, scale = "response", band = F, partial = T)
+visreg(GAM3, "v", "IHO", overlay = T, scale = "response", band = F, partial = T)
+visreg(GAM3, "t", "IHO", overlay = T, scale = "response", band = F, partial = T)
+visreg(GAM3, "o", "IHO", overlay = T, scale = "response", band = F, partial = T)
 ```
 
 I predict the data and then use that dataframe to plot it in a "clean" way with `ggplot`.
@@ -635,7 +651,7 @@ save(pred_GAM, GAM3, file = "data/statistics/GAM_results.RData")
 col_pal <- c("#5BBCD6", "#00A08A", "#F2AD00", "#F98400", "#FF0000")# wesanderson::wes_palette("Darjeeling1", type = "discrete") 
 
 plot_grid(pred_GAM %>%
-            filter(var == "v" & SE < 5) %>%
+            filter(var == "v" & SE < 4) %>%
             ggplot() +
             geom_line(aes(x = value, y = fit, col = IHO, linetype = IHO), size = 0.75, alpha = 0.8) +
             # geom_ribbon(aes(x = value, ymin = CI_lower, ymax = CI_upper, fill = IHO), alpha = 0.1) +
@@ -644,16 +660,17 @@ plot_grid(pred_GAM %>%
             scale_linetype_manual(name = "IHO", values = c(2, 2, 1, 2, 2)) +
             labs(x = "Velo. 380 m", y = expression("S"[A]*"")),
           pred_GAM %>%
-            filter(var == "t" & SE < 5) %>%
+            filter(var == "t" & SE < 4) %>%
             ggplot() +
             geom_line(aes(x = value, y = fit, col = IHO, linetype = IHO), size = 0.75, alpha = 0.8) +
             # geom_ribbon(aes(x = value, ymin = CI_lower, ymax = CI_upper, fill = IHO), alpha = 0.1) +
+            # scale_x_continuous(limits = c(-1.5, 3)) +
             scale_colour_manual(name = "IHO", values = col_pal) + 
             scale_fill_manual(name = "IHO", values = col_pal) + 
             scale_linetype_manual(name = "IHO", values = c(1, 2, 1, 2, 1)) +
             labs(x = "Temp. 380 m", y = expression("S"[A]*"")),
           pred_GAM %>%
-            filter(var == "o" & SE < 5) %>%
+            filter(var == "o" & SE < 4) %>%
             ggplot() +
             geom_line(aes(x = value, y = fit, col = IHO, linetype = IHO), size = 0.75, alpha = 0.8) +
             # geom_ribbon(aes(x = value, ymin = CI_lower, ymax = CI_upper, fill = IHO), alpha = 0.1) +
@@ -662,4 +679,3 @@ plot_grid(pred_GAM %>%
             scale_linetype_manual(name = "IHO", values = c(1, 1, 1, 2, 1)) +
             labs(x = "Open water days", y = expression("S"[A]*"")))
 ```
-
