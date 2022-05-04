@@ -15,5 +15,12 @@ vignettes/*.pdf
 .Renviron
 data/
 plots/
-R/
+/PanArctic_DSL_statistics_files/figure-html
+/PanArctic_DSL_remote_sensing_files/figure-html
+/PanArctic_DSL_figures_files/figure-html
+/PanArctic_DSL_CTD_files/figure-html
+/PanArctic_DSL_acoustics_files/figure-html
 /.ipynb_checkpoints
+/PanArctic_DSL_acoustics_cache
+/PanArctic_DSL_figures_cache
+/PanArctic_DSL_remote_sensing_cache
