@@ -1,7 +1,7 @@
 ---
 title: "PanArctic DSL - Acoustic gridding"
 author: "[Pierre Priou](mailto:pierre.priou@mi.mun.ca)"
-date: "2022/05/04 at 19:53"
+date: "2022/05/05 at 14:12"
 output: 
   html_document:
     keep_md: yes
@@ -130,10 +130,9 @@ MVBS <- MVBS_raw %>%
          day_night = factor(if_else(is.na(dawn) & is.na(dusk) & month >= 4 & month <= 10, "day", # polar day case
                             if_else(is.na(dawn) & is.na(dusk) & month < 4 | month > 10, "night", # polar night case
                             if_else(date >= dawn & date <= dusk, "day", "night"))),
-                            levels = c("day", "night")),
-         empty = if_else(Sv_mean < -90, 0, 1)) %>% # empty cell = 0, cell with signal = 1
-  filter(layer_depth_min <= 995 & bottom_depth > 200 & lat != 999 & lon != 999 & Sv_mean < -30 ) %>% # Tidy data
-  dplyr::select(year, area, date, day_night, lat, lon, layer_depth_min, Sv_mean, NASC, empty, bottom_depth, frequency) 
+                            levels = c("day", "night"))) %>% 
+  filter(layer_depth_min <= 995 & bottom_depth > 200 & lat != 999 & lon != 999 & Sv_mean < -30) %>% # Tidy data
+  dplyr::select(year, area, date, day_night, lat, lon, layer_depth_min, Sv_mean, NASC, bottom_depth, frequency) 
 
 rm(MVBS_suncalc, MVBS_bottom_depth)
 ```
@@ -142,25 +141,23 @@ Calculate integrated NASC over mesopelagic depth (200 - 1000 m depth) and centre
 
 
 ```r
-SA_metrics <- MVBS %>%
+SA_integrated <- MVBS %>%
   mutate(sv_lin = 10 ^ (Sv_mean / 10)) %>%  # linear volume backscattering coefficient
   filter(layer_depth_min >= 200 & layer_depth_min <= 995) %>% # Select mesopelagic depths
   group_by(year, area, date, day_night, lat, lon, bottom_depth) %>%
   summarise(sv_lin_mean = mean(sv_lin),
             depth_integration = max(layer_depth_min) - min(layer_depth_min) + 5, # +5 because each cell is 5m high
             NASC_int = sum(NASC), # integrated backscatter (linear)
-            CM = sum(layer_depth_min * sv_lin) / sum(sv_lin)) %>% # centre of mass in meters
+            CM = sum(layer_depth_min * NASC) / sum(NASC)) %>% # centre of mass in meters
   ungroup() %>%
-  mutate(Sv_meso = 10 * log10(sv_lin_mean),
-         SA_int = 10 * log10(NASC_int),
-         empty = factor(if_else(Sv_meso < -90, T, F)))
+  mutate(SA_int = 10 * log10(NASC_int))
 ```
 
 Save data.
 
 
 ```r
-save(MVBS, SA_metrics, file = "data/acoustics/MVBS_2015_2017.RData")
+save(MVBS, SA_integrated, file = "data/acoustics/MVBS_2015_2017.RData")
 ```
 
 ## 2D Integrated backscatter - EPSG:6931 - EASE-Grid 2.0 North (Lambert's equal-area, azimuthal)
@@ -172,16 +169,15 @@ More info on this projection can be found on the [NSIDC website](https://nsidc.o
 SA_grid_laea <- data.frame() # Empty dataframe that will be filled with gridded CTD data
 
 for (i in seq(2015, 2017, 1)) { # Data gridding
-  SA_tmp <- SA_metrics %>%
+  SA_tmp <- SA_integrated %>%
     filter(year == i & day_night == "day") %>%
-    dplyr::select(year, lat, lon, NASC_int, Sv_meso, CM)
+    dplyr::select(year, lat, lon, NASC_int, CM)
   # Rasterize data in latlon
   SA_tmp_laea <- SpatialPointsDataFrame(SpatialPoints(cbind(SA_tmp$lon, SA_tmp$lat), 
                                                         proj4string = CRS("EPSG:4326")),
                                           data.frame(lat = SA_tmp$lat,
                                                      lon = SA_tmp$lon,
                                                      NASC_int = SA_tmp$NASC_int,
-                                                     Sv_meso = SA_tmp$Sv_meso,
                                                      CM = SA_tmp$CM)) %>%
     spTransform(., CRSobj = crs(arctic_laea)) %>% # Change projection to EPSG:6931
     rasterize(., arctic_laea, fun = mean, na.rm = T) %>% # Rasterize data in latlon
@@ -194,7 +190,7 @@ for (i in seq(2015, 2017, 1)) { # Data gridding
                                    lon > -95 & lon <= -50 & lat > 66 & lat <= 82 ~ "BB",
                                    lon >= -25 & lon <= 145 & lat > 77 & lat <= 90 ~ "SV"),
                          levels = c("BF_CAA", "BB", "SV"))) %>%
-    dplyr::select(year, area, lat, lon, xc, yc, NASC_int, Sv_meso, CM) 
+    dplyr::select(year, area, lat, lon, xc, yc, NASC_int, CM) 
   SA_grid_laea <- bind_rows(SA_grid_laea, SA_tmp_laea)
 }
 rm(SA_tmp, SA_tmp_laea, i) # Remove temporary data
@@ -206,13 +202,13 @@ SA_grid_laea <- SA_grid_laea %>% # Calculate normalized backscatter anomalies
   st_join(., IHO_sf_laea, join = st_within) %>% # Append IHO region
   st_drop_geometry() %>%
   mutate(name = if_else(is.na(name) == T & yc < 0, "Baffin Bay",
-                if_else(is.na(name) == T & yc > 0 & lat > 70, "The Northwestern Passages", 
-                if_else(name == "The Northwestern Passages" & yc < 0, "Baffin Bay", 
+                if_else(is.na(name) == T & yc > 0 & lat > 70, "The Northwestern Passages",
+                if_else(name == "The Northwestern Passages" & yc < 0, "Baffin Bay",
                 if_else(name == "Arctic Ocean" & name_3 == "West Arctic Ocean", "West Arctic Ocean",
                 if_else(name == "Arctic Ocean" & name_3 == "East Arctic Ocean", "East Arctic Ocean", name))))),
-         empty = factor(if_else(Sv_meso < -90, T, F))) %>%
+         empty = factor(if_else(SA_int < 0, T, F))) %>%
     rename(IHO_area = name, area = area.x) %>%
-  dplyr::select(year, xc, yc, lon, lat, IHO_area, area, NASC_int, SA_int, Sv_meso, CM, empty, cell_res)
+  dplyr::select(year, xc, yc, lon, lat, IHO_area, area, NASC_int, SA_int, CM, empty, cell_res)
 ```
 
 Map to check whether the IHO regions are well implemented.
