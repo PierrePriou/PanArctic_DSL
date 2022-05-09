@@ -1,7 +1,7 @@
 ---
 title: "PanArctic DSL - Statistics"
 author: "[Pierre Priou](mailto:pierre.priou@mi.mun.ca)"
-date: "2022/05/06 at 17:42"
+date: "2022/05/09 at 15:30"
 output: 
   html_document:
     keep_md: yes
@@ -633,8 +633,8 @@ summ_GAM
 ```
 
 ```{=html}
-<div id="htmlwidget-1be093a5ba030bb676d0" style="width:100%;height:auto;" class="datatables html-widget"></div>
-<script type="application/json" data-for="htmlwidget-1be093a5ba030bb676d0">{"x":{"filter":"none","vertical":false,"data":[["GAM5","GAM3","GAM4","GAM1","GAM2"],[27.088,25.201,24.297,10.836,25.413],[62.97,59.8,54.74,41.98,54.06],[0.54,0.51,0.47,0.38,0.46],[0.8,-0.83,-0.55,-2.41,-4.49],[-44.6,-38.5,-26.084,-23.211,-22.058],[0,6.1,18.52,21.39,22.54],[0.9546633465,0.0452118292,9.10232e-05,2.16415e-05,1.21595e-05]],"container":"<table class=\"cell-border stribe\">\n  <thead>\n    <tr>\n      <th>model<\/th>\n      <th>df<\/th>\n      <th>dev_expl<\/th>\n      <th>r2<\/th>\n      <th>reml<\/th>\n      <th>AIC<\/th>\n      <th>dAIC<\/th>\n      <th>w_AIC<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[1,2,3,4,5,6,7]}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
+<div id="htmlwidget-15bc36f43093385136d4" style="width:100%;height:auto;" class="datatables html-widget"></div>
+<script type="application/json" data-for="htmlwidget-15bc36f43093385136d4">{"x":{"filter":"none","vertical":false,"data":[["GAM5","GAM3","GAM4","GAM1","GAM2"],[27.088,25.201,24.297,10.836,25.413],[62.97,59.8,54.74,41.98,54.06],[0.54,0.51,0.47,0.38,0.46],[0.8,-0.83,-0.55,-2.41,-4.49],[-44.6,-38.5,-26.084,-23.211,-22.058],[0,6.1,18.52,21.39,22.54],[0.9546633465,0.0452118292,9.10232e-05,2.16415e-05,1.21595e-05]],"container":"<table class=\"cell-border stribe\">\n  <thead>\n    <tr>\n      <th>model<\/th>\n      <th>df<\/th>\n      <th>dev_expl<\/th>\n      <th>r2<\/th>\n      <th>reml<\/th>\n      <th>AIC<\/th>\n      <th>dAIC<\/th>\n      <th>w_AIC<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[1,2,3,4,5,6,7]}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
 ```
 
 I select `GAM4 model GS` because I expect to have a similar functional response within each region but that response can vary between region.
@@ -702,15 +702,13 @@ gam.check(GAM4, rep = 500)
 ## Basis dimension (k) checking results. Low p-value (k-index<1) may
 ## indicate that k is too low, especially if edf is close to k'.
 ## 
-##              k'    edf k-index p-value  
-## s(v)      4.000  1.223    1.08   0.765  
-## s(t)      4.000  3.086    1.04   0.640  
-## s(o)      4.000  2.379    0.90   0.095 .
-## s(v,IHO) 20.000  4.630    1.08   0.765  
-## s(t,IHO) 20.000  0.814    1.04   0.610  
-## s(o,IHO) 20.000  2.883    0.90   0.140  
-## ---
-## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+##              k'    edf k-index p-value
+## s(v)      4.000  1.223    1.08    0.76
+## s(t)      4.000  3.086    1.04    0.64
+## s(o)      4.000  2.379    0.90    0.11
+## s(v,IHO) 20.000  4.630    1.08    0.80
+## s(t,IHO) 20.000  0.814    1.04    0.61
+## s(o,IHO) 20.000  2.883    0.90    0.11
 ```
 
 ```r

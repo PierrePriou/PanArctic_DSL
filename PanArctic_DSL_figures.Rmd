@@ -380,24 +380,25 @@ p_Sv_grid_laea
 
 ### Lines
 
-```{r, fig.width=7, fig.height=4}
+```{r, fig.width=7.5, fig.height=4}
 # wesanderson::wes_palette("Darjeeling1", type = "discrete") 1st and 5th colours are inverted
 # col_pal <- c("#5BBCD6", "#00A08A", "#F2AD00", "#F98400", "#FF0000")
-col_pal <- c("#5BBCD6", "#F2AD00", "#FF0000", "black")
+# col_pal <- c("#5BBCD6", "#F2AD00", "#FF0000", "black")
+col_pal <- c("#1170aa", "#fc7d0b", "#76B7B2", "black") # Custom colour palette
 
 # Calculate median Sv profile for each grid cell
 Sv_prof <- Sv_grid_laea %>% 
-    mutate(IHO_area = factor(case_when(IHO_area == "East Arctic Ocean" ~ "East Arctic Ocean",
-                                     IHO_area == "West Arctic Ocean" ~ "West Arctic Ocean\n& Beaufort Sea",
-                                     IHO_area == "Beaufort Sea" ~ "West Arctic Ocean\n& Beaufort Sea",
-                                     IHO_area == "The Northwestern Passages" ~ "Canadian Arctic\nArchipelago",
+  mutate(IHO_area = factor(case_when(IHO_area == "East Arctic Ocean" ~ "East Arctic\nOcean",
+                                     IHO_area == "West Arctic Ocean" ~ "West Arctic\nOcean",
+                                     IHO_area == "Beaufort Sea" ~ "Beaufort Sea",
+                                     IHO_area == "The Northwestern Passages" ~ "Can. Arctic\nArchipelago",
                                      IHO_area == "Baffin Bay" ~ "Baffin Bay",
                                      IHO_area == "Davis Strait" ~ "Davis Strait"),
-                           levels = c("West Arctic Ocean\n& Beaufort Sea", "Canadian Arctic\nArchipelago",
-                                      "Baffin Bay", "Davis Strait", "East Arctic Ocean"))) %>%
+                           levels = c("West Arctic\nOcean", "Beaufort Sea", "Can. Arctic\nArchipelago",
+                                      "Baffin Bay", "Davis Strait", "East Arctic\nOcean"))) %>%
   mutate(depth_round = rounder(depth, -10)) %>% # round down to nearest 10
   group_by(depth_round, IHO_area, xc, yc, year) %>%
-  summarise(sv_lin50 = median(sv_lin_q0.50)) %>% 
+  summarise(sv_lin50 = median(sv_lin_median)) %>% 
   ungroup() %>%
   mutate(Sv_median = 10 * log10(sv_lin50),
          year = as.factor(year)) %>%
@@ -405,32 +406,32 @@ Sv_prof <- Sv_grid_laea %>%
 
 # Calculate median Sv profile 
 Sv_prof_median_year <- Sv_grid_laea %>%
-    mutate(IHO_area = factor(case_when(IHO_area == "East Arctic Ocean" ~ "East Arctic Ocean",
-                                     IHO_area == "West Arctic Ocean" ~ "West Arctic Ocean\n& Beaufort Sea",
-                                     IHO_area == "Beaufort Sea" ~ "West Arctic Ocean\n& Beaufort Sea",
-                                     IHO_area == "The Northwestern Passages" ~ "Canadian Arctic\nArchipelago",
+  mutate(IHO_area = factor(case_when(IHO_area == "East Arctic Ocean" ~ "East Arctic\nOcean",
+                                     IHO_area == "West Arctic Ocean" ~ "West Arctic\nOcean",
+                                     IHO_area == "Beaufort Sea" ~ "Beaufort Sea",
+                                     IHO_area == "The Northwestern Passages" ~ "Can. Arctic\nArchipelago",
                                      IHO_area == "Baffin Bay" ~ "Baffin Bay",
                                      IHO_area == "Davis Strait" ~ "Davis Strait"),
-                           levels = c("West Arctic Ocean\n& Beaufort Sea", "Canadian Arctic\nArchipelago",
-                                      "Baffin Bay", "Davis Strait", "East Arctic Ocean"))) %>%
+                           levels = c("West Arctic\nOcean", "Beaufort Sea", "Can. Arctic\nArchipelago",
+                                      "Baffin Bay", "Davis Strait", "East Arctic\nOcean"))) %>%
   mutate(depth_round = rounder(depth, -10)) %>% # round down to nearest 20
   group_by(depth_round, IHO_area, year) %>%
-  summarise(sv_lin50 = median(sv_lin_q0.50)) %>% 
+  summarise(sv_lin50 = median(sv_lin_median)) %>% 
   ungroup() %>%
   mutate(Sv_median = 10 * log10(sv_lin50),
          year = as.character(year))
 Sv_prof_median <- Sv_grid_laea %>%
-    mutate(IHO_area = factor(case_when(IHO_area == "East Arctic Ocean" ~ "East Arctic Ocean",
-                                     IHO_area == "West Arctic Ocean" ~ "West Arctic Ocean\n& Beaufort Sea",
-                                     IHO_area == "Beaufort Sea" ~ "West Arctic Ocean\n& Beaufort Sea",
-                                     IHO_area == "The Northwestern Passages" ~ "Canadian Arctic\nArchipelago",
+  mutate(IHO_area = factor(case_when(IHO_area == "East Arctic Ocean" ~ "East Arctic\nOcean",
+                                     IHO_area == "West Arctic Ocean" ~ "West Arctic\nOcean",
+                                     IHO_area == "Beaufort Sea" ~ "Beaufort Sea",
+                                     IHO_area == "The Northwestern Passages" ~ "Can. Arctic\nArchipelago",
                                      IHO_area == "Baffin Bay" ~ "Baffin Bay",
                                      IHO_area == "Davis Strait" ~ "Davis Strait"),
-                           levels = c("West Arctic Ocean\n& Beaufort Sea", "Canadian Arctic\nArchipelago",
-                                      "Baffin Bay", "Davis Strait", "East Arctic Ocean"))) %>%
+                           levels = c("West Arctic\nOcean", "Beaufort Sea", "Can. Arctic\nArchipelago",
+                                      "Baffin Bay", "Davis Strait", "East Arctic\nOcean"))) %>%
   mutate(depth_round = rounder(depth, -10)) %>% # round down to nearest 20
   group_by(depth_round, IHO_area) %>%
-  summarise(sv_lin50 = median(sv_lin_q0.50)) %>% 
+  summarise(sv_lin50 = median(sv_lin_median)) %>% 
   ungroup() %>%
   mutate(Sv_median = 10 * log10(sv_lin50),
          year = "Median") %>%
@@ -448,11 +449,11 @@ CM_prof <- Sv_prof_median %>%
 # Plot
 p_Sv_prof_lines <- Sv_prof_median %>%
   ggplot() +
-  # geom_line(data = Sv_prof, aes(x = depth_round, y = Sv_median, group = ID), col = "grey80", na.rm = T) +
+  geom_line(data = Sv_prof, aes(x = depth_round, y = Sv_median, group = ID), col = "grey85", size = 0.5) +
   geom_vline(xintercept = 200, lty = 3) + # Mesopelagic zone
-  geom_line(aes(x = depth_round, y = Sv_median, col = year)) + # Sv profiles per year and median
+  geom_line(aes(x = depth_round, y = Sv_median, col = year), size = 0.7) + # Sv profiles per year and median
   geom_vline(data = CM_prof, aes(xintercept = CM), lty = 2) + # Center of mass
-  geom_text(data = CM_prof, aes(x = CM -10, y = -102, label = as.character(CM_round)),
+  geom_text(data = CM_prof, aes(x = CM -10, y = -70, label = as.character(CM_round)),
             vjust = 0, size = 3, fontface = "italic") + # Label center of mass
   scale_x_reverse("Depth (m)", breaks = seq(0, 1000, 100)) + 
   scale_y_continuous(expression("S"[V]*" (dB re 1 m"^-1*")"), breaks = seq(-200, 0, 10)) +
@@ -465,7 +466,7 @@ p_Sv_prof_lines <- Sv_prof_median %>%
         legend.position = "top",
         panel.spacing = unit(0, "in"),
         plot.margin = unit(c(0, 0.1, 0, 0), "in"))
-ggsave("plots/Fig2_Sv_profiles_lines.png", p_Sv_prof_lines, height = 3.5, width = 7, dpi = 600, units = "in")
+ggsave("plots/Fig2_Sv_profiles_lines.png", p_Sv_prof_lines, height = 3.5, width = 8, dpi = 600, units = "in")
 p_Sv_prof_lines
 ```
 
@@ -544,7 +545,118 @@ ggsave("plots/Fig2_Sv_profiles_boxplots.png", p_Sv_prof_boxplot, height = 4.5, w
 p_Sv_prof_boxplot
 ```
 
-## Figure 3. Map of mesopelagic backscatter hotspots
+## Figure 3. Boxplot mesopelagic NASC & Map detections
+
+```{r fig3-boxplot-NASC, fig.width=6.5, fig.height=5}
+map_DSL <- SA_grid_laea %>%  # Map of DSL detections
+  mutate(DSL = factor(if_else(empty_clean == T, F, T), levels = c(T, F))) %>%
+  arrange(DSL) %>%
+  ggplot(aes(x = xc,  y = yc)) +
+  geom_raster(data = bathy_laea, aes(x = xc, y = yc, fill = depth_d)) + # bathy
+  scale_fill_cmocean("Depth (m)", name = "deep", discrete = T, na.value = NA, alpha = 0.4) +
+  geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), fill = "grey80") + # Coast
+  geom_point(aes(col = DSL), size = 0.6) +
+  scale_color_manual("DSL presence", values = c("#1170aa", "#fc7d0b")) +
+  facet_wrap(~ year) +
+  coord_fixed(xlim = c(-2450, 600), ylim = c(-1500, 1800), expand = F) +
+  # coord_fixed(xlim = c(-2600, 1100), ylim = c(-1600, 1900), expand = F) +
+  guides(fill = "none",
+         colour = guide_legend(override.aes = list(size = 2))) + # Increase symbol size in legend
+  theme(legend.position = "top",
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        axis.title = element_blank())
+
+p_boxplot_SA <- SA_grid_laea %>% # Boxplot of SA per region
+  mutate(IHO_area = factor(case_when(IHO_area == "East Arctic Ocean" ~ "East Arctic\nOcean",
+                                     IHO_area == "West Arctic Ocean" ~ "West Arctic\nOcean",
+                                     IHO_area == "Beaufort Sea" ~ "Beaufort Sea",
+                                     IHO_area == "The Northwestern Passages" ~ "Can. Arctic\nArchipelago",
+                                     IHO_area == "Baffin Bay" ~ "Baffin Bay",
+                                     IHO_area == "Davis Strait" ~ "Davis Strait"),
+                           levels = c("West Arctic\nOcean", "Beaufort Sea", "Can. Arctic\nArchipelago",
+                                      "Baffin Bay", "Davis Strait", "East Arctic\nOcean"))) %>%
+  filter(empty_clean == F) %>%
+  ggplot(aes(x = IHO_area, y = SA_int)) + 
+  geom_boxplot(width = 0.6) +
+  scale_y_continuous(expression("S"[A]*" (dB re 1 m"^2*" nmi"^-2*")")) +
+  scale_fill_viridis_d() +
+  theme(axis.title.x = element_blank(), 
+        plot.margin = unit(c(0.1, 0.1, 0, 0), "in"))
+
+p_map_SA_DSL <- plot_grid(map_DSL, p_boxplot_SA, ncol = 1, align = "v", axis = "lr") 
+ggsave("plots/Fig3_map_boxplot_SA.png", p_map_SA_DSL, height = 5, width = 6, dpi = 600, units = "in")
+p_map_SA_DSL
+```
+
+
+## Table 1. Abundance mesopelagic fish
+
+```{r table1-heatmap-abundance, fig.align='center', fig.width=4.5, fig.height=3.25}
+relative_abundance_area <- trawl_station %>%
+  group_by(area) %>%
+  summarise(total_fish = sum(number_fish)) %>% # Calculate total number of fish caught per area
+  ungroup() %>%
+  right_join(., trawl_area, by = c("area")) %>% # Join with relative abundance dataset
+  mutate(area = factor(case_when(area == "BF_CAA" ~ "Beaufort Sea &\nCan. Arct. Archipelago",
+                                 area == "BB" ~ "Baffin Bay",
+                                 area == "SV" ~ "Svalbard"),
+                       levels = c("Beaufort Sea &\nCan. Arct. Archipelago", "Baffin Bay", "Svalbard"))) %>%
+  unite(area_label, area, total_fish, sep = "\nn = ", remove = F) %>% # Create labels for x axis
+  # Format species name appropriately
+  mutate(fish_species = str_replace(fish_species, pattern = "_", replacement = " "),
+         fish_species = str_replace(fish_species, pattern = " sp", replacement = " sp."),
+         fish_species = str_to_sentence(fish_species),
+         fish_species = if_else(fish_species == "Notolepis rissoi", "Arctozenus risso", fish_species),
+         fish_species = factor(fish_species, levels = c("Icelus bicornis",
+                                                        "Anarhichas lupus",
+                                                        "Reinhardtius hippoglossoides",
+                                                        "Arctozenus risso",
+                                                        "Melanogrammus aeglefinus",
+                                                        "Gadus morhua",
+                                                        "Leptoclinus maculatus",
+                                                        "Sebastes sp.",
+                                                        "Myctophidae",
+                                                        "Liparidae",
+                                                        "Boreogadus saida")),
+         color_text = if_else(RA_area >= 40, "white", "black"),
+         RA_area_round = 10 * floor(RA_area / 10),
+         area_label = factor(area_label, levels = c("Beaufort Sea &\nCan. Arct. Archipelago\nn = 923",
+                                                    "Baffin Bay\nn = 232",
+                                                    "Svalbard\nn = 464"))) %>%
+  # Plot
+  ggplot() +
+  geom_tile(aes(x = area_label, y = fish_species, fill = RA_area_round), color = "white", lwd = 0.6) +
+  geom_text(aes(x = area_label, y = fish_species, label = sprintf("%0.1f", round(RA_area, 1)), color = color_text), size = 3) +
+  scale_x_discrete(expand = c(0, 0)) +
+  scale_y_discrete(labels = c("Twohorn sculpin",
+                              "Atlantic wolffish",
+                              "Greenland halibut",
+                              "Spotted barracudina",
+                              "Haddock",
+                              "Atlantic cod",
+                              "Daubed shanny",
+                              "Redfish",
+                              "Lanternfish",
+                              "Snailfish",
+                              "Polar cod"),
+                   expand = c(0, 0)) +
+  scale_colour_identity() +
+  scale_fill_viridis_c("Relative\nabundance (%)  ", option = "mako", breaks = seq(0, 100, 20), limits = c(0, 100), direction = -1) +
+  guides(fill = guide_colorbar(label.position = "top")) +
+  theme(axis.title = element_blank(),
+        legend.position = "top",
+        legend.title = element_text(vjust = 0),
+        legend.title.align = 0.5,
+        legend.key.height = unit(0.1, "in"),
+        legend.key.width = unit(0.3, "in"),
+        legend.box.margin = margin(0,0,-5,0))
+relative_abundance_area
+```
+
+# Supplementary data
+
+## OLD Figure 3. Map of mesopelagic backscatter hotspots
 
 ```{r fig3-map-sa-anomalies, fig.align='center', fig.height=3.25, fig.width=6}
 col_pal <- c("#80cdc1",  "#f5f5f5", "#dfc27d", "#a6611a")
@@ -629,71 +741,6 @@ SA_grid_laea %>%
   theme(legend.position = "right", axis.text = element_blank(), axis.ticks = element_blank(), axis.title = element_blank())
 ```
 
-## Table 1. Abundance mesopelagic fish
-
-```{r table1-heatmap-abundance, fig.align='center', fig.width=4.5, fig.height=3.25}
-relative_abundance_area <- trawl_station %>%
-  group_by(area) %>%
-  summarise(total_fish = sum(number_fish)) %>% # Calculate total number of fish caught per area
-  ungroup() %>%
-  right_join(., trawl_area, by = c("area")) %>% # Join with relative abundance dataset
-  mutate(area = factor(case_when(area == "BF_CAA" ~ "Beaufort Sea &\nCan. Arct. Archipelago",
-                                 area == "BB" ~ "Baffin Bay",
-                                 area == "SV" ~ "Svalbard"),
-                       levels = c("Beaufort Sea &\nCan. Arct. Archipelago", "Baffin Bay", "Svalbard"))) %>%
-  unite(area_label, area, total_fish, sep = "\nn = ", remove = F) %>% # Create labels for x axis
-  # Format species name appropriately
-  mutate(fish_species = str_replace(fish_species, pattern = "_", replacement = " "),
-         fish_species = str_replace(fish_species, pattern = " sp", replacement = " sp."),
-         fish_species = str_to_sentence(fish_species),
-         fish_species = if_else(fish_species == "Notolepis rissoi", "Arctozenus risso", fish_species),
-         fish_species = factor(fish_species, levels = c("Icelus bicornis",
-                                                        "Anarhichas lupus",
-                                                        "Reinhardtius hippoglossoides",
-                                                        "Arctozenus risso",
-                                                        "Melanogrammus aeglefinus",
-                                                        "Gadus morhua",
-                                                        "Leptoclinus maculatus",
-                                                        "Sebastes sp.",
-                                                        "Myctophidae",
-                                                        "Liparidae",
-                                                        "Boreogadus saida")),
-         color_text = if_else(RA_area >= 40, "white", "black"),
-         RA_area_round = 10 * floor(RA_area / 10),
-         area_label = factor(area_label, levels = c("Beaufort Sea &\nCan. Arct. Archipelago\nn = 923",
-                                                    "Baffin Bay\nn = 232",
-                                                    "Svalbard\nn = 464"))) %>%
-  # Plot
-  ggplot() +
-  geom_tile(aes(x = area_label, y = fish_species, fill = RA_area_round), color = "white", lwd = 0.6) +
-  geom_text(aes(x = area_label, y = fish_species, label = sprintf("%0.1f", round(RA_area, 1)), color = color_text), size = 3) +
-  scale_x_discrete(expand = c(0, 0)) +
-  scale_y_discrete(labels = c("Twohorn sculpin",
-                              "Atlantic wolffish",
-                              "Greenland halibut",
-                              "Spotted barracudina",
-                              "Haddock",
-                              "Atlantic cod",
-                              "Daubed shanny",
-                              "Redfish",
-                              "Lanternfish",
-                              "Snailfish",
-                              "Polar cod"),
-                   expand = c(0, 0)) +
-  scale_colour_identity() +
-  scale_fill_viridis_c("Relative\nabundance (%)  ", option = "mako", breaks = seq(0, 100, 20), limits = c(0, 100), direction = -1) +
-  guides(fill = guide_colorbar(label.position = "top")) +
-  theme(axis.title = element_blank(),
-        legend.position = "top",
-        legend.title = element_text(vjust = 0),
-        legend.title.align = 0.5,
-        legend.key.height = unit(0.1, "in"),
-        legend.key.width = unit(0.3, "in"),
-        legend.box.margin = margin(0,0,-5,0))
-relative_abundance_area
-```
-
-# Supplementary data
 
 ## Table S3. Acoustic settings
  
