@@ -1,7 +1,7 @@
 ---
 title: "PanArctic DSL - Acoustic gridding"
 author: "[Pierre Priou](mailto:pierre.priou@mi.mun.ca)"
-date: "2022/05/06 at 11:52"
+date: "2022/05/09 at 11:24"
 output: 
   html_document:
     keep_md: yes
@@ -274,16 +274,19 @@ coord_equivalences <- SA_grid_laea %>% # Calculate coord equivalences between 43
   summarise()
 
 Sv_grid_laea <- Sv_grid_laea %>% # Tidy data
-    mutate(Sv_median = 10 * log10(sv_lin_median), 
+    mutate(Sv_median = 10 * log10(sv_lin_median),
            area = factor(case_when(lon > -155 & lon <= -95 & lat > 65 & lat <= 82 ~ "BF_CAA",
                                    lon > -95 & lon <= -50 & lat > 66 & lat <= 82 ~ "BB",
                                    lon >= -25 & lon <= 145 & lat > 77 & lat <= 90 ~ "SV"),
                          levels = c("BF_CAA", "BB", "SV")),
            cell_res = cell_res,
-           empty = factor(if_else(Sv_median < -90, T, F))) %>%
+           empty = factor(if_else(Sv_median < -90, T, F)),
+           sv_lin_median_clean = if_else(empty == T, 10^(-999/10), sv_lin_median),
+           Sv_median_clean = if_else(empty == T, -999, Sv_median)) %>%
   ungroup() %>%
   left_join(., coord_equivalences, by = c("xc", "yc", "area")) %>%
-  dplyr::select(year, xc, yc, lon, lat, IHO_area, area, depth, sv_lin_median, Sv_median, empty, cell_res)
+  dplyr::select(year, xc, yc, lon, lat, IHO_area, area, depth, sv_lin_median, sv_lin_median_clean,
+                Sv_median, Sv_median_clean, empty, cell_res)
 ```
 
 # Save data 

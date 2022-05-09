@@ -170,7 +170,7 @@ pre code {
 
 <h1 class="title toc-ignore">PanArctic DSL - Acoustic gridding</h1>
 <h4 class="author"><a href="mailto:pierre.priou@mi.mun.ca">Pierre Priou</a></h4>
-<h4 class="date">2022/05/06 at 11:52</h4>
+<h4 class="date">2022/05/09 at 11:24</h4>
 
 </div>
 
@@ -401,16 +401,19 @@ coord_equivalences &lt;- SA_grid_laea %&gt;% # Calculate coord equivalences betw
   summarise()
 
 Sv_grid_laea &lt;- Sv_grid_laea %&gt;% # Tidy data
-    mutate(Sv_median = 10 * log10(sv_lin_median), 
+    mutate(Sv_median = 10 * log10(sv_lin_median),
            area = factor(case_when(lon &gt; -155 &amp; lon &lt;= -95 &amp; lat &gt; 65 &amp; lat &lt;= 82 ~ &quot;BF_CAA&quot;,
                                    lon &gt; -95 &amp; lon &lt;= -50 &amp; lat &gt; 66 &amp; lat &lt;= 82 ~ &quot;BB&quot;,
                                    lon &gt;= -25 &amp; lon &lt;= 145 &amp; lat &gt; 77 &amp; lat &lt;= 90 ~ &quot;SV&quot;),
                          levels = c(&quot;BF_CAA&quot;, &quot;BB&quot;, &quot;SV&quot;)),
            cell_res = cell_res,
-           empty = factor(if_else(Sv_median &lt; -90, T, F))) %&gt;%
+           empty = factor(if_else(Sv_median &lt; -90, T, F)),
+           sv_lin_median_clean = if_else(empty == T, 10^(-999/10), sv_lin_median),
+           Sv_median_clean = if_else(empty == T, -999, Sv_median)) %&gt;%
   ungroup() %&gt;%
   left_join(., coord_equivalences, by = c(&quot;xc&quot;, &quot;yc&quot;, &quot;area&quot;)) %&gt;%
-  dplyr::select(year, xc, yc, lon, lat, IHO_area, area, depth, sv_lin_median, Sv_median, empty, cell_res)</code></pre>
+  dplyr::select(year, xc, yc, lon, lat, IHO_area, area, depth, sv_lin_median, sv_lin_median_clean,
+                Sv_median, Sv_median_clean, empty, cell_res)</code></pre>
 </div>
 </div>
 <div id="save-data" class="section level1">
