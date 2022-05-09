@@ -224,6 +224,34 @@ rm(cell_res)
 
 # Plots 
 
+## Base map with areas reprojcted
+
+```{r map-areas, fig.height=4, fig.width=6}
+# Bathymetric map of the Arctic with location of acoustic and trawl
+p_map_laea <- bathy_laea %>%
+  ggplot(aes(x = xc, y = yc)) +
+  # Plot bathy
+  geom_raster(aes(fill = depth_d)) +
+  scale_fill_cmocean("Depth (m)", name = "deep", discrete = T, na.value = NA, alpha = 0.3) +
+  # Areas of interest
+  geom_polygon(data = IHO_WAO, aes(x = xc, y = yc, group = group), fill = NA, col = "red", lwd = 0.3, lty = 1) +
+  geom_shape(data = IHO_BF, aes(x = xc, y = yc, group = group), fill = NA, col = "purple", lwd = 0.3, lty = 1) +
+  geom_shape(data = IHO_CAA, aes(x = xc, y = yc, group = group), fill = NA, col = "orange", lwd = 0.3, lty = 1) +
+  geom_shape(data = IHO_BB, aes(x = xc, y = yc, group = group), fill = NA, col = "blue", lwd = 0.3, lty = 1) +
+  geom_shape(data = IHO_DS, aes(x = xc, y = yc, group = group), fill = NA, col = "green", lwd = 0.3, lty = 1) +
+  geom_shape(data = IHO_EAO, aes(x = xc, y = yc, group = group), fill = NA, col = "yellow", lwd = 0.3, lty = 1) +
+  # Plot coastlines
+  geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), fill = "grey30") +
+  # Arctic circle
+  geom_path(data = arctic_circle_laea, aes(x = xc, y = yc), col = "grey10", lty = 2, size = 0.3) +
+  coord_fixed(xlim = c(-2450, 600), ylim = c(-1500, 1800), expand = F) +
+  guides(fill = guide_legend(keywidth = 0.2, keyheight = 0.2, default.unit = "in"), color = "none") +
+  theme(legend.position = "right", panel.border = element_rect(fill = NA), axis.text = element_blank(),
+        axis.ticks = element_blank(), axis.title = element_blank())
+ggsave("plots/base_map_laeamap_stations.png", p_map_laea, height = 3, width = 6, dpi = 600, units = "in")
+p_map_laea
+```
+
 ## Figure 1. Bathy map with sampling locations
 
 Careful this map takes forever to compute (> 18 h) when bathy has to be drawn.
