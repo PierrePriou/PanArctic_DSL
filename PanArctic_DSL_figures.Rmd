@@ -253,13 +253,14 @@ DSL_area <- SA_grid_laea %>%
 SA_all_area <- SA_grid_laea %>%
   filter(empty_clean == F) %>%
   summarise(n = n(),
+            SA_int_median = round(median(10 * log10(NASC_int_clean)), 1),
+            SA_int_mad = round(mad(10 * log10(NASC_int_clean)), 1),
             NASC_median = round(median(NASC_int_clean), 1),
-            NASC_mad = round(mad(NASC_int_clean)),
+            NASC_mad = round(mad(NASC_int_clean), 1),
             CM_median = round(median(CM)),
             CM_mad = round(mad(CM))) %>%
   ungroup() %>%
   mutate(IHO_area = "All areas")
-
 
 # Calculate median SA within each area
 SA_grid_laea %>%
@@ -267,8 +268,10 @@ SA_grid_laea %>%
   mutate(IHO_area == as.character(IHO_area)) %>%
   group_by(IHO_area) %>%
   summarise(n = n(),
+            SA_int_median = round(median(10 * log10(NASC_int_clean)), 1),
+            SA_int_mad = round(mad(10 * log10(NASC_int_clean)), 1),
             NASC_median = round(median(NASC_int_clean), 1),
-            NASC_mad = round(mad(NASC_int_clean)),
+            NASC_mad = round(mad(NASC_int_clean), 1),
             CM_median = round(median(CM)),
             CM_mad = round(mad(CM))) %>%
   ungroup() %>%
@@ -283,6 +286,7 @@ SA_grid_laea %>%
                                      IHO_area == "All areas" ~ "All areas"),
                            levels = c("West Arctic\nOcean", "Beaufort Sea", "Can. Arctic\nArchipelago",
                                       "Baffin Bay", "Davis Strait", "East Arctic\nOcean", "All areas"))) %>%
+  dplyr::select(-CM_median, -CM_mad) %>%
   datatable(rownames = F)
 ```
 
@@ -670,6 +674,8 @@ map_DSL <- SA_grid_laea %>%  # Map of DSL detections
         axis.ticks = element_blank(),
         axis.title = element_blank())
 
+col_pal <- c("#1170aa", "#fc7d0b", "#76B7B2") # Custom colour palette
+
 p_boxplot_SA <- SA_grid_laea %>% # Boxplot of SA per region
   mutate(IHO_area = factor(case_when(IHO_area == "East Arctic Ocean" ~ "East Arctic\nOcean",
                                      IHO_area == "West Arctic Ocean" ~ "West Arctic\nOcean",
@@ -680,14 +686,16 @@ p_boxplot_SA <- SA_grid_laea %>% # Boxplot of SA per region
                            levels = c("West Arctic\nOcean", "Beaufort Sea", "Can. Arctic\nArchipelago",
                                       "Baffin Bay", "Davis Strait", "East Arctic\nOcean"))) %>%
   filter(empty_clean == F) %>%
-  ggplot(aes(x = IHO_area, y = SA_int_clean)) + 
-  geom_boxplot(width = 0.6) +
+  ggplot(aes(x = IHO_area, y = SA_int_clean, fill = factor(year))) + 
+  geom_boxplot(position = position_dodge(preserve = "single")) +
   scale_y_continuous(expression("S"[A]*" (dB re 1 m"^2*" nmi"^-2*")")) +
-  scale_fill_viridis_d() +
+  scale_fill_manual(values = col_pal) +
   theme(axis.title.x = element_blank(), 
+        legend.title = element_blank(),
+        legend.position = c(0.075, 0.78),
         plot.margin = unit(c(0.1, 0.1, 0, 0), "in"))
 
-p_map_SA_DSL <- plot_grid(map_DSL, p_Sv_prof_lines, ncol = 1, align = "v", axis = "lr") 
+p_map_SA_DSL <- plot_grid(map_DSL, p_boxplot_SA, ncol = 1, align = "v", axis = "lr") 
 ggsave("plots/Fig3_map_boxplot_SA.png", p_map_SA_DSL, height = 5, width = 6, dpi = 600, units = "in")
 p_map_SA_DSL
 ```
