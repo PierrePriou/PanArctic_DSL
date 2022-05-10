@@ -27,6 +27,7 @@ library(ggpubr)                 # Display stats with ggplot
 library(RColorBrewer)           # Diverging color palette
 library(ggnewscale)             # Multiple color scales on a single plot
 library(lemon)                  # Repeated axis on facets
+library(DT)                     # Interactive tables
 source("R/getNOAA.ice.bathy.R") # Load bathy data from NOAA
 source("R/rounder.R")
 # Custom figure theme
@@ -219,6 +220,70 @@ IHO_regions <- bind_rows(IHO_EAO, IHO_WAO, IHO_BF, IHO_CAA, IHO_BB, IHO_DS) # Co
 
 # Remove unused variable
 rm(cell_res)
+```
+
+# Summary statistics
+
+```{r summary-region}
+# Calculate percent of DSL in all grid cells across all areas
+DSL_all_area <- SA_grid_laea %>%
+  group_by(empty_clean) %>%
+  summarise(n = n()) %>%
+  ungroup() %>%
+  mutate(total = sum(n),
+         percent = round(n / total, 2) * 100) %>%
+  filter(empty_clean == F) %>%
+  mutate(IHO_area = "All areas") %>%
+  dplyr::select(IHO_area, percent)
+
+# Calculate percent of DSL within each area
+DSL_area <- SA_grid_laea %>% 
+  group_by(IHO_area, empty_clean) %>%
+  summarise(n = n()) %>%
+  ungroup() %>%
+  group_by(IHO_area) %>%
+  mutate(total = sum(n),
+         percent = round(n / total, 2) * 100) %>%
+  ungroup() %>%
+  filter(empty_clean == F) %>%
+  dplyr::select(IHO_area, percent) %>%
+  bind_rows(., DSL_all_area)
+
+# Calculate median SA across all areas
+SA_all_area <- SA_grid_laea %>%
+  filter(empty_clean == F) %>%
+  summarise(n = n(),
+            NASC_median = round(median(NASC_int_clean), 1),
+            NASC_mad = round(mad(NASC_int_clean)),
+            CM_median = round(median(CM)),
+            CM_mad = round(mad(CM))) %>%
+  ungroup() %>%
+  mutate(IHO_area = "All areas")
+
+
+# Calculate median SA within each area
+SA_grid_laea %>%
+  filter(empty_clean == F) %>%
+  mutate(IHO_area == as.character(IHO_area)) %>%
+  group_by(IHO_area) %>%
+  summarise(n = n(),
+            NASC_median = round(median(NASC_int_clean), 1),
+            NASC_mad = round(mad(NASC_int_clean)),
+            CM_median = round(median(CM)),
+            CM_mad = round(mad(CM))) %>%
+  ungroup() %>%
+  bind_rows(., SA_all_area) %>%
+  left_join(., DSL_area, by = "IHO_area") %>%
+  mutate(IHO_area = factor(case_when(IHO_area == "East Arctic Ocean" ~ "East Arctic\nOcean",
+                                     IHO_area == "West Arctic Ocean" ~ "West Arctic\nOcean",
+                                     IHO_area == "Beaufort Sea" ~ "Beaufort Sea",
+                                     IHO_area == "The Northwestern Passages" ~ "Can. Arctic\nArchipelago",
+                                     IHO_area == "Baffin Bay" ~ "Baffin Bay",
+                                     IHO_area == "Davis Strait" ~ "Davis Strait",
+                                     IHO_area == "All areas" ~ "All areas"),
+                           levels = c("West Arctic\nOcean", "Beaufort Sea", "Can. Arctic\nArchipelago",
+                                      "Baffin Bay", "Davis Strait", "East Arctic\nOcean", "All areas"))) %>%
+  datatable(rownames = F)
 ```
 
 
@@ -414,8 +479,14 @@ p_Sv_grid_laea
 # col_pal <- c("#5BBCD6", "#F2AD00", "#FF0000", "black")
 col_pal <- c("#1170aa", "#fc7d0b", "#76B7B2", "black") # Custom colour palette
 
+empty_DSL <- SA_grid_laea %>% 
+  group_by(xc, yc, year, empty_clean) %>%
+  summarise()
+
 # Calculate median Sv profile for each grid cell
 Sv_prof <- Sv_grid_laea %>% 
+  left_join(., empty_DSL, by = c("year", "xc", "yc")) %>% # Add DSL presence
+  filter(empty_clean == F) %>%
   mutate(IHO_area = factor(case_when(IHO_area == "East Arctic Ocean" ~ "East Arctic\nOcean",
                                      IHO_area == "West Arctic Ocean" ~ "West Arctic\nOcean",
                                      IHO_area == "Beaufort Sea" ~ "Beaufort Sea",
@@ -434,6 +505,8 @@ Sv_prof <- Sv_grid_laea %>%
 
 # Calculate median Sv profile 
 Sv_prof_median_year <- Sv_grid_laea %>%
+  left_join(., empty_DSL, by = c("year", "xc", "yc")) %>% # Add DSL presence
+  filter(empty_clean == F) %>%
   mutate(IHO_area = factor(case_when(IHO_area == "East Arctic Ocean" ~ "East Arctic\nOcean",
                                      IHO_area == "West Arctic Ocean" ~ "West Arctic\nOcean",
                                      IHO_area == "Beaufort Sea" ~ "Beaufort Sea",
@@ -449,6 +522,8 @@ Sv_prof_median_year <- Sv_grid_laea %>%
   mutate(Sv_median = 10 * log10(sv_lin50),
          year = as.character(year))
 Sv_prof_median <- Sv_grid_laea %>%
+  left_join(., empty_DSL, by = c("year", "xc", "yc")) %>% # Add DSL presence
+  filter(empty_clean == F) %>%
   mutate(IHO_area = factor(case_when(IHO_area == "East Arctic Ocean" ~ "East Arctic\nOcean",
                                      IHO_area == "West Arctic Ocean" ~ "West Arctic\nOcean",
                                      IHO_area == "Beaufort Sea" ~ "Beaufort Sea",
@@ -575,7 +650,7 @@ p_Sv_prof_boxplot
 
 ## Figure 3. Boxplot mesopelagic NASC & Map detections
 
-```{r fig3-boxplot-NASC, fig.width=6.5, fig.height=5}
+```{r fig3-boxplot-NASC, fig.width=6, fig.height=5}
 map_DSL <- SA_grid_laea %>%  # Map of DSL detections
   mutate(DSL = factor(if_else(empty_clean == T, F, T), levels = c(T, F))) %>%
   arrange(DSL) %>%
@@ -605,14 +680,14 @@ p_boxplot_SA <- SA_grid_laea %>% # Boxplot of SA per region
                            levels = c("West Arctic\nOcean", "Beaufort Sea", "Can. Arctic\nArchipelago",
                                       "Baffin Bay", "Davis Strait", "East Arctic\nOcean"))) %>%
   filter(empty_clean == F) %>%
-  ggplot(aes(x = IHO_area, y = SA_int)) + 
+  ggplot(aes(x = IHO_area, y = SA_int_clean)) + 
   geom_boxplot(width = 0.6) +
   scale_y_continuous(expression("S"[A]*" (dB re 1 m"^2*" nmi"^-2*")")) +
   scale_fill_viridis_d() +
   theme(axis.title.x = element_blank(), 
         plot.margin = unit(c(0.1, 0.1, 0, 0), "in"))
 
-p_map_SA_DSL <- plot_grid(map_DSL, p_boxplot_SA, ncol = 1, align = "v", axis = "lr") 
+p_map_SA_DSL <- plot_grid(map_DSL, p_Sv_prof_lines, ncol = 1, align = "v", axis = "lr") 
 ggsave("plots/Fig3_map_boxplot_SA.png", p_map_SA_DSL, height = 5, width = 6, dpi = 600, units = "in")
 p_map_SA_DSL
 ```
