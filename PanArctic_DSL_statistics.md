@@ -1,7 +1,7 @@
 ---
 title: "PanArctic DSL - Statistics"
 author: "[Pierre Priou](mailto:pierre.priou@mi.mun.ca)"
-date: "2022/05/09 at 15:30"
+date: "2022/05/10 at 16:18"
 output: 
   html_document:
     keep_md: yes
@@ -116,17 +116,30 @@ stat_laea <- left_join(SA_laea, phy_laea, by = c("year", "area", "xc", "yc", "ce
                                                             ice_week),
                                                        na.rm = T),
                             ice_week)) %>%
-  filter(depth == 380) %>% # Select data at 380 m depth and remove cells with no DSL
+  filter(depth == 222) %>% # Select data at 222 m depth and remove cells with no DSL
   mutate(velocity = velocity * 100, # Convert to cm/s
          IHO_area = factor(case_when(IHO_area == "East Arctic Ocean" ~ "EAO",
-                                     IHO_area == "West Arctic Ocean" ~ "WAO_BF_CAA",
-                                     IHO_area == "Beaufort Sea" ~ "WAO_BF_CAA",
-                                     IHO_area == "The Northwestern Passages" ~ "WAO_BF_CAA",
+                                     IHO_area == "West Arctic Ocean" ~ "WAO_BF",
+                                     IHO_area == "Beaufort Sea" ~ "WAO_BF",
+                                     IHO_area == "The Northwestern Passages" ~ "CAA",
                                      IHO_area == "Baffin Bay" ~ "BB",
                                      IHO_area == "Davis Strait" ~ "DS"),
-                            levels = c("WAO_BF_CAA", "BB", "DS", "EAO"))) %>%
+                            levels = c("WAO_BF", "CAA", "BB", "DS", "EAO"))) %>%
   ungroup() %>%
   dplyr::select(-xc_na, -yc_na, -year_na)
+
+stat_laea %>% group_by(IHO_area) %>% summarise(n = n())
+```
+
+```
+## # A tibble: 5 x 2
+##   IHO_area     n
+##   <fct>    <int>
+## 1 WAO_BF      12
+## 2 CAA         21
+## 3 BB          44
+## 4 DS          24
+## 5 EAO         25
 ```
 
 # Data exploration 
@@ -184,7 +197,7 @@ stat_laea %>% # Temperature
   geom_tile(aes(fill = thetao)) +
   scale_fill_cmocean("Temp (dC)", name = "thermal", na.value = "red") +
   facet_wrap(~ year, ncol = 3) +
-  ggtitle("Temperature at 380 m depth") +
+  ggtitle("Temperature at 222 m depth") +
   coord_fixed(xlim = c(-2600, 1100), ylim = c(-1800, 1900), expand = F) + 
   theme(axis.text = element_blank(), axis.ticks = element_blank(), axis.title = element_blank())
 ```
@@ -199,7 +212,7 @@ stat_laea %>% # Ice concentration
   geom_tile(aes(fill = velocity)) +
   scale_fill_cmocean("velo (cm/s)", name = "speed", na.value = "red") +
   facet_wrap(~ year, ncol = 3) +
-  ggtitle("Current velocity at 380 m depth") +
+  ggtitle("Current velocity at 222 m depth") +
   coord_fixed(xlim = c(-2600, 1100), ylim = c(-1800, 1900), expand = F) + 
   theme(axis.text = element_blank(), axis.ticks = element_blank(), axis.title = element_blank())
 ```
@@ -210,9 +223,17 @@ stat_laea %>% # Ice concentration
 
 
 ```r
-SA_diff <- stat_laea %>%
-  dplyr::select(year, IHO_area, SA_int_clean, NASC_int, CM) %>%
-  mutate(year = factor(year))
+SA_diff <- SA_grid_laea %>%
+  filter(empty_clean == F) %>%
+  dplyr::select(year, IHO_area, NASC_int_clean, SA_int_clean, NASC_int, CM) %>%
+  mutate(IHO_area = factor(case_when(IHO_area == "East Arctic Ocean" ~ "EAO",
+                                     IHO_area == "West Arctic Ocean" ~ "WAO_BF",
+                                     IHO_area == "Beaufort Sea" ~ "WAO_BF",
+                                     IHO_area == "The Northwestern Passages" ~ "CAA",
+                                     IHO_area == "Baffin Bay" ~ "BB",
+                                     IHO_area == "Davis Strait" ~ "DS"),
+                           levels = c("WAO_BF", "CAA", "BB", "DS", "EAO")),
+         year = factor(year))
 ```
 
 ## All areas
@@ -224,7 +245,7 @@ I check whether there are inter-annual and spatial variability in S~A~ and the c
 # Visualize data
 plot_grid(SA_diff %>% 
             ggplot() +
-            geom_boxplot(aes(x = year, y = SA_int_clean)),
+            geom_boxplot(aes(x = year, y = NASC_int_clean)),
           SA_diff %>% 
             ggplot() +
             geom_boxplot(aes(x = year, y = CM)))
@@ -237,15 +258,26 @@ plot_grid(SA_diff %>%
 ## Outliers
 SA_diff %>%
   group_by(year) %>%
-  identify_outliers(SA_int_clean) 
+  identify_outliers(NASC_int_clean) 
 ```
 
 ```
-## # A tibble: 2 x 7
-##   year  IHO_area SA_int_clean NASC_int    CM is.outlier is.extreme
-##   <fct> <fct>           <dbl>    <dbl> <dbl> <lgl>      <lgl>     
-## 1 2017  EAO              41.6   14314.  412. TRUE       FALSE     
-## 2 2017  EAO              48.3   67316.  392. TRUE       FALSE
+## # A tibble: 12 x 8
+##    year  IHO_area NASC_int_clean SA_int_clean NASC_int    CM is.outlier
+##    <fct> <fct>             <dbl>        <dbl>    <dbl> <dbl> <lgl>     
+##  1 2015  BB                 946.         29.8     947.  313. TRUE      
+##  2 2015  BB                1528.         31.8    1529.  292. TRUE      
+##  3 2016  BB                 765.         28.8     765.  353. TRUE      
+##  4 2016  BB                 548.         27.4     548.  330. TRUE      
+##  5 2016  BB                1029.         30.1    1030.  338. TRUE      
+##  6 2016  EAO               2434.         33.9    2435.  471. TRUE      
+##  7 2016  DS                1036.         30.2    1036.  364. TRUE      
+##  8 2017  CAA                650.         28.1     650.  393. TRUE      
+##  9 2017  CAA                543.         27.3     543.  303. TRUE      
+## 10 2017  EAO              14313.         41.6   14314.  412. TRUE      
+## 11 2017  EAO              67315.         48.3   67316.  392. TRUE      
+## 12 2017  EAO                649.         28.1     650.  310. TRUE      
+## # ... with 1 more variable: is.extreme <lgl>
 ```
 
 ```r
@@ -255,28 +287,36 @@ SA_diff %>%
 ```
 
 ```
-## # A tibble: 2 x 7
-##   year  IHO_area   SA_int_clean NASC_int    CM is.outlier is.extreme
-##   <fct> <fct>             <dbl>    <dbl> <dbl> <lgl>      <lgl>     
-## 1 2015  WAO_BF_CAA         7.69     7.72  591. TRUE       TRUE      
-## 2 2015  WAO_BF_CAA         3.81     5.78  572. TRUE       TRUE
+## # A tibble: 2 x 8
+##   year  IHO_area NASC_int_clean SA_int_clean NASC_int    CM is.outlier
+##   <fct> <fct>             <dbl>        <dbl>    <dbl> <dbl> <lgl>     
+## 1 2015  WAO_BF             5.87         7.69     7.72  591. TRUE      
+## 2 2015  WAO_BF             2.40         3.81     5.78  572. TRUE      
+## # ... with 1 more variable: is.extreme <lgl>
 ```
 
 ```r
 SA_diff %>%
   group_by(IHO_area) %>%
-  identify_outliers(SA_int_clean) 
+  identify_outliers(NASC_int_clean) 
 ```
 
 ```
-## # A tibble: 5 x 7
-##   IHO_area year  SA_int_clean NASC_int    CM is.outlier is.extreme
-##   <fct>    <fct>        <dbl>    <dbl> <dbl> <lgl>      <lgl>     
-## 1 BB       2017          3.10     5.08  285. TRUE       FALSE     
-## 2 BB       2017          2.83     3.83  284. TRUE       FALSE     
-## 3 DS       2016         30.2   1036.    364. TRUE       FALSE     
-## 4 EAO      2017         41.6  14314.    412. TRUE       FALSE     
-## 5 EAO      2017         48.3  67316.    392. TRUE       FALSE
+## # A tibble: 11 x 8
+##    IHO_area year  NASC_int_clean SA_int_clean NASC_int    CM is.outlier
+##    <fct>    <fct>          <dbl>        <dbl>    <dbl> <dbl> <lgl>     
+##  1 BB       2015            946.         29.8     947.  313. TRUE      
+##  2 BB       2015           1528.         31.8    1529.  292. TRUE      
+##  3 BB       2016            765.         28.8     765.  353. TRUE      
+##  4 BB       2016            548.         27.4     548.  330. TRUE      
+##  5 BB       2016           1029.         30.1    1030.  338. TRUE      
+##  6 DS       2016           1036.         30.2    1036.  364. TRUE      
+##  7 DS       2017            228.         23.6     229.  341. TRUE      
+##  8 EAO      2016           2434.         33.9    2435.  471. TRUE      
+##  9 EAO      2017          14313.         41.6   14314.  412. TRUE      
+## 10 EAO      2017          67315.         48.3   67316.  392. TRUE      
+## 11 EAO      2017            649.         28.1     650.  310. TRUE      
+## # ... with 1 more variable: is.extreme <lgl>
 ```
 
 ```r
@@ -286,21 +326,24 @@ SA_diff %>%
 ```
 
 ```
-## # A tibble: 7 x 7
-##   IHO_area   year  SA_int_clean NASC_int    CM is.outlier is.extreme
-##   <fct>      <fct>        <dbl>    <dbl> <dbl> <lgl>      <lgl>     
-## 1 WAO_BF_CAA 2015          7.69     7.72  591. TRUE       TRUE      
-## 2 WAO_BF_CAA 2015          3.81     5.78  572. TRUE       TRUE      
-## 3 BB         2015         14.3     28.8   415. TRUE       FALSE     
-## 4 BB         2016         13.5     24.7   393. TRUE       FALSE     
-## 5 BB         2016         16.6     48.0   427. TRUE       FALSE     
-## 6 BB         2016         16.6     47.4   401. TRUE       FALSE     
-## 7 BB         2017         13.0     20.8   265. TRUE       FALSE
+## # A tibble: 9 x 8
+##   IHO_area year  NASC_int_clean SA_int_clean NASC_int    CM is.outlier
+##   <fct>    <fct>          <dbl>        <dbl>    <dbl> <dbl> <lgl>     
+## 1 WAO_BF   2015            5.87         7.69     7.72  591. TRUE      
+## 2 WAO_BF   2015            2.40         3.81     5.78  572. TRUE      
+## 3 WAO_BF   2017           49.9         17.0     50.6   300. TRUE      
+## 4 BB       2015           26.8         14.3     28.8   415. TRUE      
+## 5 BB       2016           84.7         19.3     86.5   261. TRUE      
+## 6 BB       2016           22.2         13.5     24.7   393. TRUE      
+## 7 BB       2016           45.6         16.6     48.0   427. TRUE      
+## 8 BB       2016           45.9         16.6     47.4   401. TRUE      
+## 9 BB       2017           19.8         13.0     20.8   265. TRUE      
+## # ... with 1 more variable: is.extreme <lgl>
 ```
 
 ```r
 ## Normality: Checked by looking at the anova residuals with QQ plot
-ggqqplot(SA_diff, "SA_int_clean", facet.by = "year")
+ggqqplot(SA_diff, "NASC_int_clean", facet.by = "year")
 ```
 
 ![](PanArctic_DSL_statistics_files/figure-html/all-interannual-spatial-prep-2.png)<!-- -->
@@ -312,7 +355,7 @@ ggqqplot(SA_diff, "CM", facet.by = "year")
 ![](PanArctic_DSL_statistics_files/figure-html/all-interannual-spatial-prep-3.png)<!-- -->
 
 ```r
-ggqqplot(SA_diff, "SA_int_clean", facet.by = "IHO_area")
+ggqqplot(SA_diff, "NASC_int_clean", facet.by = "IHO_area")
 ```
 
 ![](PanArctic_DSL_statistics_files/figure-html/all-interannual-spatial-prep-4.png)<!-- -->
@@ -325,7 +368,7 @@ ggqqplot(SA_diff, "CM", facet.by = "IHO_area")
 
 ```r
 ## Homogeneity of variance
-plot(lm(SA_int_clean ~ year, data = SA_diff), 1)
+plot(lm(NASC_int_clean ~ year, data = SA_diff), 1)
 ```
 
 ![](PanArctic_DSL_statistics_files/figure-html/all-interannual-spatial-prep-6.png)<!-- -->
@@ -337,7 +380,7 @@ plot(lm(CM ~ year, data = SA_diff), 1)
 ![](PanArctic_DSL_statistics_files/figure-html/all-interannual-spatial-prep-7.png)<!-- -->
 
 ```r
-plot(lm(SA_int_clean ~ IHO_area, data = SA_diff), 1)
+plot(lm(NASC_int_clean ~ IHO_area, data = SA_diff), 1)
 ```
 
 ![](PanArctic_DSL_statistics_files/figure-html/all-interannual-spatial-prep-8.png)<!-- -->
@@ -348,31 +391,19 @@ plot(lm(CM ~ IHO_area, data = SA_diff), 1)
 
 ![](PanArctic_DSL_statistics_files/figure-html/all-interannual-spatial-prep-9.png)<!-- -->
 
-```r
-SA_diff %>%
-  levene_test(SA_int_clean ~ year)
-```
-
-```
-## # A tibble: 1 x 4
-##     df1   df2 statistic     p
-##   <int> <int>     <dbl> <dbl>
-## 1     2   117     0.465 0.629
-```
-
 I used a non parametric Kruskal-Wallis test to test for interannual and spatial variability because the variance is not homogenous and not very normal.
 
 
 ```r
 SA_diff %>% # Kruskal wallis interannual difference SA
-  kruskal_test(SA_int_clean ~ year)
+  kruskal_test(NASC_int_clean ~ year)
 ```
 
 ```
 ## # A tibble: 1 x 6
-##   .y.              n statistic    df      p method        
-## * <chr>        <int>     <dbl> <int>  <dbl> <chr>         
-## 1 SA_int_clean   120      5.17     2 0.0754 Kruskal-Wallis
+##   .y.                n statistic    df      p method        
+## * <chr>          <int>     <dbl> <int>  <dbl> <chr>         
+## 1 NASC_int_clean   127      5.74     2 0.0566 Kruskal-Wallis
 ```
 
 ```r
@@ -384,19 +415,19 @@ SA_diff %>% # Kruskal wallis interannual difference CM
 ## # A tibble: 1 x 6
 ##   .y.       n statistic    df     p method        
 ## * <chr> <int>     <dbl> <int> <dbl> <chr>         
-## 1 CM      120      2.94     2  0.23 Kruskal-Wallis
+## 1 CM      127      3.40     2 0.183 Kruskal-Wallis
 ```
 
 ```r
 SA_diff %>% # Kruskal wallis interannual difference SA
-  kruskal_test(SA_int_clean ~ IHO_area)
+  kruskal_test(NASC_int_clean ~ IHO_area)
 ```
 
 ```
 ## # A tibble: 1 x 6
-##   .y.              n statistic    df      p method        
-## * <chr>        <int>     <dbl> <int>  <dbl> <chr>         
-## 1 SA_int_clean   120      8.37     3 0.0389 Kruskal-Wallis
+##   .y.                n statistic    df        p method        
+## * <chr>          <int>     <dbl> <int>    <dbl> <chr>         
+## 1 NASC_int_clean   127      21.3     4 0.000278 Kruskal-Wallis
 ```
 
 ```r
@@ -406,9 +437,9 @@ SA_diff %>% # Kruskal wallis interannual difference CM
 
 ```
 ## # A tibble: 1 x 6
-##   .y.       n statistic    df            p method        
-## * <chr> <int>     <dbl> <int>        <dbl> <chr>         
-## 1 CM      120      38.1     3 0.0000000266 Kruskal-Wallis
+##   .y.       n statistic    df        p method        
+## * <chr> <int>     <dbl> <int>    <dbl> <chr>         
+## 1 CM      127      48.9     4 6.22e-10 Kruskal-Wallis
 ```
 
 The center of mass did not vary significantly between years (H = 1.652899, p = 0.438) but varied significantly among areas (*H* = 57.8495, *p* < 0.001). Mesopelagic backscatter S~A~ varied significantly between areas (*H* = 26.19394, *p* < 0.001) but not years (*H* = 8.6464, *p* = 0.013). Thus, in the S~A~ HGAM a random effect for change in S~A~ per area is likely needed.
@@ -421,17 +452,18 @@ I check whether there are inter-annual variability in S~A~ across years within a
 ```r
 SA_diff %>% # Kruskal wallis interannual difference SA within group
   group_by(IHO_area) %>%
-  kruskal_test(SA_int_clean ~ year)
+  kruskal_test(NASC_int_clean ~ year)
 ```
 
 ```
-## # A tibble: 4 x 7
-##   IHO_area   .y.              n statistic    df        p method        
-## * <fct>      <chr>        <int>     <dbl> <int>    <dbl> <chr>         
-## 1 WAO_BF_CAA SA_int_clean    29   17.6        2 0.000149 Kruskal-Wallis
-## 2 BB         SA_int_clean    42    4.83       2 0.0893   Kruskal-Wallis
-## 3 DS         SA_int_clean    24    0.0857     2 0.958    Kruskal-Wallis
-## 4 EAO        SA_int_clean    25    4.87       2 0.0878   Kruskal-Wallis
+## # A tibble: 5 x 7
+##   IHO_area .y.                n statistic    df      p method        
+## * <fct>    <chr>          <int>     <dbl> <int>  <dbl> <chr>         
+## 1 WAO_BF   NASC_int_clean    12    3.69       2 0.158  Kruskal-Wallis
+## 2 CAA      NASC_int_clean    21   11.8        2 0.0027 Kruskal-Wallis
+## 3 BB       NASC_int_clean    45    5.14       2 0.0764 Kruskal-Wallis
+## 4 DS       NASC_int_clean    24    0.0857     2 0.958  Kruskal-Wallis
+## 5 EAO      NASC_int_clean    25    4.87       2 0.0878 Kruskal-Wallis
 ```
 
 There was no interannual differences in SA within each region (WAO_BF - H = 4.8395483, *p* = 0.0889; CAA - H = 6.9278752, *p* = 0.0313; BB - H = 0.0968, *p* = 0.0889; DS - H = 0.9470, *p* = 0.0889; EAO - H = 5.0263899, *p* = 0.0810). Therefore, there seems to be no need for a random effect for interannual variability within years.
@@ -556,15 +588,26 @@ ggcorrplot(corr_DS, type = "lower", lab = T, title = "corr BB")
 ![](PanArctic_DSL_statistics_files/figure-html/corr-area-3.png)<!-- -->
 
 ```r
-corr_WAO_BF_CAA <- SA_df %>% # Compute Spearman correlation matrix
-  filter(IHO == "WAO_BF_CAA") %>%
+corr_WAO_BF <- SA_df %>% # Compute Spearman correlation matrix
+  filter(IHO == "WAO_BF") %>%
   dplyr::select(-year, -xc, -yc, -IHO, -SA_int_n, -v_n, -t_n, -o_n, -s_n) %>%
   cor(., method = "spearman") %>%
   round(., 2)
-ggcorrplot(corr_WAO_BF_CAA, type = "lower", lab = T, title = "corr WAO")
+ggcorrplot(corr_WAO_BF, type = "lower", lab = T, title = "corr WAO BF")
 ```
 
 ![](PanArctic_DSL_statistics_files/figure-html/corr-area-4.png)<!-- -->
+
+```r
+corr_CAA <- SA_df %>% # Compute Spearman correlation matrix
+  filter(IHO == "CAA") %>%
+  dplyr::select(-year, -xc, -yc, -IHO, -SA_int_n, -v_n, -t_n, -o_n, -s_n) %>%
+  cor(., method = "spearman") %>%
+  round(., 2)
+ggcorrplot(corr_CAA, type = "lower", lab = T, title = "corr CAA")
+```
+
+![](PanArctic_DSL_statistics_files/figure-html/corr-area-5.png)<!-- -->
 
 ## Model fitting
 
@@ -591,8 +634,8 @@ GAM3 <- gam(SA_int_n ~ IHO + s(v, by = IHO, k = 5, bs = "tp") + s(t, by = IHO, k
               s(o, by = IHO, k = 5, bs = "tp"),
             data = SA_df, family = "gaussian", method = "REML")
 # Model GS
-GAM4 <- gam(SA_int_n ~ IHO + s(v, k = 5) + s(t, k = 5) + s(o, k = 5) + s(v, IHO, bs = "fs", k = 5) +
-              s(t, IHO, bs = "fs", k = 5) + s(o, IHO, bs = "fs", k = 5),
+GAM4 <- gam(SA_int_n ~ IHO + s(v, k = 5, bs = "tp") + s(t, k = 5, bs = "tp") + s(o, k = 5, bs = "tp") +
+              s(v, IHO, bs = "fs", k = 5) + s(t, IHO, bs = "fs", k = 5) + s(o, IHO, bs = "fs", k = 5),
             data = SA_df, family = "gaussian", method = "REML")
 ```
 
@@ -603,8 +646,8 @@ GAM4 <- gam(SA_int_n ~ IHO + s(v, k = 5) + s(t, k = 5) + s(o, k = 5) + s(v, IHO,
 
 ```r
 # Model GI
-GAM5 <- gam(SA_int_n ~ IHO + s(v, k = 5) + s(t, k = 5) + s(o, k = 5) + s(v, by = IHO, k = 5, bs = "tp") + 
-              s(t, by = IHO, k = 5, bs = "tp") + s(o, by = IHO, k = 5, bs = "tp"),
+GAM5 <- gam(SA_int_n ~ IHO + s(v, k = 5, bs = "tp") + s(t, k = 5, bs = "tp") + s(o, k = 5, bs = "tp") +
+              s(v, by = IHO, k = 5, bs = "tp") + s(t, by = IHO, k = 5, bs = "tp") + s(o, by = IHO, k = 5, bs = "tp"),
             data = SA_df, family = "gaussian", method = "REML")
 
 # Summary metrics
@@ -633,8 +676,8 @@ summ_GAM
 ```
 
 ```{=html}
-<div id="htmlwidget-15bc36f43093385136d4" style="width:100%;height:auto;" class="datatables html-widget"></div>
-<script type="application/json" data-for="htmlwidget-15bc36f43093385136d4">{"x":{"filter":"none","vertical":false,"data":[["GAM5","GAM3","GAM4","GAM1","GAM2"],[27.088,25.201,24.297,10.836,25.413],[62.97,59.8,54.74,41.98,54.06],[0.54,0.51,0.47,0.38,0.46],[0.8,-0.83,-0.55,-2.41,-4.49],[-44.6,-38.5,-26.084,-23.211,-22.058],[0,6.1,18.52,21.39,22.54],[0.9546633465,0.0452118292,9.10232e-05,2.16415e-05,1.21595e-05]],"container":"<table class=\"cell-border stribe\">\n  <thead>\n    <tr>\n      <th>model<\/th>\n      <th>df<\/th>\n      <th>dev_expl<\/th>\n      <th>r2<\/th>\n      <th>reml<\/th>\n      <th>AIC<\/th>\n      <th>dAIC<\/th>\n      <th>w_AIC<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[1,2,3,4,5,6,7]}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
+<div id="htmlwidget-1521e1629accc8c2a8e4" style="width:100%;height:auto;" class="datatables html-widget"></div>
+<script type="application/json" data-for="htmlwidget-1521e1629accc8c2a8e4">{"x":{"filter":"none","vertical":false,"data":[["GAM3","GAM5","GAM2","GAM4","GAM1"],[35.642,35.409,27.112,22.458,7.959],[68.76,68.54,56.13,52.25,35.27],[0.59,0.58,0.48,0.45,0.33],[1.45,3.9,-3.36,2.2,1.41],[-46.918,-46.483,-21.188,-19.822,-10.48],[0,0.44,25.73,27.1,36.44],[0.5541604533,0.4458373822,1.4336e-06,7.241e-07,6.8e-09]],"container":"<table class=\"cell-border stribe\">\n  <thead>\n    <tr>\n      <th>model<\/th>\n      <th>df<\/th>\n      <th>dev_expl<\/th>\n      <th>r2<\/th>\n      <th>reml<\/th>\n      <th>AIC<\/th>\n      <th>dAIC<\/th>\n      <th>w_AIC<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[1,2,3,4,5,6,7]}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
 ```
 
 I select `GAM4 model GS` because I expect to have a similar functional response within each region but that response can vary between region.
@@ -650,32 +693,33 @@ summary(GAM4)
 ## Link function: identity 
 ## 
 ## Formula:
-## SA_int_n ~ IHO + s(v, k = 5) + s(t, k = 5) + s(o, k = 5) + s(v, 
-##     IHO, bs = "fs", k = 5) + s(t, IHO, bs = "fs", k = 5) + s(o, 
-##     IHO, bs = "fs", k = 5)
+## SA_int_n ~ IHO + s(v, k = 5, bs = "tp") + s(t, k = 5, bs = "tp") + 
+##     s(o, k = 5, bs = "tp") + s(v, IHO, bs = "fs", k = 5) + s(t, 
+##     IHO, bs = "fs", k = 5) + s(o, IHO, bs = "fs", k = 5)
 ## 
 ## Parametric coefficients:
-##             Estimate Std. Error t value Pr(>|t|)   
-## (Intercept)   0.3480     0.1069   3.256  0.00154 **
-## IHOBB         0.1595     0.1114   1.431  0.15554   
-## IHODS         0.1829     0.1901   0.962  0.33828   
-## IHOEAO        0.1326     0.1393   0.952  0.34337   
+##              Estimate Std. Error t value Pr(>|t|)    
+## (Intercept)  0.507007   0.077452   6.546 2.04e-09 ***
+## IHOCAA      -0.032185   0.089917  -0.358    0.721    
+## IHOBB        0.013235   0.077978   0.170    0.866    
+## IHODS       -0.127884   0.134543  -0.951    0.344    
+## IHOEAO       0.002248   0.124390   0.018    0.986    
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
 ## Approximate significance of smooth terms:
-##             edf Ref.df     F  p-value    
-## s(v)     1.2233  1.300 3.136 0.076955 .  
-## s(t)     3.0861  3.543 3.026 0.037283 *  
-## s(o)     2.3794  2.726 8.530 0.000357 ***
-## s(v,IHO) 4.6301 15.000 0.620 0.023297 *  
-## s(t,IHO) 0.8142 14.000 0.107 0.118222    
-## s(o,IHO) 2.8830 15.000 0.366 0.027976 *  
+##                edf Ref.df     F  p-value    
+## s(v)     2.694e+00  3.182 3.091 0.027741 *  
+## s(t)     1.000e+00  1.000 4.637 0.033515 *  
+## s(o)     2.133e+00  2.405 5.668 0.007431 ** 
+## s(v,IHO) 4.182e-05 19.000 0.000 0.319376    
+## s(t,IHO) 1.229e+00 17.000 0.098 0.214854    
+## s(o,IHO) 5.718e+00 19.000 0.909 0.000784 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
-## R-sq.(adj) =  0.467   Deviance explained = 54.7%
-## -REML = -0.54669  Scale est. = 0.037341  n = 120
+## R-sq.(adj) =  0.448   Deviance explained = 52.3%
+## -REML = 2.2014  Scale est. = 0.040778  n = 126
 ```
 
 ## Model checking
@@ -694,21 +738,21 @@ gam.check(GAM4, rep = 500)
 ## 
 ## Method: REML   Optimizer: outer newton
 ## full convergence after 15 iterations.
-## Gradient range [-1.38077e-06,5.605702e-06]
-## (score -0.5466875 & scale 0.03734113).
-## eigenvalue range [-6.525242e-13,56.66375].
-## Model rank =  76 / 76 
+## Gradient range [-5.06926e-07,1.630614e-05]
+## (score 2.201414 & scale 0.04077809).
+## Hessian positive definite, eigenvalue range [2.070206e-07,59.16527].
+## Model rank =  92 / 92 
 ## 
 ## Basis dimension (k) checking results. Low p-value (k-index<1) may
 ## indicate that k is too low, especially if edf is close to k'.
 ## 
-##              k'    edf k-index p-value
-## s(v)      4.000  1.223    1.08    0.76
-## s(t)      4.000  3.086    1.04    0.64
-## s(o)      4.000  2.379    0.90    0.11
-## s(v,IHO) 20.000  4.630    1.08    0.80
-## s(t,IHO) 20.000  0.814    1.04    0.61
-## s(o,IHO) 20.000  2.883    0.90    0.11
+##                k'      edf k-index p-value
+## s(v)     4.00e+00 2.69e+00    0.98    0.33
+## s(t)     4.00e+00 1.00e+00    1.12    0.89
+## s(o)     4.00e+00 2.13e+00    0.92    0.18
+## s(v,IHO) 2.50e+01 4.18e-05    0.98    0.32
+## s(t,IHO) 2.50e+01 1.23e+00    1.12    0.90
+## s(o,IHO) 2.50e+01 5.72e+00    0.92    0.16
 ```
 
 ```r
@@ -769,9 +813,9 @@ I turn on the double penalty (`select = TRUE`) and check the covariates that has
 
 
 ```r
-GAM4_p <- gam(SA_int_clean ~ year + s(v, k = 5) + s(t, k = 5) + s(o, k = 5) + s(v, IHO, bs = "fs", k = 5) + 
-              s(t, IHO, bs = "fs", k = 5) + s(o, IHO, bs = "fs", k = 5),
-            data = SA_df, family = "gaussian", method = "REML", select=TRUE)
+GAM4_p <- gam(SA_int_n ~ IHO + s(v, k = 5, bs = "tp") + s(t, k = 5, bs = "tp") + s(o, k = 5, bs = "tp") +
+                s(v, IHO, bs = "fs", k = 5) + s(t, IHO, bs = "fs", k = 5) + s(o, IHO, bs = "fs", k = 5),
+              data = SA_df, family = "gaussian", method = "REML", select = TRUE)
 ```
 
 ```
@@ -789,31 +833,33 @@ summary(GAM4_p)
 ## Link function: identity 
 ## 
 ## Formula:
-## SA_int_clean ~ year + s(v, k = 5) + s(t, k = 5) + s(o, k = 5) + 
-##     s(v, IHO, bs = "fs", k = 5) + s(t, IHO, bs = "fs", k = 5) + 
-##     s(o, IHO, bs = "fs", k = 5)
+## SA_int_n ~ IHO + s(v, k = 5, bs = "tp") + s(t, k = 5, bs = "tp") + 
+##     s(o, k = 5, bs = "tp") + s(v, IHO, bs = "fs", k = 5) + s(t, 
+##     IHO, bs = "fs", k = 5) + s(o, IHO, bs = "fs", k = 5)
 ## 
 ## Parametric coefficients:
-##             Estimate Std. Error t value Pr(>|t|)    
-## (Intercept)   16.150      1.617   9.989   <2e-16 ***
-## year2016       2.996      1.848   1.621    0.108    
-## year2017       2.033      1.731   1.174    0.243    
+##              Estimate Std. Error t value Pr(>|t|)    
+## (Intercept)  0.495570   0.076987   6.437 3.57e-09 ***
+## IHOCAA      -0.009073   0.085689  -0.106    0.916    
+## IHOBB        0.023893   0.077135   0.310    0.757    
+## IHODS       -0.116148   0.131770  -0.881    0.380    
+## IHOEAO      -0.011798   0.119167  -0.099    0.921    
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
 ## Approximate significance of smooth terms:
 ##                edf Ref.df     F  p-value    
-## s(v)     0.0002123      4 0.000 0.153662    
-## s(t)     0.2200515      4 0.071 0.008110 ** 
-## s(o)     1.1096904      4 1.018 0.004604 ** 
-## s(v,IHO) 6.7540544     19 0.783 0.011258 *  
-## s(t,IHO) 2.7589777     18 0.462 0.007070 ** 
-## s(o,IHO) 4.0161195     19 0.798 0.000177 ***
+## s(v)     2.155e-07      4 0.000  0.66518    
+## s(t)     8.062e-01      4 1.040  0.00866 ** 
+## s(o)     1.754e+00      4 3.288 7.23e-06 ***
+## s(v,IHO) 4.497e+00     19 0.689  0.00361 ** 
+## s(t,IHO) 1.800e+00     18 0.154  0.13321    
+## s(o,IHO) 5.540e+00     20 1.245 1.82e-05 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
-## R-sq.(adj) =   0.35   Deviance explained = 44.2%
-## -REML = 402.12  Scale est. = 39.768    n = 120
+## R-sq.(adj) =  0.466   Deviance explained = 54.5%
+## -REML = -1.6833  Scale est. = 0.039476  n = 126
 ```
 
 ## Model visualization
@@ -866,8 +912,8 @@ Plot fitted GAM with `ggplot`.
 
 
 ```r
-# col_pal <- c("#5BBCD6", "#00A08A", "#F2AD00", "#F98400", "#FF0000")# wesanderson::wes_palette("Darjeeling1", type = "discrete") 
-col_pal <- c("#5BBCD6",  "#00A08A", "#F98400", "#FF0000")# wesanderson::wes_palette("Darjeeling1", type = "discrete") 
+col_pal <- c("#5BBCD6", "#00A08A", "#F2AD00", "#F98400", "#FF0000")# wesanderson::wes_palette("Darjeeling1", type = "discrete")
+# col_pal <- c("#5BBCD6",  "#00A08A", "#F98400", "#FF0000")# wesanderson::wes_palette("Darjeeling1", type = "discrete") 
 
 GAM_plot <- plot_grid(get_legend(ggplot(data = pred_GAM, aes(x = v, y = v_fit, fill = IHO, col = IHO)) + 
                                    geom_point() +
@@ -879,7 +925,7 @@ GAM_plot <- plot_grid(get_legend(ggplot(data = pred_GAM, aes(x = v, y = v_fit, f
               ggplot(aes(x = v)) +
               geom_ribbon(aes(ymin = v_lower, ymax = v_upper, fill = IHO), alpha = 0.1) +
               geom_line(aes(y = v_fit, col = IHO), size = 1) +
-              scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, 0.5)) +
+              # scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, 0.5)) +
               scale_colour_manual(values = col_pal) + 
               scale_fill_manual(values = col_pal) + 
               labs(x = expression("Velocity at 380 m (cm s"^-1*")"), 
@@ -889,7 +935,7 @@ GAM_plot <- plot_grid(get_legend(ggplot(data = pred_GAM, aes(x = v, y = v_fit, f
               ggplot(aes(x = t)) +
               geom_ribbon(aes(ymin = t_lower, ymax = t_upper, fill = IHO), alpha = 0.1) +
               geom_line(aes(y = t_fit, col = IHO), size = 1) +
-              scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, 0.5)) +
+              # scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, 0.5)) +
               scale_colour_manual(values = col_pal) + 
               scale_fill_manual(values = col_pal) + 
               labs(x = "Temp. at 380 m (°C)", 
@@ -899,7 +945,7 @@ GAM_plot <- plot_grid(get_legend(ggplot(data = pred_GAM, aes(x = v, y = v_fit, f
               ggplot(aes(x = o)) +
               geom_ribbon(aes(ymin = o_lower, ymax = o_upper, fill = IHO), alpha = 0.1) +
               geom_line(aes(y = o_fit, col = IHO), size = 1) +
-              scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, 0.5)) +
+              # scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, 0.5)) +
               scale_colour_manual(values = col_pal) + 
               scale_fill_manual(values = col_pal) + 
               labs(x = "Open water (days)", 

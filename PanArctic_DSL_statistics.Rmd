@@ -113,17 +113,19 @@ stat_laea <- left_join(SA_laea, phy_laea, by = c("year", "area", "xc", "yc", "ce
                                                             ice_week),
                                                        na.rm = T),
                             ice_week)) %>%
-  filter(depth == 380) %>% # Select data at 380 m depth and remove cells with no DSL
+  filter(depth == 222) %>% # Select data at 222 m depth and remove cells with no DSL
   mutate(velocity = velocity * 100, # Convert to cm/s
          IHO_area = factor(case_when(IHO_area == "East Arctic Ocean" ~ "EAO",
-                                     IHO_area == "West Arctic Ocean" ~ "WAO_BF_CAA",
-                                     IHO_area == "Beaufort Sea" ~ "WAO_BF_CAA",
-                                     IHO_area == "The Northwestern Passages" ~ "WAO_BF_CAA",
+                                     IHO_area == "West Arctic Ocean" ~ "WAO_BF",
+                                     IHO_area == "Beaufort Sea" ~ "WAO_BF",
+                                     IHO_area == "The Northwestern Passages" ~ "CAA",
                                      IHO_area == "Baffin Bay" ~ "BB",
                                      IHO_area == "Davis Strait" ~ "DS"),
-                            levels = c("WAO_BF_CAA", "BB", "DS", "EAO"))) %>%
+                            levels = c("WAO_BF", "CAA", "BB", "DS", "EAO"))) %>%
   ungroup() %>%
   dplyr::select(-xc_na, -yc_na, -year_na)
+
+stat_laea %>% group_by(IHO_area) %>% summarise(n = n())
 ```
 
 # Data exploration 
@@ -171,7 +173,7 @@ stat_laea %>% # Temperature
   geom_tile(aes(fill = thetao)) +
   scale_fill_cmocean("Temp (dC)", name = "thermal", na.value = "red") +
   facet_wrap(~ year, ncol = 3) +
-  ggtitle("Temperature at 380 m depth") +
+  ggtitle("Temperature at 222 m depth") +
   coord_fixed(xlim = c(-2600, 1100), ylim = c(-1800, 1900), expand = F) + 
   theme(axis.text = element_blank(), axis.ticks = element_blank(), axis.title = element_blank())
 ```
@@ -183,7 +185,7 @@ stat_laea %>% # Ice concentration
   geom_tile(aes(fill = velocity)) +
   scale_fill_cmocean("velo (cm/s)", name = "speed", na.value = "red") +
   facet_wrap(~ year, ncol = 3) +
-  ggtitle("Current velocity at 380 m depth") +
+  ggtitle("Current velocity at 222 m depth") +
   coord_fixed(xlim = c(-2600, 1100), ylim = c(-1800, 1900), expand = F) + 
   theme(axis.text = element_blank(), axis.ticks = element_blank(), axis.title = element_blank())
 ```
@@ -191,9 +193,17 @@ stat_laea %>% # Ice concentration
 # Spatial and interannual variability
 
 ```{r prep-diff}
-SA_diff <- stat_laea %>%
-  dplyr::select(year, IHO_area, SA_int_clean, NASC_int, CM) %>%
-  mutate(year = factor(year))
+SA_diff <- SA_grid_laea %>%
+  filter(empty_clean == F) %>%
+  dplyr::select(year, IHO_area, NASC_int_clean, SA_int_clean, NASC_int, CM) %>%
+  mutate(IHO_area = factor(case_when(IHO_area == "East Arctic Ocean" ~ "EAO",
+                                     IHO_area == "West Arctic Ocean" ~ "WAO_BF",
+                                     IHO_area == "Beaufort Sea" ~ "WAO_BF",
+                                     IHO_area == "The Northwestern Passages" ~ "CAA",
+                                     IHO_area == "Baffin Bay" ~ "BB",
+                                     IHO_area == "Davis Strait" ~ "DS"),
+                           levels = c("WAO_BF", "CAA", "BB", "DS", "EAO")),
+         year = factor(year))
 ```
 
 ## All areas
@@ -204,7 +214,7 @@ I check whether there are inter-annual and spatial variability in S~A~ and the c
 # Visualize data
 plot_grid(SA_diff %>% 
             ggplot() +
-            geom_boxplot(aes(x = year, y = SA_int_clean)),
+            geom_boxplot(aes(x = year, y = NASC_int_clean)),
           SA_diff %>% 
             ggplot() +
             geom_boxplot(aes(x = year, y = CM)))
@@ -213,41 +223,39 @@ plot_grid(SA_diff %>%
 ## Outliers
 SA_diff %>%
   group_by(year) %>%
-  identify_outliers(SA_int_clean) 
+  identify_outliers(NASC_int_clean) 
 SA_diff %>%
   group_by(year) %>%
   identify_outliers(CM) 
 SA_diff %>%
   group_by(IHO_area) %>%
-  identify_outliers(SA_int_clean) 
+  identify_outliers(NASC_int_clean) 
 SA_diff %>%
   group_by(IHO_area) %>%
   identify_outliers(CM) 
 
 ## Normality: Checked by looking at the anova residuals with QQ plot
-ggqqplot(SA_diff, "SA_int_clean", facet.by = "year")
+ggqqplot(SA_diff, "NASC_int_clean", facet.by = "year")
 ggqqplot(SA_diff, "CM", facet.by = "year")
-ggqqplot(SA_diff, "SA_int_clean", facet.by = "IHO_area")
+ggqqplot(SA_diff, "NASC_int_clean", facet.by = "IHO_area")
 ggqqplot(SA_diff, "CM", facet.by = "IHO_area")
 
 ## Homogeneity of variance
-plot(lm(SA_int_clean ~ year, data = SA_diff), 1)
+plot(lm(NASC_int_clean ~ year, data = SA_diff), 1)
 plot(lm(CM ~ year, data = SA_diff), 1)
-plot(lm(SA_int_clean ~ IHO_area, data = SA_diff), 1)
+plot(lm(NASC_int_clean ~ IHO_area, data = SA_diff), 1)
 plot(lm(CM ~ IHO_area, data = SA_diff), 1)
-SA_diff %>%
-  levene_test(SA_int_clean ~ year)
 ```
 
 I used a non parametric Kruskal-Wallis test to test for interannual and spatial variability because the variance is not homogenous and not very normal.
 
 ```{r all-kruskal-wallis}
 SA_diff %>% # Kruskal wallis interannual difference SA
-  kruskal_test(SA_int_clean ~ year)
+  kruskal_test(NASC_int_clean ~ year)
 SA_diff %>% # Kruskal wallis interannual difference CM
   kruskal_test(CM ~ year)
 SA_diff %>% # Kruskal wallis interannual difference SA
-  kruskal_test(SA_int_clean ~ IHO_area)
+  kruskal_test(NASC_int_clean ~ IHO_area)
 SA_diff %>% # Kruskal wallis interannual difference CM
   kruskal_test(CM ~ IHO_area)
 ```
@@ -261,7 +269,7 @@ I check whether there are inter-annual variability in S~A~ across years within a
 ```{r area-kruskal-wallis}
 SA_diff %>% # Kruskal wallis interannual difference SA within group
   group_by(IHO_area) %>%
-  kruskal_test(SA_int_clean ~ year)
+  kruskal_test(NASC_int_clean ~ year)
 ```
 
 There was no interannual differences in SA within each region (WAO_BF - H = 4.8395483, *p* = 0.0889; CAA - H = 6.9278752, *p* = 0.0313; BB - H = 0.0968, *p* = 0.0889; DS - H = 0.9470, *p* = 0.0889; EAO - H = 5.0263899, *p* = 0.0810). Therefore, there seems to be no need for a random effect for interannual variability within years.
@@ -366,13 +374,19 @@ corr_DS <- SA_df %>% # Compute Spearman correlation matrix
   round(., 2)
 ggcorrplot(corr_DS, type = "lower", lab = T, title = "corr BB")
 
-corr_WAO_BF_CAA <- SA_df %>% # Compute Spearman correlation matrix
-  filter(IHO == "WAO_BF_CAA") %>%
+corr_WAO_BF <- SA_df %>% # Compute Spearman correlation matrix
+  filter(IHO == "WAO_BF") %>%
   dplyr::select(-year, -xc, -yc, -IHO, -SA_int_n, -v_n, -t_n, -o_n, -s_n) %>%
   cor(., method = "spearman") %>%
   round(., 2)
-ggcorrplot(corr_WAO_BF_CAA, type = "lower", lab = T, title = "corr WAO")
+ggcorrplot(corr_WAO_BF, type = "lower", lab = T, title = "corr WAO BF")
 
+corr_CAA <- SA_df %>% # Compute Spearman correlation matrix
+  filter(IHO == "CAA") %>%
+  dplyr::select(-year, -xc, -yc, -IHO, -SA_int_n, -v_n, -t_n, -o_n, -s_n) %>%
+  cor(., method = "spearman") %>%
+  round(., 2)
+ggcorrplot(corr_CAA, type = "lower", lab = T, title = "corr CAA")
 ```
 
 ## Model fitting
@@ -391,12 +405,12 @@ GAM3 <- gam(SA_int_n ~ IHO + s(v, by = IHO, k = 5, bs = "tp") + s(t, by = IHO, k
               s(o, by = IHO, k = 5, bs = "tp"),
             data = SA_df, family = "gaussian", method = "REML")
 # Model GS
-GAM4 <- gam(SA_int_n ~ IHO + s(v, k = 5) + s(t, k = 5) + s(o, k = 5) + s(v, IHO, bs = "fs", k = 5) +
-              s(t, IHO, bs = "fs", k = 5) + s(o, IHO, bs = "fs", k = 5),
+GAM4 <- gam(SA_int_n ~ IHO + s(v, k = 5, bs = "tp") + s(t, k = 5, bs = "tp") + s(o, k = 5, bs = "tp") +
+              s(v, IHO, bs = "fs", k = 5) + s(t, IHO, bs = "fs", k = 5) + s(o, IHO, bs = "fs", k = 5),
             data = SA_df, family = "gaussian", method = "REML")
 # Model GI
-GAM5 <- gam(SA_int_n ~ IHO + s(v, k = 5) + s(t, k = 5) + s(o, k = 5) + s(v, by = IHO, k = 5, bs = "tp") + 
-              s(t, by = IHO, k = 5, bs = "tp") + s(o, by = IHO, k = 5, bs = "tp"),
+GAM5 <- gam(SA_int_n ~ IHO + s(v, k = 5, bs = "tp") + s(t, k = 5, bs = "tp") + s(o, k = 5, bs = "tp") +
+              s(v, by = IHO, k = 5, bs = "tp") + s(t, by = IHO, k = 5, bs = "tp") + s(o, by = IHO, k = 5, bs = "tp"),
             data = SA_df, family = "gaussian", method = "REML")
 
 # Summary metrics
@@ -485,9 +499,9 @@ pacf(resid(GAM4), main = "pACF")
 I turn on the double penalty (`select = TRUE`) and check the covariates that has been shrunk. 
 
 ```{r GAM-selection}
-GAM4_p <- gam(SA_int_clean ~ year + s(v, k = 5) + s(t, k = 5) + s(o, k = 5) + s(v, IHO, bs = "fs", k = 5) + 
-              s(t, IHO, bs = "fs", k = 5) + s(o, IHO, bs = "fs", k = 5),
-            data = SA_df, family = "gaussian", method = "REML", select=TRUE)
+GAM4_p <- gam(SA_int_n ~ IHO + s(v, k = 5, bs = "tp") + s(t, k = 5, bs = "tp") + s(o, k = 5, bs = "tp") +
+                s(v, IHO, bs = "fs", k = 5) + s(t, IHO, bs = "fs", k = 5) + s(o, IHO, bs = "fs", k = 5),
+              data = SA_df, family = "gaussian", method = "REML", select = TRUE)
 summary(GAM4_p)
 ```
 
@@ -536,8 +550,8 @@ rm(pred_v, pred_t, pred_o)
 Plot fitted GAM with `ggplot`.
 
 ```{r ggplot-GAM, warning=FALSE}
-# col_pal <- c("#5BBCD6", "#00A08A", "#F2AD00", "#F98400", "#FF0000")# wesanderson::wes_palette("Darjeeling1", type = "discrete") 
-col_pal <- c("#5BBCD6",  "#00A08A", "#F98400", "#FF0000")# wesanderson::wes_palette("Darjeeling1", type = "discrete") 
+col_pal <- c("#5BBCD6", "#00A08A", "#F2AD00", "#F98400", "#FF0000")# wesanderson::wes_palette("Darjeeling1", type = "discrete")
+# col_pal <- c("#5BBCD6",  "#00A08A", "#F98400", "#FF0000")# wesanderson::wes_palette("Darjeeling1", type = "discrete") 
 
 GAM_plot <- plot_grid(get_legend(ggplot(data = pred_GAM, aes(x = v, y = v_fit, fill = IHO, col = IHO)) + 
                                    geom_point() +
@@ -549,7 +563,7 @@ GAM_plot <- plot_grid(get_legend(ggplot(data = pred_GAM, aes(x = v, y = v_fit, f
               ggplot(aes(x = v)) +
               geom_ribbon(aes(ymin = v_lower, ymax = v_upper, fill = IHO), alpha = 0.1) +
               geom_line(aes(y = v_fit, col = IHO), size = 1) +
-              scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, 0.5)) +
+              # scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, 0.5)) +
               scale_colour_manual(values = col_pal) + 
               scale_fill_manual(values = col_pal) + 
               labs(x = expression("Velocity at 380 m (cm s"^-1*")"), 
@@ -559,7 +573,7 @@ GAM_plot <- plot_grid(get_legend(ggplot(data = pred_GAM, aes(x = v, y = v_fit, f
               ggplot(aes(x = t)) +
               geom_ribbon(aes(ymin = t_lower, ymax = t_upper, fill = IHO), alpha = 0.1) +
               geom_line(aes(y = t_fit, col = IHO), size = 1) +
-              scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, 0.5)) +
+              # scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, 0.5)) +
               scale_colour_manual(values = col_pal) + 
               scale_fill_manual(values = col_pal) + 
               labs(x = "Temp. at 380 m (°C)", 
@@ -569,7 +583,7 @@ GAM_plot <- plot_grid(get_legend(ggplot(data = pred_GAM, aes(x = v, y = v_fit, f
               ggplot(aes(x = o)) +
               geom_ribbon(aes(ymin = o_lower, ymax = o_upper, fill = IHO), alpha = 0.1) +
               geom_line(aes(y = o_fit, col = IHO), size = 1) +
-              scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, 0.5)) +
+              # scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, 0.5)) +
               scale_colour_manual(values = col_pal) + 
               scale_fill_manual(values = col_pal) + 
               labs(x = "Open water (days)", 
