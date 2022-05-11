@@ -556,16 +556,17 @@ CM_prof <- Sv_prof_median %>%
 # Plot
 p_Sv_prof_lines <- Sv_prof_median %>%
   ggplot() +
-  geom_line(data = Sv_prof, aes(x = depth_round, y = Sv_median, group = ID), col = "grey85", size = 0.5) +
-  geom_vline(xintercept = 200, lty = 3) + # Mesopelagic zone
+  # geom_line(data = Sv_prof, aes(x = depth_round, y = Sv_median, group = ID), col = "grey85", size = 0.5) +
+  # geom_vline(xintercept = 200, lty = 3) + # Mesopelagic zone
   geom_line(aes(x = depth_round, y = Sv_median, col = year), size = 0.7) + # Sv profiles per year and median
   geom_vline(data = CM_prof, aes(xintercept = CM), lty = 2) + # Center of mass
   geom_text(data = CM_prof, aes(x = CM -10, y = -70, label = as.character(CM_round)),
             vjust = 0, size = 3, fontface = "italic") + # Label center of mass
-  scale_x_reverse("Depth (m)", breaks = seq(0, 1000, 100)) + 
+  geom_rect(aes(xmin = 0, xmax = 200, ymin = -Inf, ymax = Inf), col = NA, fill = "grey90", alpha = 0.05) + # Mesopelagic zone
+  scale_x_reverse("Depth (m)", breaks = seq(0, 1000, 200)) + 
   scale_y_continuous(expression("S"[V]*" (dB re 1 m"^-1*")"), breaks = seq(-200, 0, 10)) +
   scale_colour_manual(values = col_pal) +
-  coord_flip(ylim = c(-105, -65), xlim = c(800, 20)) +
+  coord_flip(ylim = c(-105, -65), xlim = c(1000, 0), expand = F) +
   facet_rep_grid(~ IHO_area) +
   theme(panel.border = element_blank(),
         axis.line = element_line(),
@@ -686,7 +687,7 @@ p_boxplot_SA <- SA_grid_laea %>% # Boxplot of SA per region
                            levels = c("West Arctic\nOcean", "Beaufort Sea", "Can. Arctic\nArchipelago",
                                       "Baffin Bay", "Davis Strait", "East Arctic\nOcean"))) %>%
   filter(empty_clean == F) %>%
-  ggplot(aes(x = IHO_area, y = SA_int_clean, fill = factor(year))) + 
+  ggplot(aes(x = IHO_area, y = SA_int_clean)) + 
   geom_boxplot(position = position_dodge(preserve = "single")) +
   scale_y_continuous(expression("S"[A]*" (dB re 1 m"^2*" nmi"^-2*")")) +
   scale_fill_manual(values = col_pal) +
