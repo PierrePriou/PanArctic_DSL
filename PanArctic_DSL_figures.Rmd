@@ -229,24 +229,32 @@ rm(cell_res)
 ```{r summary-region}
 # Calculate percent of DSL in all grid cells across all areas
 DSL_all_area <- SA_grid_laea %>%
-  group_by(empty_clean) %>%
+  group_by(empty_clean, year) %>% # per year
   summarise(n = n()) %>%
   ungroup() %>%
-  mutate(total = sum(n),
-         percent = round(n / total, 2) * 100) %>%
+  group_by(year) %>%
+  mutate(total = sum(n)) %>%
+  ungroup() %>%
+  mutate(percent = round(n / total, 2) * 100) %>%
+  group_by(empty_clean) %>%
+  summarise(percent = mean(percent)) %>% # mean percentage across all years
   filter(empty_clean == F) %>%
   mutate(IHO_area = "All areas") %>%
   dplyr::select(IHO_area, percent)
 
 # Calculate percent of DSL within each area
 DSL_area <- SA_grid_laea %>% 
-  group_by(IHO_area, empty_clean) %>%
+  group_by(IHO_area, empty_clean, year) %>% # per year
   summarise(n = n()) %>%
   ungroup() %>%
-  group_by(IHO_area) %>%
-  mutate(total = sum(n),
-         percent = round(n / total, 2) * 100) %>%
+  group_by(IHO_area, year) %>% 
+  mutate(total = sum(n)) %>%
   ungroup() %>%
+  group_by(IHO_area) %>% # per area per year
+  mutate(percent = round(n / total, 2) * 100) %>%
+  ungroup() %>%
+  group_by(IHO_area, empty_clean) %>% # per area
+  summarise(percent = round(mean(percent))) %>% # mean percentage across all years
   filter(empty_clean == F) %>%
   dplyr::select(IHO_area, percent) %>%
   bind_rows(., DSL_all_area)
@@ -254,6 +262,7 @@ DSL_area <- SA_grid_laea %>%
 # Calculate median SA across all areas
 SA_all_area <- SA_grid_laea %>%
   filter(empty_clean == F) %>%
+  group_by(year) %>% # per year
   summarise(n = n(),
             SA_int_median = round(median(10 * log10(NASC_int_clean)), 1),
             SA_int_mad = round(mad(10 * log10(NASC_int_clean)), 1),
@@ -262,13 +271,20 @@ SA_all_area <- SA_grid_laea %>%
             CM_median = round(median(CM)),
             CM_mad = round(mad(CM))) %>%
   ungroup() %>%
+  summarise(n = sum(n), # Mean across all areas and years
+            SA_int_median = round(mean(SA_int_median), 1),
+            SA_int_mad = round(mean(SA_int_mad), 1),
+            NASC_median = round(mean(NASC_median), 1),
+            NASC_mad = round(mean(NASC_mad), 1),
+            CM_median = round(mean(CM_median)),
+            CM_mad = round(mean(CM_mad))) %>%
   mutate(IHO_area = "All areas")
 
 # Calculate median SA within each area
 SA_grid_laea %>%
   filter(empty_clean == F) %>%
   mutate(IHO_area == as.character(IHO_area)) %>%
-  group_by(IHO_area) %>%
+  group_by(IHO_area, year) %>%  # median per year
   summarise(n = n(),
             SA_int_median = round(median(10 * log10(NASC_int_clean)), 1),
             SA_int_mad = round(mad(10 * log10(NASC_int_clean)), 1),
@@ -277,6 +293,15 @@ SA_grid_laea %>%
             CM_median = round(median(CM)),
             CM_mad = round(mad(CM))) %>%
   ungroup() %>%
+  group_by(IHO_area) %>% # Mean per area
+  summarise(n = sum(n), # Mean across all areas and years
+            SA_int_median = round(mean(SA_int_median), 1),
+            SA_int_mad = round(mean(SA_int_mad), 1),
+            NASC_median = round(mean(NASC_median), 1),
+            NASC_mad = round(mean(NASC_mad), 1),
+            CM_median = round(mean(CM_median)),
+            CM_mad = round(mean(CM_mad))) %>%
+  ungroup() %>% 
   bind_rows(., SA_all_area) %>%
   left_join(., DSL_area, by = "IHO_area") %>%
   mutate(IHO_area = factor(case_when(IHO_area == "East Arctic Ocean" ~ "East Arctic\nOcean",
@@ -637,7 +662,8 @@ map_DSL <- SA_grid_laea %>%  # Map of DSL detections
 
 col_pal <- c("#1170aa", "#fc7d0b", "#76B7B2") # Custom colour palette
 
-p_boxplot_SA <- SA_grid_laea %>% # Boxplot of SA per region
+# p_boxplot_SA <- 
+  SA_grid_laea %>% # Boxplot of SA per region
   mutate(IHO_area = factor(case_when(IHO_area == "East Arctic Ocean" ~ "East Arctic\nOcean",
                                      IHO_area == "West Arctic Ocean" ~ "West Arctic\nOcean",
                                      IHO_area == "Beaufort Sea" ~ "Beaufort Sea",
@@ -661,6 +687,42 @@ ggsave("plots/Fig3_map_boxplot_SA.png", p_map_SA_DSL, height = 5, width = 6, dpi
 p_map_SA_DSL
 ```
 
+```{r}
+test <- SA_grid_laea %>% # Boxplot of SA per region
+  mutate(IHO_area = factor(case_when(IHO_area == "East Arctic Ocean" ~ "East Arctic\nOcean",
+                                     IHO_area == "West Arctic Ocean" ~ "West Arctic\nOcean",
+                                     IHO_area == "Beaufort Sea" ~ "Beaufort Sea",
+                                     IHO_area == "The Northwestern Passages" ~ "Can. Arctic\nArchipelago",
+                                     IHO_area == "Baffin Bay" ~ "Baffin Bay",
+                                     IHO_area == "Davis Strait" ~ "Davis Strait"),
+                           levels = c("West Arctic\nOcean", "Beaufort Sea", "Can. Arctic\nArchipelago",
+                                      "Baffin Bay", "Davis Strait", "East Arctic\nOcean"))) %>%
+  filter(empty_clean == F) %>%
+  group_by(IHO_area, year) %>%  # median per year
+  summarise(NASC_median = median(NASC_int_clean),
+            NASC_05 = quantile(NASC_int_clean, 0.05),
+            NASC_25 = quantile(NASC_int_clean, 0.25),
+            NASC_75 = quantile(NASC_int_clean, 0.75),
+            NASC_95 = quantile(NASC_int_clean, 0.95),
+            NASC_mad = mad(NASC_int_clean)) %>%
+  ungroup() %>%
+  group_by(IHO_area) %>% # Mean per area
+  summarise(NASC_median = mean(NASC_median),
+            NASC_05 = mean(NASC_05),
+            NASC_25 = mean(NASC_25),
+            NASC_75 = mean(NASC_75),
+            NASC_95 = mean(NASC_95),
+            NASC_mad = mean(NASC_mad)) %>%
+  ungroup() #%>% 
+  
+test %>%
+  ggplot(aes(x = IHO_area, y = NASC_median, col = IHO_area)) + 
+  geom_pointrange(aes(ymin = NASC_median - NASC_mad, ymax = NASC_median + NASC_mad))
+
+  geom_crossbar(aes(ymin = NASC_25, ymax = NASC_75)) +
+  geom_pointrange(aes(ymin = NASC_05, ymax = NASC_95))
+
+```
 
 ## Table 1. Abundance mesopelagic fish
 
