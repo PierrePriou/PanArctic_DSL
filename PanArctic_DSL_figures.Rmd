@@ -264,16 +264,12 @@ SA_all_area <- SA_grid_laea %>%
   filter(empty_clean == F) %>%
   group_by(year) %>% # per year
   summarise(n = n(),
-            SA_int_median = round(median(10 * log10(NASC_int_clean)), 1),
-            SA_int_mad = round(mad(10 * log10(NASC_int_clean)), 1),
-            NASC_median = round(median(NASC_int_clean), 1),
-            NASC_mad = round(mad(NASC_int_clean), 1),
-            CM_median = round(median(CM)),
-            CM_mad = round(mad(CM))) %>%
+            NASC_median = median(NASC_int_clean),
+            NASC_mad = mad(NASC_int_clean), 
+            CM_median = median(CM),
+            CM_mad = mad(CM)) %>%
   ungroup() %>%
   summarise(n = sum(n), # Mean across all areas and years
-            SA_int_median = round(mean(SA_int_median), 1),
-            SA_int_mad = round(mean(SA_int_mad), 1),
             NASC_median = round(mean(NASC_median), 1),
             NASC_mad = round(mean(NASC_mad), 1),
             CM_median = round(mean(CM_median)),
@@ -286,8 +282,6 @@ SA_grid_laea %>%
   mutate(IHO_area == as.character(IHO_area)) %>%
   group_by(IHO_area, year) %>%  # median per year
   summarise(n = n(),
-            SA_int_median = round(median(10 * log10(NASC_int_clean)), 1),
-            SA_int_mad = round(mad(10 * log10(NASC_int_clean)), 1),
             NASC_median = round(median(NASC_int_clean), 1),
             NASC_mad = round(mad(NASC_int_clean), 1),
             CM_median = round(median(CM)),
@@ -295,8 +289,6 @@ SA_grid_laea %>%
   ungroup() %>%
   group_by(IHO_area) %>% # Mean per area
   summarise(n = sum(n), # Mean across all areas and years
-            SA_int_median = round(mean(SA_int_median), 1),
-            SA_int_mad = round(mean(SA_int_mad), 1),
             NASC_median = round(mean(NASC_median), 1),
             NASC_mad = round(mean(NASC_mad), 1),
             CM_median = round(mean(CM_median)),
@@ -550,8 +542,8 @@ p_Sv_prof_lines <- Sv_prof_median %>%
   # geom_rect(aes(xmin = 0, xmax = 200, ymin = -Inf, ymax = Inf), col = NA, fill = "grey87", alpha = 0.05) + # Mesopelagic zone
   scale_x_reverse("Depth (m)", breaks = seq(0, 1000, 200)) + 
   scale_y_continuous(expression("S"[V]*" (dB re 1 m"^-1*")"), breaks = seq(-200, 0, 10)) +
-  scale_colour_manual(values = met.brewer("Hiroshige", n = 6, direction = -1)) +
-  scale_fill_manual(values = met.brewer("Hiroshige", n = 6, direction = -1)) +
+  scale_colour_manual(values = met.brewer("Johnson", n = 6, direction = -1)) +
+  scale_fill_manual(values = met.brewer("Johnson", n = 6, direction = -1)) +
   coord_flip(ylim = c(-105, -65), xlim = c(1000, 0), expand = F) +
   facet_grid(~ IHO_area) +
   theme(panel.border = element_blank(),
@@ -662,8 +654,7 @@ map_DSL <- SA_grid_laea %>%  # Map of DSL detections
 
 col_pal <- c("#1170aa", "#fc7d0b", "#76B7B2") # Custom colour palette
 
-# p_boxplot_SA <- 
-  SA_grid_laea %>% # Boxplot of SA per region
+p_boxplot_SA <- SA_grid_laea %>% # Boxplot of SA per region
   mutate(IHO_area = factor(case_when(IHO_area == "East Arctic Ocean" ~ "East Arctic\nOcean",
                                      IHO_area == "West Arctic Ocean" ~ "West Arctic\nOcean",
                                      IHO_area == "Beaufort Sea" ~ "Beaufort Sea",
@@ -687,8 +678,27 @@ ggsave("plots/Fig3_map_boxplot_SA.png", p_map_SA_DSL, height = 5, width = 6, dpi
 p_map_SA_DSL
 ```
 
-```{r}
-test <- SA_grid_laea %>% # Boxplot of SA per region
+```{r fig3-map-points}
+map_DSL <- SA_grid_laea %>%  # Map of DSL detections
+  mutate(DSL = factor(if_else(empty_clean == T, F, T), levels = c(T, F))) %>%
+  arrange(DSL) %>%
+  ggplot(aes(x = xc,  y = yc)) +
+  geom_raster(data = bathy_laea, aes(x = xc, y = yc, fill = depth_d)) + # bathy
+  scale_fill_cmocean("Depth (m)", name = "deep", discrete = T, na.value = NA, alpha = 0.4) +
+  geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), fill = "grey80") + # Coast
+  geom_point(aes(col = DSL), size = 0.6) +
+  scale_color_manual("DSL presence", values = c("#1170aa", "#fc7d0b")) +
+  facet_wrap(~ year) +
+  coord_fixed(xlim = c(-2450, 600), ylim = c(-1500, 1800), expand = F) +
+  # coord_fixed(xlim = c(-2600, 1100), ylim = c(-1600, 1900), expand = F) +
+  guides(fill = "none",
+         colour = guide_legend(override.aes = list(size = 2))) + # Increase symbol size in legend
+  theme(legend.position = "top",
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        axis.title = element_blank())
+
+pointrange_NASC <- SA_grid_laea %>% # Pointrange of SA per region
   mutate(IHO_area = factor(case_when(IHO_area == "East Arctic Ocean" ~ "East Arctic\nOcean",
                                      IHO_area == "West Arctic Ocean" ~ "West Arctic\nOcean",
                                      IHO_area == "Beaufort Sea" ~ "Beaufort Sea",
@@ -700,28 +710,26 @@ test <- SA_grid_laea %>% # Boxplot of SA per region
   filter(empty_clean == F) %>%
   group_by(IHO_area, year) %>%  # median per year
   summarise(NASC_median = median(NASC_int_clean),
-            NASC_05 = quantile(NASC_int_clean, 0.05),
-            NASC_25 = quantile(NASC_int_clean, 0.25),
-            NASC_75 = quantile(NASC_int_clean, 0.75),
-            NASC_95 = quantile(NASC_int_clean, 0.95),
             NASC_mad = mad(NASC_int_clean)) %>%
-  ungroup() %>%
+  ungroup() %>% 
   group_by(IHO_area) %>% # Mean per area
   summarise(NASC_median = mean(NASC_median),
-            NASC_05 = mean(NASC_05),
-            NASC_25 = mean(NASC_25),
-            NASC_75 = mean(NASC_75),
-            NASC_95 = mean(NASC_95),
             NASC_mad = mean(NASC_mad)) %>%
-  ungroup() #%>% 
-  
-test %>%
+  ungroup() %>% 
   ggplot(aes(x = IHO_area, y = NASC_median, col = IHO_area)) + 
-  geom_pointrange(aes(ymin = NASC_median - NASC_mad, ymax = NASC_median + NASC_mad))
+  geom_pointrange(aes(ymin = NASC_median - NASC_mad, ymax = NASC_median + NASC_mad)) +
+  scale_colour_manual(values = met.brewer("Johnson", n = 6, direction = -1)) +
+  scale_y_continuous(expression("Median s"[A]*" (m"^2*" nmi"^-2*")")) +
+  theme(panel.border = element_blank(),
+        axis.title.x = element_blank(),
+        axis.line = element_line(),
+        legend.title = element_blank(), 
+        legend.position = "none",
+        plot.margin = unit(c(0.1, 0.1, 0, 0), "in"))
 
-  geom_crossbar(aes(ymin = NASC_25, ymax = NASC_75)) +
-  geom_pointrange(aes(ymin = NASC_05, ymax = NASC_95))
-
+p_map_pointrange_NASC <- plot_grid(map_DSL, pointrange_NASC, ncol = 1, align = "v", axis = "lr") 
+ggsave("plots/Fig3_map_pointrange_NASC.png", p_map_pointrange_NASC, height = 5, width = 6, dpi = 600, units = "in")
+p_map_pointrange_NASC
 ```
 
 ## Table 1. Abundance mesopelagic fish
