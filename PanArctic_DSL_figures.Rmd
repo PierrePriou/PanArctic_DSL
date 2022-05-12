@@ -261,11 +261,11 @@ DSL_area <- SA_grid_laea %>%
 
 # Calculate median SA across all areas
 SA_all_area <- SA_grid_laea %>%
-  filter(empty_clean == F) %>%
+  # filter(empty_clean == F) %>%
   group_by(year) %>% # per year
   summarise(n = n(),
-            NASC_median = median(NASC_int_clean),
-            NASC_mad = mad(NASC_int_clean), 
+            NASC_median = median(NASC_int),
+            NASC_mad = mad(NASC_int), 
             CM_median = median(CM),
             CM_mad = mad(CM)) %>%
   ungroup() %>%
@@ -278,12 +278,12 @@ SA_all_area <- SA_grid_laea %>%
 
 # Calculate median SA within each area
 SA_grid_laea %>%
-  filter(empty_clean == F) %>%
+  # filter(empty_clean == F) %>%
   mutate(IHO_area == as.character(IHO_area)) %>%
   group_by(IHO_area, year) %>%  # median per year
   summarise(n = n(),
-            NASC_median = round(median(NASC_int_clean), 1),
-            NASC_mad = round(mad(NASC_int_clean), 1),
+            NASC_median = round(median(NASC_int), 1),
+            NASC_mad = round(mad(NASC_int), 1),
             CM_median = round(median(CM)),
             CM_mad = round(mad(CM))) %>%
   ungroup() %>%
@@ -305,7 +305,7 @@ SA_grid_laea %>%
                                      IHO_area == "All areas" ~ "All areas"),
                            levels = c("West Arctic\nOcean", "Beaufort Sea", "Can. Arctic\nArchipelago",
                                       "Baffin Bay", "Davis Strait", "East Arctic\nOcean", "All areas"))) %>%
-  dplyr::select(-CM_median, -CM_mad) %>%
+  # dplyr::select(-CM_median, -CM_mad) %>%
   datatable(rownames = F)
 ```
 
@@ -680,20 +680,22 @@ p_map_SA_DSL
 
 ```{r fig3-map-points}
 map_DSL <- SA_grid_laea %>%  # Map of DSL detections
-  mutate(DSL = factor(if_else(empty_clean == T, F, T), levels = c(T, F))) %>%
+  mutate(NASC_int_d = cut(NASC_int, c(0, 1, 10, 100, 1000, 10000, Inf))) %>%
+  mutate(DSL = factor(if_else(empty_clean == T, "Absent", "Present"), levels = c("Present", "Absent"))) %>%
   arrange(DSL) %>%
   ggplot(aes(x = xc,  y = yc)) +
   geom_raster(data = bathy_laea, aes(x = xc, y = yc, fill = depth_d)) + # bathy
   scale_fill_cmocean("Depth (m)", name = "deep", discrete = T, na.value = NA, alpha = 0.4) +
   geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), fill = "grey80") + # Coast
-  geom_point(aes(col = DSL), size = 0.6) +
-  scale_color_manual("DSL presence", values = c("#1170aa", "#fc7d0b")) +
+  geom_point(aes(col = NASC_int_d), size = 0.6) +
+  scale_color_viridis_d(option = "plasma", labels = c("< 1", "1-10", "11-100", "101-1000", "1001-10000", "> 10000")) +
   facet_wrap(~ year) +
   coord_fixed(xlim = c(-2450, 600), ylim = c(-1500, 1800), expand = F) +
   # coord_fixed(xlim = c(-2600, 1100), ylim = c(-1600, 1900), expand = F) +
   guides(fill = "none",
-         colour = guide_legend(override.aes = list(size = 2))) + # Increase symbol size in legend
+         colour = guide_legend(override.aes = list(size = 2), nrow = 1)) + # Increase symbol size in legend
   theme(legend.position = "top",
+        legend.title = element_blank(),
         axis.text = element_blank(),
         axis.ticks = element_blank(),
         axis.title = element_blank())
