@@ -275,6 +275,17 @@ Sv_grid_laea <- Sv_grid_laea %>% # Tidy data
                 Sv_median, Sv_median_clean, empty, cell_res)
 ```
 
+There is an outlier in Baffin Bay at 995 m depth due to seafloor not being removed properly. I therefore clean the data myself.
+
+```{r outlier-correction-BB}
+Sv_grid_laea <- Sv_grid_laea %>%
+  mutate(sv_lin_median = if_else(year == 2015 & area == "BB" & xc == -1775 & yc == -725 & depth == 995, 1.258925e-100, sv_lin_median),
+         sv_lin_median_clean = if_else(year == 2015 & area == "BB" & xc == -1775 & yc == -725 & depth == 995, 1.258925e-100, sv_lin_median_clean),
+         Sv_median = if_else(year == 2015 & area == "BB" & xc == -1775 & yc == -725 & depth == 995, -999, Sv_median),
+         Sv_median_clean = if_else(year == 2015 & area == "BB" & xc == -1775 & yc == -725 & depth == 995, -999, Sv_median_clean))
+```
+
+
 # Save data 
 
 ```{r save-data}
