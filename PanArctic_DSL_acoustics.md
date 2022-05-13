@@ -1,7 +1,7 @@
 ---
 title: "PanArctic DSL - Acoustic gridding"
 author: "[Pierre Priou](mailto:pierre.priou@mi.mun.ca)"
-date: "2022/05/09 at 11:24"
+date: "2022/05/13 at 18:18"
 output: 
   html_document:
     keep_md: yes
@@ -55,6 +55,13 @@ cell_res <- 50 # Cell resolution in km
 res(arctic_laea) <- c(cell_res, cell_res) # Define the 100 km cell resolution
 
 # IHO areas
+IHO_sf_latlon <- dir_ls("data/arctic_regions/", glob = "*.shp") %>% 
+  tibble(fname = .) %>%
+  mutate(data = map(fname, read_sf)) %>%
+  unnest(data) %>%
+  st_as_sf() %>%
+  st_transform(crs = crs(arctic_latlon)) %>%
+  st_make_valid()
 IHO_sf_laea <- dir_ls("data/arctic_regions/", glob = "*.shp") %>% 
   tibble(fname = .) %>%
   mutate(data = map(fname, read_sf)) %>%
@@ -203,14 +210,12 @@ SA_grid_laea <- SA_grid_laea %>% # Calculate normalized backscatter anomalies
   mutate(cell_res = cell_res, # Add cell resolution to dataframe
          SA_int = 10 * log10(NASC_int),
          SA_int_clean = 10 * log10(NASC_int_clean)) %>% # Calculate integrated backscatter strength
-  st_as_sf(coords = c("xc", "yc"), crs = st_crs(arctic_laea), remove = F) %>%
-  st_join(., IHO_sf_laea, join = st_within) %>% # Append IHO region
+  st_as_sf(coords = c("lon", "lat"), crs = st_crs(arctic_latlon), remove = F) %>%
+  st_join(., IHO_sf_latlon, join = st_within) %>% # Append IHO region
   st_drop_geometry() %>%
-  mutate(name = if_else(is.na(name) == T & yc < 0, "Baffin Bay",
-                if_else(is.na(name) == T & yc > 0 & lat > 70, "The Northwestern Passages",
-                if_else(name == "The Northwestern Passages" & yc < 0, "Baffin Bay",
+  mutate(name = if_else(name == "The Northwestern Passages" & yc < 0, "Baffin Bay",
                 if_else(name == "Arctic Ocean" & name_3 == "West Arctic Ocean", "West Arctic Ocean",
-                if_else(name == "Arctic Ocean" & name_3 == "East Arctic Ocean", "East Arctic Ocean", name))))),
+                if_else(name == "Arctic Ocean" & name_3 == "East Arctic Ocean", "East Arctic Ocean", name))),
          empty = factor(if_else(SA_int < 0, T, F)),
          empty_clean = factor(if_else(SA_int_clean < 0, T, F))) %>%
     rename(IHO_area = name, area = area.x) %>%
@@ -236,6 +241,24 @@ SA_grid_laea %>%
 ```
 
 ![](PanArctic_DSL_acoustics_files/figure-html/plot-areas-1.png)<!-- -->
+
+Instead of rasterizing data and having the mean value of each grid cell of the raster I also create a dataframe with the "raw" data re-projected. 
+
+
+```r
+SA_raw_laea <- SA_integrated %>% 
+  st_as_sf(coords = c("lon", "lat"), crs = st_crs("EPSG:4326"), remove = F) %>% # Transform into sf
+  st_join(., IHO_sf_latlon, join = st_within) %>% # Append IHO region
+  st_transform(crs = st_crs(arctic_laea)) %>% # Change projection
+  mutate(xc = st_coordinates(.)[,1],
+         yc = st_coordinates(.)[,2]) %>%
+  st_drop_geometry() %>%
+  mutate(name = if_else(name == "The Northwestern Passages" & yc < 0, "Baffin Bay",
+                if_else(name == "Arctic Ocean" & name_3 == "West Arctic Ocean", "West Arctic Ocean",
+                if_else(name == "Arctic Ocean" & name_3 == "East Arctic Ocean", "East Arctic Ocean", name)))) %>%
+  rename(IHO_area = name, area = area.x) %>%
+  dplyr::select(year, xc, yc, lon, lat, day_night, IHO_area, area, NASC_int, SA_int, CM)
+```
 
 ## 3D S~V~ profiles - EPSG:6931 - EASE-Grid 2.0 North (Lambert's equal-area, azimuthal)
 
@@ -289,10 +312,22 @@ Sv_grid_laea <- Sv_grid_laea %>% # Tidy data
                 Sv_median, Sv_median_clean, empty, cell_res)
 ```
 
+There is an outlier in Baffin Bay at 995 m depth due to seafloor not being removed properly. I therefore clean the data myself.
+
+
+```r
+Sv_grid_laea <- Sv_grid_laea %>%
+  mutate(sv_lin_median = if_else(year == 2015 & area == "BB" & xc == -1775 & yc == -725 & depth == 995, 1.258925e-100, sv_lin_median),
+         sv_lin_median_clean = if_else(year == 2015 & area == "BB" & xc == -1775 & yc == -725 & depth == 995, 1.258925e-100, sv_lin_median_clean),
+         Sv_median = if_else(year == 2015 & area == "BB" & xc == -1775 & yc == -725 & depth == 995, -999, Sv_median),
+         Sv_median_clean = if_else(year == 2015 & area == "BB" & xc == -1775 & yc == -725 & depth == 995, -999, Sv_median_clean))
+```
+
+
 # Save data 
 
 
 ```r
-save(SA_grid_laea, file = "data/acoustics/SA_grids.RData") # Save data
+save(SA_grid_laea, SA_raw_laea, file = "data/acoustics/SA_grids.RData") # Save data
 save(Sv_grid_laea, file = "data/acoustics/Sv_grids.RData") # Save data
 ```

@@ -79,12 +79,12 @@ I combine data using the EASE-Grid 2.0 North (EPSG:6931) and normalize the covar
 
 ```{r combine-data}
 SA_laea <- SA_grid_laea %>%  # Tidy anomaly dataset for joining
-  dplyr::select(-lat, -lon) %>% 
-   filter(empty_clean == F) # Select cells with DSL
+  dplyr::select(-lat, -lon) #%>% 
+   # filter(empty_clean == F) # Select cells with DSL
 phy_laea <- phy_grid_laea %>% # Tidy remote sensing dataset for joining
-  dplyr::select(year, area, xc, yc, cell_res, depth, thetao, velocity)
+  dplyr::select(year, area, xc, yc, cell_res, depth, thetao, velocity, so)
 seaice_laea <- seaice_grid_laea %>%
-  dplyr::select(year, area, xc, yc, cell_res, openwater_duration, ice_week)
+  dplyr::select(year, area, xc, yc, cell_res, openwater_duration, mean_ice_conc)
 
 stat_laea <- left_join(SA_laea, phy_laea, by = c("year", "area", "xc", "yc", "cell_res")) %>% # Join acoustic and physics
   left_join(., seaice_laea, by = c("year", "area", "xc", "yc", "cell_res")) %>%
@@ -103,25 +103,25 @@ stat_laea <- left_join(SA_laea, phy_laea, by = c("year", "area", "xc", "yc", "ce
                                                                                 openwater_duration),
                                                                            na.rm = T),
                                       openwater_duration),
-         ice_week = if_else(is.na(ice_week) == T, mean(pull(subset(seaice_grid_laea,
-                                                                   xc >= xc_na - 50 &
-                                                                     xc <= xc_na + 50 & 
-                                                                     yc >= yc_na - 50 & 
-                                                                     yc <= yc_na + 50 & 
-                                                                     year == year_na,
-                                                                   select = ice_week),
-                                                            ice_week),
-                                                       na.rm = T),
-                            ice_week)) %>%
-  filter(depth == 222) %>% # Select data at 222 m depth and remove cells with no DSL
-  mutate(velocity = velocity * 100, # Convert to cm/s
+         mean_ice_conc = if_else(is.na(mean_ice_conc) == T, mean(pull(subset(seaice_grid_laea,
+                                                                                       xc >= xc_na - 50 &
+                                                                                         xc <= xc_na + 50 & 
+                                                                                         yc >= yc_na - 50 & 
+                                                                                         yc <= yc_na + 50 & 
+                                                                                         year == year_na,
+                                                                                       select = mean_ice_conc),
+                                                                                mean_ice_conc),
+                                                                           na.rm = T),
+                                      mean_ice_conc),
+         velocity = velocity * 100, # Convert to cm/s
          IHO_area = factor(case_when(IHO_area == "East Arctic Ocean" ~ "EAO",
                                      IHO_area == "West Arctic Ocean" ~ "WAO_BF",
                                      IHO_area == "Beaufort Sea" ~ "WAO_BF",
                                      IHO_area == "The Northwestern Passages" ~ "CAA",
                                      IHO_area == "Baffin Bay" ~ "BB",
                                      IHO_area == "Davis Strait" ~ "DS"),
-                            levels = c("WAO_BF", "CAA", "BB", "DS", "EAO"))) %>%
+                            levels = c("WAO_BF", "BF", "CAA", "BB", "DS", "EAO"))) %>%
+  filter(depth == 222) %>% # Select data at 222 m depth and remove cells with no DSL
   ungroup() %>%
   dplyr::select(-xc_na, -yc_na, -year_na)
 
@@ -195,7 +195,7 @@ stat_laea %>% # Ice concentration
 ```{r prep-diff}
 SA_diff <- SA_grid_laea %>%
   filter(empty_clean == F) %>%
-  dplyr::select(year, IHO_area, NASC_int_clean, SA_int_clean, NASC_int, CM) %>%
+  dplyr::select(year, IHO_area, NASC_int, SA_int, NASC_int, CM) %>%
   mutate(IHO_area = factor(case_when(IHO_area == "East Arctic Ocean" ~ "EAO",
                                      IHO_area == "West Arctic Ocean" ~ "WAO_BF",
                                      IHO_area == "Beaufort Sea" ~ "WAO_BF",
@@ -214,7 +214,7 @@ I check whether there are inter-annual and spatial variability in S~A~ and the c
 # Visualize data
 plot_grid(SA_diff %>% 
             ggplot() +
-            geom_boxplot(aes(x = year, y = NASC_int_clean)),
+            geom_boxplot(aes(x = year, y = NASC_int)),
           SA_diff %>% 
             ggplot() +
             geom_boxplot(aes(x = year, y = CM)))
@@ -223,27 +223,27 @@ plot_grid(SA_diff %>%
 ## Outliers
 SA_diff %>%
   group_by(year) %>%
-  identify_outliers(NASC_int_clean) 
+  identify_outliers(NASC_int) 
 SA_diff %>%
   group_by(year) %>%
   identify_outliers(CM) 
 SA_diff %>%
   group_by(IHO_area) %>%
-  identify_outliers(NASC_int_clean) 
+  identify_outliers(NASC_int) 
 SA_diff %>%
   group_by(IHO_area) %>%
   identify_outliers(CM) 
 
 ## Normality: Checked by looking at the anova residuals with QQ plot
-ggqqplot(SA_diff, "NASC_int_clean", facet.by = "year")
+ggqqplot(SA_diff, "NASC_int", facet.by = "year")
 ggqqplot(SA_diff, "CM", facet.by = "year")
-ggqqplot(SA_diff, "NASC_int_clean", facet.by = "IHO_area")
+ggqqplot(SA_diff, "NASC_int", facet.by = "IHO_area")
 ggqqplot(SA_diff, "CM", facet.by = "IHO_area")
 
 ## Homogeneity of variance
-plot(lm(NASC_int_clean ~ year, data = SA_diff), 1)
+plot(lm(NASC_int ~ year, data = SA_diff), 1)
 plot(lm(CM ~ year, data = SA_diff), 1)
-plot(lm(NASC_int_clean ~ IHO_area, data = SA_diff), 1)
+plot(lm(NASC_int ~ IHO_area, data = SA_diff), 1)
 plot(lm(CM ~ IHO_area, data = SA_diff), 1)
 ```
 
@@ -251,11 +251,11 @@ I used a non parametric Kruskal-Wallis test to test for interannual and spatial 
 
 ```{r all-kruskal-wallis}
 SA_diff %>% # Kruskal wallis interannual difference SA
-  kruskal_test(NASC_int_clean ~ year)
+  kruskal_test(NASC_int ~ year)
 SA_diff %>% # Kruskal wallis interannual difference CM
   kruskal_test(CM ~ year)
 SA_diff %>% # Kruskal wallis interannual difference SA
-  kruskal_test(NASC_int_clean ~ IHO_area)
+  kruskal_test(NASC_int ~ IHO_area)
 SA_diff %>% # Kruskal wallis interannual difference CM
   kruskal_test(CM ~ IHO_area)
 ```
@@ -269,61 +269,47 @@ I check whether there are inter-annual variability in S~A~ across years within a
 ```{r area-kruskal-wallis}
 SA_diff %>% # Kruskal wallis interannual difference SA within group
   group_by(IHO_area) %>%
-  kruskal_test(NASC_int_clean ~ year)
+  kruskal_test(NASC_int ~ year)
 ```
 
 There was no interannual differences in SA within each region (WAO_BF - H = 4.8395483, *p* = 0.0889; CAA - H = 6.9278752, *p* = 0.0313; BB - H = 0.0968, *p* = 0.0889; DS - H = 0.9470, *p* = 0.0889; EAO - H = 5.0263899, *p* = 0.0810). Therefore, there seems to be no need for a random effect for interannual variability within years.
 
-# HGAM - Gaussian SA
+# HGAM - Tweedie NASC 
 
 ## Data preparation
 
 ```{r GAM-prep}
 SA_df <- stat_laea %>%
-  dplyr::select(year, xc, yc, IHO_area, SA_int_clean, velocity, thetao, openwater_duration, ice_week) %>%
+  dplyr::select(year, xc, yc, IHO_area, NASC_int, SA_int, velocity, thetao, so, openwater_duration, mean_ice_conc) %>%
   group_by(IHO_area) %>%
   mutate(year = factor(year),
-         SA_int_n = (SA_int_clean - min(SA_int_clean)) / (max(SA_int_clean) - min(SA_int_clean)),
-         v_n = (velocity - min(velocity)) / (max(velocity) - min(velocity)),
-         t_n = (thetao - min(thetao)) / (max(thetao) - min(thetao)),
-         o_n = (openwater_duration - min(openwater_duration)) / (max(openwater_duration) - min(openwater_duration)),
-         s_n = (ice_week - min(ice_week)) / (max(ice_week) - min(ice_week))) %>%
+         NASC_int_n = (NASC_int - min(NASC_int)) / (max(NASC_int) - min(NASC_int)),
+         SA_int_n = (SA_int - min(SA_int)) / (max(SA_int) - min(SA_int))) %>%
   ungroup() %>%
   rename(IHO = IHO_area, 
          v = velocity,
          t = thetao,
          o = openwater_duration,
-         s = ice_week)
+         si = mean_ice_conc,
+         s = so)
 ```
 
 Plot data.
 
-```{r plot-data-area, fig.height=6, fig.width=8, message=FALSE}
-plot_grid(SA_df %>%
-            ggplot(aes(x = v, y = SA_int_clean, col = IHO)) +
-            geom_point() +
-            geom_smooth(method = "lm", se = F, col = "grey20") +
-            facet_grid(~ IHO) +
-            theme(legend.position = "none"),
-          SA_df %>%
-            ggplot(aes(x = t, y = SA_int_clean, col = IHO)) +
-            geom_point() +
-            geom_smooth(method = "lm", se = F, col = "grey20") +
-            facet_grid(~ IHO) +
-            theme(legend.position = "none"),
-          SA_df %>%
-            ggplot(aes(x = o, y = SA_int_clean, col = IHO)) +
-            geom_point() +
-            geom_smooth(method = "lm", se = F, col = "grey20") +
-            facet_grid(~ IHO) +
-            theme(legend.position = "none"),
-          SA_df %>%
-            ggplot(aes(x = s, y = SA_int_clean, col = IHO)) +
-            geom_point() +
-            geom_smooth(method = "lm", se = F, col = "grey20") +
-            facet_grid(~ IHO) +
-            theme(legend.position = "none"),
-          ncol = 1)
+```{r plot-data-area}
+SA_df %>%
+  ggplot(aes(x = v, y = SA_int, col = IHO)) +
+  geom_point() +
+  geom_smooth(method = "gam", se = F, col = "grey20") +
+  facet_wrap(~ IHO) +
+  theme(legend.position = "none")
+
+SA_df %>%
+  ggplot(aes(x = o, y = SA_int, col = IHO)) +
+  geom_point() +
+  geom_smooth(method = "gam", se = F, col = "grey20") +
+  facet_wrap(~ IHO) +
+  theme(legend.position = "none")
 ```
 
 ```{r plot-distribution, fig.height=8, fig.width=10, message=FALSE}
@@ -353,81 +339,49 @@ plot_grid(SA_df %>%
 Check correlations.
 
 ```{r corr-area}
-corr_EAO <- SA_df %>% # Compute Spearman correlation matrix
-  filter(IHO == "EAO") %>%
-  dplyr::select(-year, -xc, -yc, -IHO, -SA_int_n, -v_n, -t_n, -o_n, -s_n) %>%
+corr <- SA_df %>% # Compute Spearman correlation matrix
+  dplyr::select(-year, -xc, -yc, -IHO, -NASC_int_n, -SA_int_n) %>%
   cor(., method = "spearman") %>%
   round(., 2)
-ggcorrplot(corr_EAO, type = "lower", lab = T, title = "corr EAO")
-
-corr_BB <- SA_df %>% # Compute Spearman correlation matrix
-  filter(IHO == "BB") %>%
-  dplyr::select(-year, -xc, -yc, -IHO, -SA_int_n, -v_n, -t_n, -o_n, -s_n) %>%
-  cor(., method = "spearman") %>%
-  round(., 2)
-ggcorrplot(corr_BB, type = "lower", lab = T, title = "corr BB")
-
-corr_DS <- SA_df %>% # Compute Spearman correlation matrix
-  filter(IHO == "DS") %>%
-  dplyr::select(-year, -xc, -yc, -IHO, -SA_int_n, -v_n, -t_n, -o_n, -s_n) %>%
-  cor(., method = "spearman") %>%
-  round(., 2)
-ggcorrplot(corr_DS, type = "lower", lab = T, title = "corr BB")
-
-corr_WAO_BF <- SA_df %>% # Compute Spearman correlation matrix
-  filter(IHO == "WAO_BF") %>%
-  dplyr::select(-year, -xc, -yc, -IHO, -SA_int_n, -v_n, -t_n, -o_n, -s_n) %>%
-  cor(., method = "spearman") %>%
-  round(., 2)
-ggcorrplot(corr_WAO_BF, type = "lower", lab = T, title = "corr WAO BF")
-
-corr_CAA <- SA_df %>% # Compute Spearman correlation matrix
-  filter(IHO == "CAA") %>%
-  dplyr::select(-year, -xc, -yc, -IHO, -SA_int_n, -v_n, -t_n, -o_n, -s_n) %>%
-  cor(., method = "spearman") %>%
-  round(., 2)
-ggcorrplot(corr_CAA, type = "lower", lab = T, title = "corr CAA")
+ggcorrplot(corr, type = "lower", lab = T, title = "corr")
 ```
+
+# Velocity
+
+I decided to fit hierarchical generalized additive model due to their flexibility in modelling non linear relationships. I am interested in the effect of velocity and primary production on mesopelagic density. I fit separate GAMs for each covariate. I follow the model structure from Pedersen et al. 2019. 
 
 ## Model fitting
 
-I decided to fit hierarchical generalized additive model due to their flexibility in modelling non linear relationships. I fit several models with different structures (random intercept, random "slope") following Pedersen et al. 2019.
-
-```{r HGAM-fit}
+```{r velo-HGAM-fit}
 # Model G
-GAM1 <- gam(SA_int_n ~ s(v, k = 5, bs = "tp") + s(t, k = 5, bs = "tp") + s(o, k = 5, bs = "tp"),
-            data = SA_df, family = "gaussian", method = "REML")
-# Model S
-GAM2 <- gam(SA_int_n ~ s(v, IHO, bs = "fs", k = 5) + s(t, IHO, bs = "fs", k = 5) + s(o, IHO, bs = "fs", k = 5), 
-            data = SA_df, family = "gaussian", method = "REML")
-# Model I
-GAM3 <- gam(SA_int_n ~ IHO + s(v, by = IHO, k = 5, bs = "tp") + s(t, by = IHO, k = 5, bs = "tp") + 
-              s(o, by = IHO, k = 5, bs = "tp"),
-            data = SA_df, family = "gaussian", method = "REML")
+velo_G <- gam(NASC_int ~ s(v, k = 5, bs = "tp") + # Global smoothers
+                 s(IHO, bs = "re") + # Random intercept
+                 s(IHO, year, bs = "re"), # Random effect 
+            data = SA_df, family = tw(link = "log"), method = "REML")
 # Model GS
-GAM4 <- gam(SA_int_n ~ IHO + s(v, k = 5, bs = "tp") + s(t, k = 5, bs = "tp") + s(o, k = 5, bs = "tp") +
-              s(v, IHO, bs = "fs", k = 5) + s(t, IHO, bs = "fs", k = 5) + s(o, IHO, bs = "fs", k = 5),
-            data = SA_df, family = "gaussian", method = "REML")
+velo_GS <- gam(NASC_int ~ s(v, k = 5, bs = "tp") + # Global smoothers
+                 s(v, IHO, bs = "fs", k = 5) + # Group-level smoothers (random intercept already included)
+                 s(IHO, year, bs = "re"), # Random effect 
+            data = SA_df, family = tw(link = "log"), method = "REML")
 # Model GI
-GAM5 <- gam(SA_int_n ~ IHO + s(v, k = 5, bs = "tp") + s(t, k = 5, bs = "tp") + s(o, k = 5, bs = "tp") +
-              s(v, by = IHO, k = 5, bs = "tp") + s(t, by = IHO, k = 5, bs = "tp") + s(o, by = IHO, k = 5, bs = "tp"),
-            data = SA_df, family = "gaussian", method = "REML")
+velo_GI <- gam(NASC_int ~ s(v, k = 5, bs = "tp") + # Global smoothers
+                 s(IHO, bs = "re") + # Random intercept
+                 s(v, by = IHO, k = 5, bs = "tp") + # Group-level smoother
+                 s(year, IHO, bs = "re"), # Random effect
+               data = SA_df, family = tw(link = "log"), method = "REML")
 
 # Summary metrics
-GAM_AIC <- AIC(GAM1, GAM2, GAM3, GAM4, GAM5) %>% 
+velo_AIC <- AIC(velo_G, velo_GS, velo_GI) %>% 
   rownames_to_column() %>%
   rename(model = rowname)
 # Metrics data frame
-summ_GAM <- data.frame(model = c("GAM1", "GAM2", "GAM3", "GAM4", "GAM5"),
-                       reml = round(c(GAM1$gcv.ubre, GAM2$gcv.ubre, GAM3$gcv.ubre, GAM4$gcv.ubre, GAM5$gcv.ubre), 2), 
-                       dev_expl = round(c((1 - (GAM1$deviance / GAM1$null.deviance)) * 100,
-                                          (1 - (GAM2$deviance / GAM2$null.deviance)) * 100,
-                                          (1 - (GAM3$deviance / GAM3$null.deviance)) * 100,
-                                          (1 - (GAM4$deviance / GAM4$null.deviance)) * 100,
-                                          (1 - (GAM5$deviance / GAM5$null.deviance)) * 100), 2),
-                       r2 = round(c(summary(GAM1)$r.sq, summary(GAM2)$r.sq, summary(GAM3)$r.sq, summary(GAM4)$r.sq, 
-                                    summary(GAM5)$r.sq), 2)) %>%
-  full_join(., GAM_AIC, by = "model") %>%
+data.frame(model = c("velo_G", "velo_GS", "velo_GI"),
+                       reml = round(c(velo_G$gcv.ubre, velo_GS$gcv.ubre, velo_GI$gcv.ubre), 2), 
+                       dev_expl = round(c((1 - (velo_G$deviance / velo_G$null.deviance)) * 100,
+                                          (1 - (velo_GS$deviance / velo_GS$null.deviance)) * 100,
+                                          (1 - (velo_GI$deviance / velo_GI$null.deviance)) * 100), 2),
+                       r2 = round(c(summary(velo_G)$r.sq, summary(velo_GS)$r.sq, summary(velo_GI)$r.sq), 2)) %>%
+  full_join(., velo_AIC, by = "model") %>%
   mutate(df = round(df, 3),
          AIC = round(AIC, 3),
          dAIC = round(AIC - min(AIC), 2),
@@ -435,63 +389,80 @@ summ_GAM <- data.frame(model = c("GAM1", "GAM2", "GAM3", "GAM4", "GAM5"),
   dplyr::select(model, df, dev_expl, r2, reml, AIC, dAIC, w_AIC) %>%
   arrange(dAIC) %>% 
   datatable(class = "cell-border stribe", rownames = F)
-summ_GAM
 ```
 
-I select `GAM4 model GS` because I expect to have a similar functional response within each region but that response can vary between region.
-
-```{r summary-GAM}
-summary(GAM4)
+```{r veloG-summary}
+summary(velo_G)
 ```
 
+```{r veloGS-summary}
+summary(velo_GS)
+```
+```{r veloGI-summary}
+summary(velo_GI)
+```
 ## Model checking
+
+### Basis size and residual distribution
 
 First I check the basis size k. `k-indexes` are > 1 or close to 1 so the basis size is large enough. The residual plot look good too.
 
-```{r basis-size-residuals}
-par(mfrow = c(2, 2))
-gam.check(GAM4, rep = 500)
-worm_plot(GAM4, method = "simulate", point_col = "steelblue", point_alpha = 0.4)
+```{r veloG-basis-size-residuals}
+appraise(velo_G)
+k.check(velo_G)
 ```
 
-Check residuals versus covariates.
+```{r veloGS-basis-size-residuals}
+appraise(velo_GS)
+k.check(velo_GS)
+```
 
-```{r residuals-covariates, message=FALSE}
-resid_GAM <- bind_cols(SA_df, residuals.gam(GAM4)) %>%
-  rename(resid = "...15")
-plot_grid(resid_GAM %>%
+```{r veloGI-basis-size-residuals}
+appraise(velo_GI)
+k.check(velo_GI)
+```
+
+
+### Resiudals against covariates
+
+```{r veloGS-residuals-covariates, message=FALSE}
+velo_GS_resid <- bind_cols(SA_df, residuals.gam(velo_GS)) %>%
+  rename(resid = "...14")
+plot_grid(velo_GS_resid %>%
             ggplot(aes(x = v, y = resid)) + 
             geom_hline(yintercept = 0, col = "red") +
             labs(x = "velocity") +
             geom_point(), 
-          resid_GAM %>%
-            ggplot(aes(x = t, y = resid)) + 
-            geom_hline(yintercept = 0, col = "red") +
-            labs(x = "temperature") +
-            geom_point(), 
-          resid_GAM %>%
-            ggplot(aes(x = o, y = resid)) + 
-            geom_hline(yintercept = 0, col = "red") +
-            labs(x = "open water") +
-            geom_point(), 
-          resid_GAM %>%
+           velo_GS_resid %>%
             ggplot(aes(x = IHO, y = resid)) + 
             geom_hline(yintercept = 0, col = "red") +
             labs(x = "area") +
             geom_boxplot(fill = NA), 
-          resid_GAM %>%
+          velo_GS_resid %>%
             ggplot(aes(x = year, y = resid)) + 
             geom_hline(yintercept = 0, col = "red") +
             labs(x = "year") +
             geom_boxplot(fill = NA))
 ```
 
-Check auto-correlation wihtin the model. All seems in order.
-
-```{r acf-pacf}
-par(mfrow = c(1, 2), mar = c(4, 4, 4, 0.5))
-acf(resid(GAM4), main = "ACF")
-pacf(resid(GAM4), main = "pACF")
+```{r veloGI-residuals-covariates, message=FALSE}
+velo_GI_resid <- bind_cols(SA_df, residuals.gam(velo_GI)) %>%
+  rename(resid = "...14")
+plot_grid(velo_GI_resid %>%
+            ggplot(aes(x = v, y = resid)) + 
+            geom_hline(yintercept = 0, col = "red") +
+            labs(x = "velocity") +
+            geom_point(), 
+           velo_GI_resid %>%
+            ggplot(aes(x = IHO, y = resid)) + 
+            geom_hline(yintercept = 0, col = "red") +
+            labs(x = "area") +
+            geom_boxplot(fill = NA), 
+          velo_GI_resid %>%
+            ggplot(aes(x = year, y = resid)) + 
+            geom_hline(yintercept = 0, col = "red") +
+            labs(x = "year") +
+            geom_boxplot(fill = NA))
 ```
 
 ## Model selection
@@ -499,10 +470,12 @@ pacf(resid(GAM4), main = "pACF")
 I turn on the double penalty (`select = TRUE`) and check the covariates that has been shrunk. 
 
 ```{r GAM-selection}
-GAM4_p <- gam(SA_int_n ~ IHO + s(v, k = 5, bs = "tp") + s(t, k = 5, bs = "tp") + s(o, k = 5, bs = "tp") +
-                s(v, IHO, bs = "fs", k = 5) + s(t, IHO, bs = "fs", k = 5) + s(o, IHO, bs = "fs", k = 5),
-              data = SA_df, family = "gaussian", method = "REML", select = TRUE)
-summary(GAM4_p)
+# Model GI
+GAMgi_p <- gam(SA_int_n ~ s(IHO, bs = "re") + #s(year, IHO, bs = "re") + # Random effects and intercepts
+               s(v, k = 5, bs = "tp", m = 2) + s(o, k = 5, bs = "tp", m = 2) + # Global smoothers
+               s(v, by = IHO, k = 5, bs = "tp", m = 1) + s(o, by = IHO, k = 5, bs = "tp", m = 1), # Group-level smoothers
+            data = SA_df, family = "gaussian", method = "REML", select = TRUE)
+summary(GAMgi_p)
 ```
 
 ## Model visualization
@@ -510,13 +483,43 @@ summary(GAM4_p)
 Quick partial effects plot with `gratia::draw`.
 
 ```{r draw-GAM}
-draw(GAM4, residuals = TRUE, scales = "fixed")
+draw(GAMgs, residuals = TRUE, scales = "free")
 ```
+
 I predict the data and then use that dataframe to plot it in a "clean" way with `ggplot`.
 
 ```{r predict-GAM}
 # Fitted GAMs
-pred_v <- fitted_values(GAM4, terms = c("s(v)", "s(v,IHO)")) %>% # Fit velocity
+pred_v <- fitted_values(GAMgi, terms = c("s(v)", "s(v):IHOWAO", "s(v):IHOBF", "s(v):IHOCAA", "s(v):IHOBB", "s(v):IHODS", "s(v):IHOEAO")) %>% # Fit velocity
+  rename(v_fit = fitted, 
+         v_se = se,
+         v_lower = lower,
+         v_upper = upper) 
+pred_o <- fitted_values(GAMgi, terms = c("s(o)", "s(o):IHOWAO", "s(o):IHOBF", "s(o):IHOCAA", "s(o):IHOBB", "s(o):IHODS", "s(o):IHOEAO")) %>% # Fit open water
+  rename(o_fit = fitted, 
+         o_se = se,
+         o_lower = lower,
+         o_upper = upper)
+pred_GAM <- left_join(SA_df, pred_v, by = c("IHO", "v", "o")) %>%
+  left_join(., pred_o, by = c("IHO", "v", "o")) 
+
+# Partial effects
+part_eff_GAM <- smooth_estimates(GAMgi) %>% # Evaluate smooths
+  add_confint()
+part_res_SA <- SA_df %>% # add partial residuals to data
+  add_partial_residuals(GAMgi)
+
+# Save predictions
+save(pred_GAM, GAMgi, file = "data/statistics/GAM_results.RData")
+
+rm(pred_v, pred_o)
+```
+
+
+
+```{r predict-GAM}
+# Fitted GAMs
+pred_v <- fitted_values(GAM4, terms = c("s(v)", "s(v,IHO)"), scale = "linear") %>% # Fit velocity
   rename(v_fit = fitted, 
          v_se = se,
          v_lower = lower,
@@ -531,9 +534,8 @@ pred_o <- fitted_values(GAM4, terms = c("s(o)", "s(o,IHO)")) %>% # Fit open wate
          o_se = se,
          o_lower = lower,
          o_upper = upper)
-pred_GAM <- left_join(SA_df, pred_v, by = c("IHO", "v", "t", "o")) %>%
-  left_join(., pred_t, by = c("IHO", "v", "t", "o")) %>%
-  left_join(., pred_o, by = c("IHO", "v", "t", "o")) 
+pred_GAM <- left_join(SA_df, pred_v, by = c("IHO", "year", "v", "o")) %>%
+  left_join(., pred_o, by = c("IHO", "year", "v", "o")) 
 
 # Partial effects
 part_eff_GAM <- smooth_estimates(GAM4) %>% # Evaluate smooths
@@ -550,48 +552,78 @@ rm(pred_v, pred_t, pred_o)
 Plot fitted GAM with `ggplot`.
 
 ```{r ggplot-GAM, warning=FALSE}
-col_pal <- c("#5BBCD6", "#00A08A", "#F2AD00", "#F98400", "#FF0000")# wesanderson::wes_palette("Darjeeling1", type = "discrete")
+# col_pal <- c("#5BBCD6", "#00A08A", "#F2AD00", "#F98400", "#FF0000")# wesanderson::wes_palette("Darjeeling1", type = "discrete")
 # col_pal <- c("#5BBCD6",  "#00A08A", "#F98400", "#FF0000")# wesanderson::wes_palette("Darjeeling1", type = "discrete") 
 
 GAM_plot <- plot_grid(get_legend(ggplot(data = pred_GAM, aes(x = v, y = v_fit, fill = IHO, col = IHO)) + 
                                    geom_point() +
-                                   scale_colour_manual(values = col_pal) + 
-                                   scale_fill_manual(values = col_pal) + 
+                                   # scale_colour_manual(values = col_pal) + 
+                                   # scale_fill_manual(values = col_pal) + 
                                    theme(legend.position = "top", legend.title = element_blank())),
           plot_grid(
             pred_GAM %>% # velocity
               ggplot(aes(x = v)) +
-              geom_ribbon(aes(ymin = v_lower, ymax = v_upper, fill = IHO), alpha = 0.1) +
-              geom_line(aes(y = v_fit, col = IHO), size = 1) +
+              # geom_ribbon(aes(ymin = v_lower, ymax = v_upper, fill = IHO), alpha = 0.1) +
+              geom_line(aes(y = 10*log10(v_fit), col = IHO), size = 1) +
               # scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, 0.5)) +
-              scale_colour_manual(values = col_pal) + 
-              scale_fill_manual(values = col_pal) + 
-              labs(x = expression("Velocity at 380 m (cm s"^-1*")"), 
-                   y = expression("S"[A]*"")) + 
-              theme(legend.position = "none"),
-            pred_GAM %>% # temperature
-              ggplot(aes(x = t)) +
-              geom_ribbon(aes(ymin = t_lower, ymax = t_upper, fill = IHO), alpha = 0.1) +
-              geom_line(aes(y = t_fit, col = IHO), size = 1) +
-              # scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, 0.5)) +
-              scale_colour_manual(values = col_pal) + 
-              scale_fill_manual(values = col_pal) + 
-              labs(x = "Temp. at 380 m (°C)", 
+              # scale_colour_manual(values = col_pal) +
+              # scale_fill_manual(values = col_pal) +
+              labs(x = expression("Velocity at 222 m (cm s"^-1*")"), 
                    y = expression("S"[A]*"")) + 
               theme(legend.position = "none"),
             pred_GAM %>% # open water
               ggplot(aes(x = o)) +
-              geom_ribbon(aes(ymin = o_lower, ymax = o_upper, fill = IHO), alpha = 0.1) +
-              geom_line(aes(y = o_fit, col = IHO), size = 1) +
+              # geom_ribbon(aes(ymin = o_lower, ymax = o_upper, fill = IHO), alpha = 0.1) +
+              geom_line(aes(y = 10*log10(o_fit), col = IHO), size = 1) +
               # scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, 0.5)) +
-              scale_colour_manual(values = col_pal) + 
-              scale_fill_manual(values = col_pal) + 
+              # scale_colour_manual(values = col_pal) + 
+              # scale_fill_manual(values = col_pal) + 
               labs(x = "Open water (days)", 
                    y = expression("S"[A]*"")) + 
               theme(legend.position = "none")), 
           nrow = 2, rel_heights = c(0.1, 1))
 GAM_plot
 ```
+
+```{r}
+pred_GAM %>% # velocity
+  ggplot(aes(x = v)) +
+  # geom_ribbon(aes(ymin = v_lower, ymax = v_upper, fill = IHO), alpha = 0.1) +
+  geom_point(aes(y = SA_int_n)) +
+  geom_line(aes(y = v_fit, col = IHO), size = 1) +
+  # scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, 0.5)) +
+  facet_wrap(~ IHO, scales = "fixed") + 
+  # scale_colour_manual(values = col_pal) + 
+  # scale_fill_manual(values = col_pal) + 
+  labs(x = expression("Velocity at 222 m (cm s"^-1*")"), 
+       y = expression("S"[A]*"")) + 
+  theme(legend.position = "none")
+pred_GAM %>% # velocity
+  ggplot(aes(x = t)) +
+  # geom_ribbon(aes(ymin = t_lower, ymax = t_upper, fill = IHO), alpha = 0.1) +
+  geom_point(aes(y = NASC_int)) + 
+  geom_line(aes(y = t_fit, col = IHO), size = 1) +
+  # scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, 0.5)) +
+  facet_wrap(~ IHO, scales = "free") + 
+  scale_colour_manual(values = col_pal) + 
+  scale_fill_manual(values = col_pal) + 
+  labs(x = "Temp at 222 m (dc)", 
+       y = expression("S"[A]*"")) + 
+  theme(legend.position = "none")
+pred_GAM %>% # velocity
+  ggplot(aes(x = o)) +
+  # geom_ribbon(aes(ymin =o_lower, ymax = o_upper, fill = IHO), alpha = 0.1) +
+  geom_point(aes(y = NASC_int)) + 
+  geom_line(aes(y = o_fit, col = IHO), size = 1) +
+  # scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, 0.5)) +
+  facet_wrap(~ IHO, scales = "free") + 
+  scale_colour_manual(values = col_pal) + 
+  scale_fill_manual(values = col_pal) + 
+  labs(x = "Open water length (days)", 
+       y = expression("S"[A]*"")) + 
+  theme(legend.position = "none")
+```
+
 
 Plot partial effects.
 
@@ -621,3 +653,4 @@ plot_grid(part_eff_GAM %>%
             geom_line(aes(x = o, y = est), lwd = 1.2) +
             labs(y = "Partial effect"))
 ```
+'
