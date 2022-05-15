@@ -1,7 +1,7 @@
 ---
 title: "PanArctic DSL - Acoustic gridding"
 author: "[Pierre Priou](mailto:pierre.priou@mi.mun.ca)"
-date: "2022/05/15 at 15:51"
+date: "2022/05/15 at 22:16"
 output: 
   html_document:
     keep_md: yes
@@ -79,9 +79,9 @@ bathy <- getNOAA.bathy(lon1 = -152, lon2 = 35, lat1 = 65, lat2 = 84, resolution 
 ## File already exists ; loading 'marmap_coord_-152;65;35;84_res_2.csv'
 ```
 
-# Integrated s~A~ and centre of mass
+# Integrated s\~A\~ and centre of mass
 
-Acoustic data were collected continuously at 38 kHz. We selected data when the ship were stationary (< 1 knot). To match acoustic records to CTD and remote sensing data, and to homogenize data spatio-temporally, I rasterized acoustic data per year. I used two different grids; the WGS84 projection (EPSG:4326) with grid cells of 2°lon x 1°lat, and the EASE-Grid 2.0 North (EPSG:6931)—which is the default grid for sea-ice data—with grid cells of 150 km x 150 km. For each cell I calculated the mean integrated nautical area scattering coefficient (s~A~; m^2^ nmi^-2^) and centre of mass over mesopelagic depths (200-1000 m). Then, I calculated the normalized backscatter anomaly for each grid cell per area—Beaufort Sea and Canadian Arctic Archipelago, Baffin Bay, and Svalbard—per year.
+Acoustic data were collected continuously at 38 kHz. We selected data when the ship were stationary (\< 1 knot). To match acoustic records to CTD and remote sensing data, and to homogenize data spatio-temporally, I rasterized acoustic data per year. I used two different grids; the WGS84 projection (EPSG:4326) with grid cells of 2°lon x 1°lat, and the EASE-Grid 2.0 North (EPSG:6931)—which is the default grid for sea-ice data—with grid cells of 150 km x 150 km. For each cell I calculated the mean integrated nautical area scattering coefficient (s\~A\~; m^2^ nmi^-2^) and centre of mass over mesopelagic depths (200-1000 m). Then, I calculated the normalized backscatter anomaly for each grid cell per area—Beaufort Sea and Canadian Arctic Archipelago, Baffin Bay, and Svalbard—per year.
 
 
 ```r
@@ -241,7 +241,7 @@ SA_grid_laea %>%
 
 ![](PanArctic_DSL_acoustics_files/figure-html/plot-areas-1.png)<!-- -->
 
-Instead of rasterizing data and having the mean value of each grid cell of the raster I also create a dataframe with the "raw" data re-projected. 
+Instead of rasterizing data and having the mean value of each grid cell of the raster I also create a dataframe with the "raw" data re-projected.
 
 
 ```r
@@ -259,7 +259,7 @@ SA_raw_laea <- SA_integrated %>%
   dplyr::select(year, xc, yc, lon, lat, day_night, IHO_area, area, NASC_int, SA_int, CM)
 ```
 
-## 3D S~V~ profiles - EPSG:6931 - EASE-Grid 2.0 North (Lambert's equal-area, azimuthal)
+## 3D S\~V\~ profiles - EPSG:6931 - EASE-Grid 2.0 North (Lambert's equal-area, azimuthal)
 
 More info on this projection can be found on the [NSIDC website](https://nsidc.org/data/ease/).I calculate the median Sv for each depth interval of each georeferenced grid cell.
 
@@ -322,8 +322,7 @@ Sv_grid_laea <- Sv_grid_laea %>%
          Sv_median_clean = if_else(year == 2015 & area == "BB" & xc == -1775 & yc == -725 & depth == 995, -999, Sv_median_clean))
 ```
 
-
-# Save data 
+# Save data
 
 
 ```r

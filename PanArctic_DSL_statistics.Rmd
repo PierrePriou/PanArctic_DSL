@@ -50,7 +50,7 @@ I want to test whether temperature and salinity at mesopelagic depth, sea-ice co
 
 ```{r data-loading, message=FALSE}
 # Map projections
-cell_res <- 50 # Cell resolution in km
+cell_res <- 25 # Cell resolution in km
 arctic_laea <- raster(extent(-2700, 2700, -2700, 2700), crs = "EPSG:6931") # Seaice projection
 projection(arctic_laea) <- gsub("units=m", "units=km", projection(arctic_laea)) # Convert proj unit from m to km
 res(arctic_laea) <- c(cell_res, cell_res) # Define the 100 km cell resolution
@@ -71,6 +71,7 @@ coast_10m_laea <- readOGR("data/bathy/ne_10m_land.shp", verbose = F) %>% # Coast
 load("data/acoustics/SA_grids.RData") # Acoustic data
 load("data/remote_sensing/physics_grids.RData") # Modelled physics data 
 load("data/remote_sensing/seaice_grids.RData") # Remote sensing sea ice data
+load("data/remote_sensing/chl_grid.RData") # Remote sensing sea ice data
 ```
 
 # Data preparation
@@ -79,17 +80,19 @@ I combine data using the EASE-Grid 2.0 North (EPSG:6931) and normalize the covar
 
 ```{r combine-data}
 SA_laea <- SA_grid_laea %>%  # Tidy anomaly dataset for joining
-  dplyr::select(-lat, -lon) #%>% 
-   # filter(empty_clean == F) # Select cells with DSL
-phy_laea <- phy_grid_laea %>% # Tidy remote sensing dataset for joining
+  dplyr::select(-lat, -lon) 
+phy_laea <- phy_grid_laea %>% # Tidy remote sensing datasets for joining
   dplyr::select(year, area, xc, yc, cell_res, depth, thetao, velocity, so)
 seaice_laea <- seaice_grid_laea %>%
   dplyr::select(year, area, xc, yc, cell_res, openwater_duration, mean_ice_conc)
+chl_laea <- chl_grid_laea %>%
+  dplyr::select(-lat, -lon)
 
 stat_laea <- left_join(SA_laea, phy_laea, by = c("year", "area", "xc", "yc", "cell_res")) %>% # Join acoustic and physics
-  left_join(., seaice_laea, by = c("year", "area", "xc", "yc", "cell_res")) %>%
+  left_join(., seaice_laea, by = c("year", "area", "xc", "yc", "cell_res")) #%>%
+  left_join(., chl_laea, by = c("year", "xc", "yc", "area")) %>%
   # For cells that have NaN, get the mean of the surrounding cells
-  rowwise() %>%
+  rowwise() #%>%
   mutate(xc_na = if_else(is.na(openwater_duration) == T, xc, NaN),
          yc_na = if_else(is.na(openwater_duration) == T, yc, NaN),
          year_na = if_else(is.na(openwater_duration) == T, year, NaN), 
@@ -128,7 +131,7 @@ stat_laea <- left_join(SA_laea, phy_laea, by = c("year", "area", "xc", "yc", "ce
 stat_laea %>% group_by(IHO_area) %>% summarise(n = n())
 ```
 
-# Data exploration 
+# Data exploration
 
 Maps of all variables.
 
@@ -208,7 +211,7 @@ SA_diff <- SA_grid_laea %>%
 
 ## All areas
 
-I check whether there are inter-annual and spatial variability in S~A~ and the centre of mass across years and areas.
+I check whether there are inter-annual and spatial variability in S\~A\~ and the centre of mass across years and areas.
 
 ```{r all-interannual-spatial-prep}
 # Visualize data
@@ -260,11 +263,11 @@ SA_diff %>% # Kruskal wallis interannual difference CM
   kruskal_test(CM ~ IHO_area)
 ```
 
-The center of mass did not vary significantly between years (H = 1.652899, p = 0.438) but varied significantly among areas (*H* = 57.8495, *p* < 0.001). Mesopelagic backscatter S~A~ varied significantly between areas (*H* = 26.19394, *p* < 0.001) but not years (*H* = 8.6464, *p* = 0.013). Thus, in the S~A~ HGAM a random effect for change in S~A~ per area is likely needed.
+The center of mass did not vary significantly between years (H = 1.652899, p = 0.438) but varied significantly among areas (*H* = 57.8495, *p* \< 0.001). Mesopelagic backscatter S\~A\~ varied significantly between areas (*H* = 26.19394, *p* \< 0.001) but not years (*H* = 8.6464, *p* = 0.013). Thus, in the S\~A\~ HGAM a random effect for change in S\~A\~ per area is likely needed.
 
 ## Within areas
 
-I check whether there are inter-annual variability in S~A~ across years within areas. This will be used to decide whether a random effect is needed in the GAM. I used a non parametric Kruskal-Wallis test to test for interannual variability within areas.
+I check whether there are inter-annual variability in S\~A\~ across years within areas. This will be used to decide whether a random effect is needed in the GAM. I used a non parametric Kruskal-Wallis test to test for interannual variability within areas.
 
 ```{r area-kruskal-wallis}
 SA_diff %>% # Kruskal wallis interannual difference SA within group
@@ -274,7 +277,7 @@ SA_diff %>% # Kruskal wallis interannual difference SA within group
 
 There was no interannual differences in SA within each region (WAO_BF - H = 4.8395483, *p* = 0.0889; CAA - H = 6.9278752, *p* = 0.0313; BB - H = 0.0968, *p* = 0.0889; DS - H = 0.9470, *p* = 0.0889; EAO - H = 5.0263899, *p* = 0.0810). Therefore, there seems to be no need for a random effect for interannual variability within years.
 
-# HGAM - Tweedie NASC 
+# HGAM - Tweedie NASC
 
 ## Data preparation
 
@@ -348,7 +351,7 @@ ggcorrplot(corr, type = "lower", lab = T, title = "corr")
 
 # Velocity
 
-I decided to fit hierarchical generalized additive model due to their flexibility in modelling non linear relationships. I am interested in the effect of velocity and primary production on mesopelagic density. I fit separate GAMs for each covariate. I follow the model structure from Pedersen et al. 2019. 
+I decided to fit hierarchical generalized additive model due to their flexibility in modelling non linear relationships. I am interested in the effect of velocity and primary production on mesopelagic density. I fit separate GAMs for each covariate. I follow the model structure from Pedersen et al. 2019.
 
 ## Model fitting
 
@@ -398,14 +401,16 @@ summary(velo_G)
 ```{r veloGS-summary}
 summary(velo_GS)
 ```
+
 ```{r veloGI-summary}
 summary(velo_GI)
 ```
+
 ## Model checking
 
 ### Basis size and residual distribution
 
-First I check the basis size k. `k-indexes` are > 1 or close to 1 so the basis size is large enough. The residual plot look good too.
+First I check the basis size k. `k-indexes` are \> 1 or close to 1 so the basis size is large enough. The residual plot look good too.
 
 ```{r veloG-basis-size-residuals}
 appraise(velo_G)
@@ -421,7 +426,6 @@ k.check(velo_GS)
 appraise(velo_GI)
 k.check(velo_GI)
 ```
-
 
 ### Resiudals against covariates
 
@@ -467,7 +471,7 @@ plot_grid(velo_GI_resid %>%
 
 ## Model selection
 
-I turn on the double penalty (`select = TRUE`) and check the covariates that has been shrunk. 
+I turn on the double penalty (`select = TRUE`) and check the covariates that has been shrunk.
 
 ```{r GAM-selection}
 # Model GI
@@ -514,8 +518,6 @@ save(pred_GAM, GAMgi, file = "data/statistics/GAM_results.RData")
 
 rm(pred_v, pred_o)
 ```
-
-
 
 ```{r predict-GAM}
 # Fitted GAMs
@@ -624,7 +626,6 @@ pred_GAM %>% # velocity
   theme(legend.position = "none")
 ```
 
-
 Plot partial effects.
 
 ```{r partial-effect-plots}
@@ -653,4 +654,5 @@ plot_grid(part_eff_GAM %>%
             geom_line(aes(x = o, y = est), lwd = 1.2) +
             labs(y = "Partial effect"))
 ```
+
 '

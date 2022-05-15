@@ -309,8 +309,7 @@ SA_grid_laea %>%
   datatable(rownames = F)
 ```
 
-
-# Plots 
+# Plots
 
 ## Base map with areas reprojcted
 
@@ -342,7 +341,7 @@ p_map_laea
 
 ## Figure 1. Bathy map with sampling locations
 
-Careful this map takes forever to compute (> 18 h) when bathy has to be drawn.
+Careful this map takes forever to compute (\> 18 h) when bathy has to be drawn.
 
 ```{r fig1-map-station-original, eval=FALSE, fig.align='center', fig.height=3.25, fig.width=6}
 MVBS %>%
@@ -408,7 +407,7 @@ p_MVBS_laea <- MVBS_laea %>%
 p_MVBS_laea
 ```
 
-## Figure 2. Vertical S~V~ profiles
+## Figure 2. Vertical S\~V\~ profiles
 
 ### Old plot
 
@@ -553,7 +552,6 @@ p_Sv_prof_lines <- Sv_prof_median %>%
 ggsave("plots/Fig2_Sv_profiles_lines.png", p_Sv_prof_lines, device = agg_png, height = 3.5, width = 6.5, dpi = 600, units = "in")
 p_Sv_prof_lines
 ```
-
 
 ### Points
 
@@ -885,9 +883,8 @@ SA_grid_laea %>%
   theme(legend.position = "right", axis.text = element_blank(), axis.ticks = element_blank(), axis.title = element_blank())
 ```
 
-
 ## Table S3. Acoustic settings
- 
+
 ```{r tableS3-acoustic-settings, echo=F, warning=F, message=F, fig.align='center'}
 summary_MVBS <- MVBS %>%
   group_by(date,process_ID, filename, area, year) %>%

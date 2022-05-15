@@ -47,14 +47,13 @@ projection(arctic_laea) <- gsub("units=m", "units=km", projection(arctic_laea)) 
 res(arctic_laea) <- c(cell_res, cell_res) # Define the 100 km cell resolution
 ```
 
-
 # Sea ice data
 
-Code that downloads sea ice data from the [Copernicus Climate website]( https://cds.climate.copernicus.eu/cdsapp#!/dataset/satellite-sea-ice-concentration?tab=overview). We use the daily sea ice concentration derived from satellite observations from ECMWF. Data is downloaded in two batches because ECMWF changed their Climate Data Record (CDR) on 2016-01-01. I changed the sea ice data projection from Lambert's azimuthal Equal Area (EPSG:6931) to WGS84 (EPSG:4326) and match the resolution to that of backscatter anomalies (2 deg longitude * 1 deg latitude).
+Code that downloads sea ice data from the [Copernicus Climate website](https://cds.climate.copernicus.eu/cdsapp#!/dataset/satellite-sea-ice-concentration?tab=overview). We use the daily sea ice concentration derived from satellite observations from ECMWF. Data is downloaded in two batches because ECMWF changed their Climate Data Record (CDR) on 2016-01-01. I changed the sea ice data projection from Lambert's azimuthal Equal Area (EPSG:6931) to WGS84 (EPSG:4326) and match the resolution to that of backscatter anomalies (2 deg longitude \* 1 deg latitude).
 
 ## CDR data 2015-01-01 - 2015-12-31
 
-Download "raw" data that I only crop to match the area of interest to reduce the file size. 
+Download "raw" data that I only crop to match the area of interest to reduce the file size.
 
 ```{r download-seaice-CDR, eval=FALSE, message=FALSE}
 # Date range of interest
@@ -154,7 +153,7 @@ for (d in dates) {
 rm(request, tmp_raw, tmp_coord, tmp_seaice) # Remove unused variables
 ```
 
-## Data tidying and gridding 
+## Data tidying and gridding
 
 First, I plot data to see if download worked.
 
@@ -211,11 +210,11 @@ rm(seaice_tmp, i) # Remove temporary data
 save(seaice_year, file = "data/remote_sensing/remote_sensing_seaice_year.RData") # Save data
 ```
 
-To match sea ice records with acoustic data, I rasterized sea ice data on the same grid as the acoustic data. I tried two different grids; the WGS84 projection (EPSG:4326) with grid cells of 2°lon * 1°lat, and the EASE-Grid 2.0 North (EPSG:6931) which is the default grid for sea-ice data. For each cell I calculated the mean ice concentration, open water, sea ice duration, day of ice breakup, and week of ice breakup. The ice breakup day is defined as the first day of the year when sea ice concentration fell below 50 %. Similarly, ice breakup week is the first week of the year when sea ice concentration fell below 50 %.
+To match sea ice records with acoustic data, I rasterized sea ice data on the same grid as the acoustic data. I tried two different grids; the WGS84 projection (EPSG:4326) with grid cells of 2°lon \* 1°lat, and the EASE-Grid 2.0 North (EPSG:6931) which is the default grid for sea-ice data. For each cell I calculated the mean ice concentration, open water, sea ice duration, day of ice breakup, and week of ice breakup. The ice breakup day is defined as the first day of the year when sea ice concentration fell below 50 %. Similarly, ice breakup week is the first week of the year when sea ice concentration fell below 50 %.
 
 ### EPSG:6931 - EASE-Grid 2.0 North (Lambert's equal-area, azimuthal)
 
-More info on this projection can be found on the [NSIDC website](https://nsidc.org/data/ease/). Because "raw" sea ice data has a 25 km * 25 km resolution, I match that resolution to the final projection (150 km * 150 km).
+More info on this projection can be found on the [NSIDC website](https://nsidc.org/data/ease/). Because "raw" sea ice data has a 25 km \* 25 km resolution, I match that resolution to the final projection (150 km \* 150 km).
 
 ```{r EPSG-6931-seaice-grid}
 seaice_grid_laea <- data.frame() # Empty dataframe that will be filled with gridded CTD data
@@ -285,7 +284,7 @@ plot_grid(seaice_grid_laea %>% # Map mean ice concentration
           ncol = 1, align = "hv", axis = "tblr")
 ```
 
-### EPSG:4326 - WGS84 projection 
+### EPSG:4326 - WGS84 projection
 
 ```{r EPSG-4326-seaice-grid}
 arctic_latlon <- raster(extent(-155, 35, 66, 85), # Base projection for acoustic and CTD data
@@ -351,25 +350,25 @@ plot_grid(seaice_grid_latlon %>% # Map mean ice concentration
           ncol = 2, align = "hv", axis = "tblr")
 ```
 
-# Arctic Ocean Physics Reanalysis 
+# Arctic Ocean Physics Reanalysis
 
 The [Arctic Ocean Physics Reanalysis](https://resources.marine.copernicus.eu/product-detail/ARCTIC_MULTIYEAR_PHY_002_003/INFORMATION) dataset was downloaded using a Jupyter notebook. The dataset has a 12.5 km^2^ grid resolution and a specific polar stereographic projection. Because PROJ4 strings are not have been replaced by WKT2 strings in `rgdal`, I need to convert the PROJ4 custom projection of Copernicus into a WKT2 string. I need to verify if the `st_crs` function converts the proj4 string into a WKT2 string correctly.
 
-The variables are: 
+The variables are:
 
-* thetao: Temperature degree Celsius
-* so: Salinity psu
-* vxo: Zonal velocity m/s (x)
-* vyo: Meridional velocity m/s (y)
-* x: x-coordinate (not longitude, need to be reprojected)
-* y: y-coordinate (not latitude, need to be reprojected)
-* mlotst: mixed layer thickness (m)
-* siconc: sea ice concentration (1)
-* sithick: sea ice thickness (m)
-* depth: depth in meters
-* time: time in hours since 1950-01-01 00:00:00
-* latitude: latitude
-* longitude: longitude
+-   thetao: Temperature degree Celsius
+-   so: Salinity psu
+-   vxo: Zonal velocity m/s (x)
+-   vyo: Meridional velocity m/s (y)
+-   x: x-coordinate (not longitude, need to be reprojected)
+-   y: y-coordinate (not latitude, need to be reprojected)
+-   mlotst: mixed layer thickness (m)
+-   siconc: sea ice concentration (1)
+-   sithick: sea ice thickness (m)
+-   depth: depth in meters
+-   time: time in hours since 1950-01-01 00:00:00
+-   latitude: latitude
+-   longitude: longitude
 
 ## Exploratory code
 
@@ -410,7 +409,7 @@ plot(test_sf4["vxo"], axes = TRUE) # Work
 rm(test_ice, test_meta, test_oce, test_sf, test_sf2, test_sf3, test_sf4, test)
 ```
 
-Batch processing of Arctic Ocean Physics Reanalysis data. For convenience, all NetCDF data is combined per year and saved as csv. 
+Batch processing of Arctic Ocean Physics Reanalysis data. For convenience, all NetCDF data is combined per year and saved as csv.
 
 ```{r physics-csv, eval=FALSE}
 for (y in seq(2015, 2017, 1)) { # Loop through data per year
@@ -478,7 +477,7 @@ phy %>%
 
 ### EPSG:6931 - EASE-Grid 2.0 North (Lambert's equal-area, azimuthal)
 
-Data is projected on the EPSG:6931 projection. I also calculate temperature (x - mean(x over the whole time series) and current anomalies. 
+Data is projected on the EPSG:6931 projection. I also calculate temperature (x - mean(x over the whole time series) and current anomalies.
 
 ```{r EPSG-6931-physics-grid}
 cell_res <- 25 # Cell resolution in km
@@ -559,9 +558,9 @@ phy_grid_laea %>% # Map current velocity at 222 m
         axis.text = element_blank(), axis.ticks = element_blank(), axis.title = element_blank())
 ```
 
-# Ocean colour data 
+# Ocean colour data
 
-Data downloaded from Copernicus Marine. The ocean colour data comes from the  [OCEANCOLOUR_ARC_CHL_L4_REP_OBSERVATIONS_009_088](https://resources.marine.copernicus.eu/product-detail/OCEANCOLOUR_ARC_CHL_L4_REP_OBSERVATIONS_009_088/INFORMATION) dataset. Data is monthly averaged and has a cell resolution of 1 x 1 km on a WGS 84 / Plate Carree (EPSG:32662) projection.
+Data downloaded from Copernicus Marine. The ocean colour data comes from the [OCEANCOLOUR_ARC_CHL_L4_REP_OBSERVATIONS_009_088](https://resources.marine.copernicus.eu/product-detail/OCEANCOLOUR_ARC_CHL_L4_REP_OBSERVATIONS_009_088/INFORMATION) dataset. Data is monthly averaged and has a cell resolution of 1 x 1 km on a WGS 84 / Plate Carree (EPSG:32662) projection.
 
 I load the data and project it on the arctic laea grid (EPSG:6931 25 x 25 km). The time variable is seconds since 1970-01-01 00:00:00.
 
@@ -606,7 +605,7 @@ for (i in file_list) { # Loop through each file
 rm(date_file, i, file_list)
 ```
 
-After rasterizing data I reload the csv files and combine the monthly data into a single dataframe. Then, I calculate the average annual concentration of chl a per cell. 
+After rasterizing data I reload the csv files and combine the monthly data into a single dataframe. Then, I calculate the average annual concentration of chl a per cell.
 
 ```{r chl-tidy, message=FALSE}
 chl_grid_laea <- list.files("data/remote_sensing/ocean_colour_OCEANCOLOUR_ARC_CHL_L4_REP_OBSERVATIONS_009_088", 
@@ -621,7 +620,7 @@ chl_grid_laea <- list.files("data/remote_sensing/ocean_colour_OCEANCOLOUR_ARC_CH
   ungroup()
 ```
 
-# Save data 
+# Save data
 
 ```{r save-data}
 save(seaice_grid_laea, seaice_grid_latlon, file = "data/remote_sensing/seaice_grids.RData") # Save data

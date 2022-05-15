@@ -35,13 +35,13 @@ options(dplyr.summarise.inform = F) # Suppress summarise() warning
 
 # CTD data
 
-CTD data were collected regularly during each of the survey. To match CTD records with acoustic data, I rasterized CTD data on the same grid as the acoustic data. I tried two different grids; the WGS84 projection (EPSG:4326) with grid cells of 2°lon * 1°lat, and the EASE-Grid 2.0 North (EPSG:6931) with grid cells of 150 km * 150 km. For each cell I calculated the mean conservative temperature and absolute salinity between 200 and 1000 m depth.
+CTD data were collected regularly during each of the survey. To match CTD records with acoustic data, I rasterized CTD data on the same grid as the acoustic data. I tried two different grids; the WGS84 projection (EPSG:4326) with grid cells of 2°lon \* 1°lat, and the EASE-Grid 2.0 North (EPSG:6931) with grid cells of 150 km \* 150 km. For each cell I calculated the mean conservative temperature and absolute salinity between 200 and 1000 m depth.
 
 ```{r data-loading, message=FALSE}
 load("data/CTD/CTD_2015_2019.RData") # CTD data
 ```
 
-## EPSG:4326 - WGS84 projection 
+## EPSG:4326 - WGS84 projection
 
 ```{r EPSG-4326-CTD-grid}
 arctic_latlon <- raster(extent(-155, 35, 66, 85), # Base projection for acoustic and CTD data
@@ -157,7 +157,7 @@ CTD_grid_laea <- CTD_grid_laea %>%
 rm(CTD_tmp, CTD_tmp_laea, i, cell_res) # Remove temporary data
 ```
 
-Plot mean conservative temperature and absolute salinity over mesopelagic depths (200 - 1000 m depth) with the EASE-Grid 2.0 North. 
+Plot mean conservative temperature and absolute salinity over mesopelagic depths (200 - 1000 m depth) with the EASE-Grid 2.0 North.
 
 ```{r EPSG-6931-map-CTD, message=FALSE, fig.width=8, fig.height=7}
 coast_10m_laea <- readOGR("data/bathy/ne_10m_land.shp", verbose = F) %>% # Coastline in laea
@@ -188,7 +188,7 @@ plot_grid(CTD_grid_laea %>% # Map conservative temperature
           ncol = 1, align = "hv", axis = "tblr")
 ```
 
-# Save data 
+# Save data
 
 ```{r save-data}
 save(CTD_grid_laea, CTD_grid_latlon, file = "data/CTD/CTD_grids.RData") # Save data
