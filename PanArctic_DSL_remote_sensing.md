@@ -1,7 +1,7 @@
 ---
 title: "PanArctic DSL - Remote sensing"
 author: "[Pierre Priou](mailto:pierre.priou@mi.mun.ca)"
-date: "2022/05/13 at 18:06"
+date: "2022/05/15 at 17:53"
 output: 
   html_document:
     keep_md: yes
@@ -40,6 +40,15 @@ theme_update(axis.text = element_text(size = 9),
              plot.title = element_text(size = 9, face = "bold"))
 options(dplyr.summarise.inform = F) # Suppress summarise() warning
 ```
+
+
+```r
+cell_res <- 25 # Cell resolution in km
+arctic_laea <- raster(extent(-2700, 2700, -2700, 2700), crs = "EPSG:6931") # Seaice projection
+projection(arctic_laea) <- gsub("units=m", "units=km", projection(arctic_laea)) # Convert proj unit from m to km
+res(arctic_laea) <- c(cell_res, cell_res) # Define the 100 km cell resolution
+```
+
 
 # Sea ice data
 
@@ -155,14 +164,14 @@ First, I plot data to see if download worked.
 
 
 ```r
-plot_grid(read_csv("data/remote_sensing/sea_ice/20151231_laea_ice_conc.csv") %>%
+plot_grid(read_csv("data/remote_sensing/sea_ice/20151231_laea_ice_conc.csv", show_col_types = F) %>%
             ggplot(aes(x = xc, y = yc, fill = ice_conc)) + 
             geom_tile() + 
             scale_fill_cmocean("Ice concentration (%)", name = "ice") +
             ggtitle("2015-02-12 - CDR") + 
             coord_fixed(expand = F) +
             theme(legend.position = "top", legend.key.height = unit(0.1, "in"), legend.key.width = unit(0.3, "in")),
-          read_csv("data/remote_sensing/sea_ice/20170212_laea_ice_conc.csv") %>%
+          read_csv("data/remote_sensing/sea_ice/20170212_laea_ice_conc.csv", show_col_types = F) %>%
             ggplot(aes(x = xc, y = yc, fill = ice_conc)) + 
             geom_tile() + 
             scale_fill_cmocean("Ice concentration (%)", name = "ice") +
@@ -184,7 +193,7 @@ for (i in seq(2015, 2017, 1)) { # Loop through data per year
   seaice_tmp <- list.files("data/remote_sensing/sea_ice", # List files in folder
                             pattern = paste0(i),
                             full.names = T) %>%
-    map_dfr(.f = ~ read_csv(.)) %>% # Read sea ice files
+    map_dfr(.f = ~ read_csv(., show_col_types = F)) %>% # Read sea ice files
     lazy_dt() %>% # Call dtplyr which considerably speed up calculations
     mutate(year = i,
            yday = yday(date), # calculate day of the year
@@ -203,8 +212,17 @@ for (i in seq(2015, 2017, 1)) { # Loop through data per year
            ice_week = if_else(is.na(ice_week) == T, 52, ice_week)) %>% # Areas where sea ice does not breakup
     as_tibble()
   seaice_year <- bind_rows(seaice_year, seaice_tmp)
+  print(paste0("Processing seaice data of ", i, "  finished."))
 }
+```
 
+```
+## [1] "Processing seaice data of 2015  finished."
+## [1] "Processing seaice data of 2016  finished."
+## [1] "Processing seaice data of 2017  finished."
+```
+
+```r
 rm(seaice_tmp, i) # Remove temporary data
 save(seaice_year, file = "data/remote_sensing/remote_sensing_seaice_year.RData") # Save data
 ```
@@ -217,11 +235,6 @@ More info on this projection can be found on the [NSIDC website](https://nsidc.o
 
 
 ```r
-cell_res <- 50 # Cell resolution in km
-arctic_laea <- raster(extent(-2700, 2700, -2700, 2700), crs = "EPSG:6931") # Seaice projection
-projection(arctic_laea) <- gsub("units=m", "units=km", projection(arctic_laea)) # Convert proj unit from m to km
-res(arctic_laea) <- c(cell_res, cell_res) # Define the 100 km cell resolution
-
 seaice_grid_laea <- data.frame() # Empty dataframe that will be filled with gridded CTD data
 
 for (i in seq(2015, 2017, 1)) { # Data gridding
@@ -445,6 +458,7 @@ Batch processing of Arctic Ocean Physics Reanalysis data. For convenience, all N
 for (y in seq(2015, 2017, 1)) { # Loop through data per year
   phy_year <-  data.frame() # Empty dataframe that will be filled with gridded sea ice data
   file_list <- list.files("data/remote_sensing/physics", pattern = paste0(y), full.names = T) # List files per year
+  
   for (i in file_list) { # Loop through each file
     # Read NetCDF 
     phy_ice_tmp <- tidync(i) %>%
@@ -465,6 +479,7 @@ for (y in seq(2015, 2017, 1)) { # Loop through data per year
     # Append data together
     phy_year <- bind_rows(phy_year, phy_tmp)
   }
+  
   # Write one csv per year
   write_csv(phy_year, file = paste0("data/remote_sensing/physics/physics_reanalysis_", y, ".csv")) 
   print(paste0("Processing of ", y, " data finished."))
@@ -477,7 +492,7 @@ Tidy csv data and calculate current velocity and angle. I also calculate the ann
 
 ```r
 phy <- list.files("data/remote_sensing/physics", pattern = "*.csv", full.names = T) %>% # List files
-  map_dfr(.f = ~ read_csv(.)) %>% # Read files 
+  map_dfr(.f = ~ read_csv(., show_col_types = F)) %>% # Read files 
   mutate(year = year(date),
          month = month(date),
          velocity = sqrt(vxo ^ 2 + vyo ^ 2), # current velocity
@@ -513,7 +528,7 @@ Data is projected on the EPSG:6931 projection. I also calculate temperature (x -
 
 
 ```r
-cell_res <- 50 # Cell resolution in km
+cell_res <- 25 # Cell resolution in km
 arctic_laea <- raster(extent(-2700, 2700, -2700, 2700), crs = "EPSG:6931") # Seaice projection
 projection(arctic_laea) <- gsub("units=m", "units=km", projection(arctic_laea)) # Convert proj unit from m to km
 res(arctic_laea) <- c(cell_res, cell_res) # Define the 100 km cell resolution
@@ -521,6 +536,7 @@ res(arctic_laea) <- c(cell_res, cell_res) # Define the 100 km cell resolution
 phy_grid_laea <- data.frame() # Empty dataframe
 
 for (i in seq(2015, 2017, 1)) { # Loop through each year
+  
   for (j in c(0, 222, 380, 644, 1062)) { # Loop through each depth bin
     phy_year_tmp <- phy_year %>%
       filter(year == i & depth == j) # Select depth bin
@@ -593,10 +609,117 @@ phy_grid_laea %>% # Map current velocity at 222 m
 
 ![](PanArctic_DSL_remote_sensing_files/figure-html/EPSG-6931-map-physics-1.png)<!-- -->
 
+# Ocean colour data 
+
+Data downloaded from Copernicus Marine. The ocean colour data comes from the  [OCEANCOLOUR_ARC_CHL_L4_REP_OBSERVATIONS_009_088](https://resources.marine.copernicus.eu/product-detail/OCEANCOLOUR_ARC_CHL_L4_REP_OBSERVATIONS_009_088/INFORMATION) dataset. Data is monthly averaged and has a cell resolution of 1 x 1 km on a WGS 84 / Plate Carree (EPSG:32662) projection.
+
+I load the data and project it on the arctic laea grid (EPSG:6931 25 x 25 km). The time variable is seconds since 1970-01-01 00:00:00.
+
+
+```r
+file_list <- list.files("data/remote_sensing/ocean_colour_OCEANCOLOUR_ARC_CHL_L4_REP_OBSERVATIONS_009_088",
+                        pattern = ".nc", full.names = T) # List files per year
+for (i in file_list) { # Loop through each file
+  date_file <- str_remove(i, pattern = "data/remote_sensing/ocean_colour_OCEANCOLOUR_ARC_CHL_L4_REP_OBSERVATIONS_009_088/") %>%
+    str_remove(., pattern = "_chl_CMEMS.nc") # Extract date
+  chl_tmp <- tidync(i) %>%
+    activate("D2,D1,D0") %>% # chlorophyll data
+    hyper_tibble() %>%
+    rename(lat = latitude, lon = longitude, chl = CHL)
+  
+  if (nrow(chl_tmp > 0)){
+    # Rasterize data in laea
+    chl_tmp_laea <- SpatialPointsDataFrame(SpatialPoints(cbind(chl_tmp$lon, chl_tmp$lat), proj4string = CRS("EPSG:4326")), 
+                                           data.frame(lat = chl_tmp$lat,
+                                                      lon = chl_tmp$lon,
+                                                      time = chl_tmp$time,
+                                                      chl = chl_tmp$chl)) %>%
+      spTransform(., CRSobj = crs(arctic_laea)) %>% # Change projection to EPSG:6931
+      rasterize(., arctic_laea, fun = mean, na.rm = T) %>% # Rasterize on the arctic_laea grid (with correct grid resolution)
+      dropLayer(1) %>% # Remove ID layer
+      rasterToPoints() %>% # Convert raster to data frame
+      as.data.frame() %>%
+      rename(xc = x, yc = y) %>% # Rename variables
+      mutate(date = as.POSIXct(time , origin = "1970-01-01 00:00:00", tz = "UTC"),
+             year = year(date)) 
+    # Write csv
+    write_csv(chl_tmp_laea, file = paste0("data/remote_sensing/ocean_colour_OCEANCOLOUR_ARC_CHL_L4_REP_OBSERVATIONS_009_088/ocean_colour_",
+                                          date_file, ".csv"))
+    print(paste0("Processing of ", date_file, " chl data finished."))
+    rm(chl_tmp_laea) # Remove temporary file
+    
+    } else {
+      print(paste0("No chl data for ", date_file, ". Moving to next file."))
+    }
+  
+  rm(chl_tmp) # Remove temporary variables
+}
+```
+
+```
+## [1] "No chl data for 20150101. Moving to next file."
+## [1] "Processing of 20150201 chl data finished."
+## [1] "Processing of 20150301 chl data finished."
+## [1] "Processing of 20150401 chl data finished."
+## [1] "Processing of 20150501 chl data finished."
+## [1] "Processing of 20150601 chl data finished."
+## [1] "Processing of 20150701 chl data finished."
+## [1] "Processing of 20150801 chl data finished."
+## [1] "Processing of 20150901 chl data finished."
+## [1] "Processing of 20151001 chl data finished."
+## [1] "No chl data for 20151101. Moving to next file."
+## [1] "No chl data for 20151201. Moving to next file."
+## [1] "No chl data for 20160101. Moving to next file."
+## [1] "Processing of 20160201 chl data finished."
+## [1] "Processing of 20160301 chl data finished."
+## [1] "Processing of 20160401 chl data finished."
+## [1] "Processing of 20160501 chl data finished."
+## [1] "Processing of 20160601 chl data finished."
+## [1] "Processing of 20160701 chl data finished."
+## [1] "Processing of 20160801 chl data finished."
+## [1] "Processing of 20160901 chl data finished."
+## [1] "Processing of 20161001 chl data finished."
+## [1] "No chl data for 20161101. Moving to next file."
+## [1] "No chl data for 20161201. Moving to next file."
+## [1] "No chl data for 20170101. Moving to next file."
+## [1] "Processing of 20170201 chl data finished."
+## [1] "Processing of 20170301 chl data finished."
+## [1] "Processing of 20170401 chl data finished."
+## [1] "Processing of 20170501 chl data finished."
+## [1] "Processing of 20170601 chl data finished."
+## [1] "Processing of 20170701 chl data finished."
+## [1] "Processing of 20170801 chl data finished."
+## [1] "Processing of 20170901 chl data finished."
+## [1] "Processing of 20171001 chl data finished."
+## [1] "No chl data for 20171101. Moving to next file."
+## [1] "No chl data for 20171201. Moving to next file."
+```
+
+```r
+rm(date_file, i, file_list)
+```
+
+After rasterizing data I reload the csv files and combine the monthly data into a single dataframe. Then, I calculate the average annual concentration of chl a per cell. 
+
+
+```r
+chl_grid_laea <- list.files("data/remote_sensing/ocean_colour_OCEANCOLOUR_ARC_CHL_L4_REP_OBSERVATIONS_009_088", 
+                            pattern = "*.csv", full.names = TRUE) %>% # List files
+  map_dfr(.f = ~ read_csv(., show_col_types = FALSE)) %>% # Read files 
+  mutate(area = factor(case_when(lon > -155 & lon <= -95 & lat > 65 & lat <= 82 ~ "BF_CAA",
+                                 lon > -95 & lon <= -50 & lat > 66 & lat <= 82 ~ "BB",
+                                 lon >= -25 & lon <= 145 & lat > 77 & lat <= 90 ~ "SV"),
+                       levels = c("BF_CAA", "BB", "SV"))) %>%
+  group_by(year, area, xc, yc, lat, lon) %>%
+  summarise(chl = mean(chl)) %>%
+  ungroup()
+```
+
 # Save data 
 
 
 ```r
 save(seaice_grid_laea, seaice_grid_latlon, file = "data/remote_sensing/seaice_grids.RData") # Save data
 save(phy_grid_laea, file = "data/remote_sensing/physics_grids.RData") # Save data
+save(chl_grid_laea, file = "data/remote_sensing/chl_grid.RData") # Save data
 ```

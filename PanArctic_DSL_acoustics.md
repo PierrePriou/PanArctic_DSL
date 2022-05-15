@@ -1,7 +1,7 @@
 ---
 title: "PanArctic DSL - Acoustic gridding"
 author: "[Pierre Priou](mailto:pierre.priou@mi.mun.ca)"
-date: "2022/05/13 at 18:18"
+date: "2022/05/15 at 15:51"
 output: 
   html_document:
     keep_md: yes
@@ -51,7 +51,7 @@ arctic_latlon <- raster(extent(-155, 35, 66, 85), # Base projection for acoustic
                         res = c(2, 1)) # cells of 2 degree longitude per 1 degree latitude
 arctic_laea <- raster(extent(-2700, 2700, -2700, 2700), crs = "EPSG:6931") # Seaice projection
 projection(arctic_laea) <- gsub("units=m", "units=km", projection(arctic_laea)) # Convert proj unit from m to km
-cell_res <- 50 # Cell resolution in km
+cell_res <- 25 # Cell resolution in km
 res(arctic_laea) <- c(cell_res, cell_res) # Define the 100 km cell resolution
 
 # IHO areas
@@ -86,10 +86,11 @@ Acoustic data were collected continuously at 38 kHz. We selected data when the s
 
 ```r
 # Load and tidy files
-MVBS_raw <- list.files("C:/Users/cfer/PhD/Chapt 2 - Arctic Mesopelagic DSL/data/acoustics/90dB threshold", 
+# MVBS_raw <- list.files("C:/Users/cfer/PhD/Chapt 2 - Arctic Mesopelagic DSL/data/acoustics/90dB threshold", 
+MVBS_raw <- list.files("D:/Travail/PhD/Chapt 2 - Arctic Mesopelagic DSL/data/acoustics/90dB threshold", 
                        pattern = "*.csv", full.names = TRUE) %>% # list files in folder
   set_names() %>%
-  map_dfr(.f = read_csv, .id = "filename") %>% # reads file
+  map_dfr(.f = ~ read_csv(., show_col_types = FALSE), .id = "filename") %>% # reads file
   dplyr::select(-Interval, -Layer, -Dist_S, -Sv_min, -Sv_max) %>%
   rename("layer_depth_min" = "Layer_depth_min",
          "layer_depth_max" = "Layer_depth_max",
@@ -130,8 +131,8 @@ MVBS_bottom_depth <- MVBS_raw %>%
 
 # Append dawn and dusk times, bottom depth to main dataframe
 MVBS <- MVBS_raw %>%
-  left_join(., MVBS_suncalc, by=c("filename", "area", "date_num")) %>%
-  left_join(., MVBS_bottom_depth) %>%
+  left_join(., MVBS_suncalc, by = c("filename", "area", "date_num")) %>%
+  left_join(., MVBS_bottom_depth, by = c("filename", "date", "lat", "lon", "area")) %>%
   mutate(year = year(date), 
          month = month(date), 
          day_night = factor(if_else(is.na(dawn) & is.na(dusk) & month >= 4 & month <= 10, "day", # polar day case
@@ -143,8 +144,6 @@ MVBS <- MVBS_raw %>%
          NASC_clean = if_else(empty == T, 0, NASC)) %>%  # Thresholded NASC
   filter(layer_depth_min <= 995 & bottom_depth > 200 & lat != 999 & lon != 999 & Sv_mean < -30) %>% # Tidy data
   dplyr::select(year, area, date, day_night, lat, lon, layer_depth_min, Sv_mean, Sv_clean, NASC, NASC_clean, empty, bottom_depth, frequency) 
-
-rm(MVBS_suncalc, MVBS_bottom_depth)
 ```
 
 Calculate integrated NASC over mesopelagic depth (200 - 1000 m depth) and centre of mass for each 10 min cell.

@@ -159,14 +159,14 @@ rm(request, tmp_raw, tmp_coord, tmp_seaice) # Remove unused variables
 First, I plot data to see if download worked.
 
 ```{r plot-seaice-latlon-cdr, fig.height=4.5, fig.width=8, message=FALSE}
-plot_grid(read_csv("data/remote_sensing/sea_ice/20151231_laea_ice_conc.csv") %>%
+plot_grid(read_csv("data/remote_sensing/sea_ice/20151231_laea_ice_conc.csv", show_col_types = F) %>%
             ggplot(aes(x = xc, y = yc, fill = ice_conc)) + 
             geom_tile() + 
             scale_fill_cmocean("Ice concentration (%)", name = "ice") +
             ggtitle("2015-02-12 - CDR") + 
             coord_fixed(expand = F) +
             theme(legend.position = "top", legend.key.height = unit(0.1, "in"), legend.key.width = unit(0.3, "in")),
-          read_csv("data/remote_sensing/sea_ice/20170212_laea_ice_conc.csv") %>%
+          read_csv("data/remote_sensing/sea_ice/20170212_laea_ice_conc.csv", show_col_types = F) %>%
             ggplot(aes(x = xc, y = yc, fill = ice_conc)) + 
             geom_tile() + 
             scale_fill_cmocean("Ice concentration (%)", name = "ice") +
@@ -185,7 +185,7 @@ for (i in seq(2015, 2017, 1)) { # Loop through data per year
   seaice_tmp <- list.files("data/remote_sensing/sea_ice", # List files in folder
                             pattern = paste0(i),
                             full.names = T) %>%
-    map_dfr(.f = ~ read_csv(.)) %>% # Read sea ice files
+    map_dfr(.f = ~ read_csv(., show_col_types = F)) %>% # Read sea ice files
     lazy_dt() %>% # Call dtplyr which considerably speed up calculations
     mutate(year = i,
            yday = yday(date), # calculate day of the year
@@ -204,6 +204,7 @@ for (i in seq(2015, 2017, 1)) { # Loop through data per year
            ice_week = if_else(is.na(ice_week) == T, 52, ice_week)) %>% # Areas where sea ice does not breakup
     as_tibble()
   seaice_year <- bind_rows(seaice_year, seaice_tmp)
+  print(paste0("Processing seaice data of ", i, "  finished."))
 }
 
 rm(seaice_tmp, i) # Remove temporary data
@@ -415,6 +416,7 @@ Batch processing of Arctic Ocean Physics Reanalysis data. For convenience, all N
 for (y in seq(2015, 2017, 1)) { # Loop through data per year
   phy_year <-  data.frame() # Empty dataframe that will be filled with gridded sea ice data
   file_list <- list.files("data/remote_sensing/physics", pattern = paste0(y), full.names = T) # List files per year
+  
   for (i in file_list) { # Loop through each file
     # Read NetCDF 
     phy_ice_tmp <- tidync(i) %>%
@@ -435,6 +437,7 @@ for (y in seq(2015, 2017, 1)) { # Loop through data per year
     # Append data together
     phy_year <- bind_rows(phy_year, phy_tmp)
   }
+  
   # Write one csv per year
   write_csv(phy_year, file = paste0("data/remote_sensing/physics/physics_reanalysis_", y, ".csv")) 
   print(paste0("Processing of ", y, " data finished."))
@@ -446,7 +449,7 @@ Tidy csv data and calculate current velocity and angle. I also calculate the ann
 
 ```{r physics-tidy, message=FALSE}
 phy <- list.files("data/remote_sensing/physics", pattern = "*.csv", full.names = T) %>% # List files
-  map_dfr(.f = ~ read_csv(.)) %>% # Read files 
+  map_dfr(.f = ~ read_csv(., show_col_types = F)) %>% # Read files 
   mutate(year = year(date),
          month = month(date),
          velocity = sqrt(vxo ^ 2 + vyo ^ 2), # current velocity
@@ -486,6 +489,7 @@ res(arctic_laea) <- c(cell_res, cell_res) # Define the 100 km cell resolution
 phy_grid_laea <- data.frame() # Empty dataframe
 
 for (i in seq(2015, 2017, 1)) { # Loop through each year
+  
   for (j in c(0, 222, 380, 644, 1062)) { # Loop through each depth bin
     phy_year_tmp <- phy_year %>%
       filter(year == i & depth == j) # Select depth bin
@@ -561,7 +565,7 @@ Data downloaded from Copernicus Marine. The ocean colour data comes from the  [O
 
 I load the data and project it on the arctic laea grid (EPSG:6931 25 x 25 km). The time variable is seconds since 1970-01-01 00:00:00.
 
-```{r chl-to-csv}
+```{r chl-to-csv, cache=TRUE}
 file_list <- list.files("data/remote_sensing/ocean_colour_OCEANCOLOUR_ARC_CHL_L4_REP_OBSERVATIONS_009_088",
                         pattern = ".nc", full.names = T) # List files per year
 for (i in file_list) { # Loop through each file
