@@ -1,7 +1,7 @@
 ---
 title: "PanArctic DSL - Remote sensing"
 author: "[Pierre Priou](mailto:pierre.priou@mi.mun.ca)"
-date: "2022/05/15 at 23:06"
+date: "2022/05/16 at 09:55"
 output: 
   html_document:
     keep_md: yes
@@ -43,7 +43,7 @@ options(dplyr.summarise.inform = F) # Suppress summarise() warning
 
 
 ```r
-cell_res <- 25 # Cell resolution in km
+cell_res <- 50 # Cell resolution in km
 arctic_laea <- raster(extent(-2700, 2700, -2700, 2700), crs = "EPSG:6931") # Seaice projection
 projection(arctic_laea) <- gsub("units=m", "units=km", projection(arctic_laea)) # Convert proj unit from m to km
 res(arctic_laea) <- c(cell_res, cell_res) # Define the 100 km cell resolution
@@ -616,6 +616,11 @@ I load the data and project it on the arctic laea grid (EPSG:6931 25 x 25 km). T
 
 
 ```r
+cell_res <- 50 # Cell resolution in km
+arctic_laea <- raster(extent(-2700, 2700, -2700, 2700), crs = "EPSG:6931") # Seaice projection
+projection(arctic_laea) <- gsub("units=m", "units=km", projection(arctic_laea)) # Convert proj unit from m to km
+res(arctic_laea) <- c(cell_res, cell_res) # Define the 100 km cell resolution
+
 file_list <- list.files("data/remote_sensing/ocean_colour_OCEANCOLOUR_ARC_CHL_L4_REP_OBSERVATIONS_009_088",
                         pattern = ".nc", full.names = T) # List files per year
 for (i in file_list) { # Loop through each file
@@ -712,7 +717,7 @@ chl_grid_laea <- list.files("data/remote_sensing/ocean_colour_OCEANCOLOUR_ARC_CH
               lon > -95 & lon <= -50 & lat > 66 & lat <= 82 ~ "BB",
               lon >= -25 & lon <= 145 & lat > 77 & lat <= 90 ~ "SV"),
     levels = c("BF_CAA", "BB", "SV"))) %>%
-  group_by(area, xc, yc, lat, lon) %>%
+  group_by(year, area, xc, yc, cell_res) %>%
   summarise(chl = mean(chl)) %>%
   ungroup()
 ```

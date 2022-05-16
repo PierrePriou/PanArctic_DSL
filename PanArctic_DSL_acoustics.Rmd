@@ -49,7 +49,7 @@ arctic_latlon <- raster(extent(-155, 35, 66, 85), # Base projection for acoustic
                         res = c(2, 1)) # cells of 2 degree longitude per 1 degree latitude
 arctic_laea <- raster(extent(-2700, 2700, -2700, 2700), crs = "EPSG:6931") # Seaice projection
 projection(arctic_laea) <- gsub("units=m", "units=km", projection(arctic_laea)) # Convert proj unit from m to km
-cell_res <- 25 # Cell resolution in km
+cell_res <- 50 # Cell resolution in km
 res(arctic_laea) <- c(cell_res, cell_res) # Define the 100 km cell resolution
 
 # IHO areas
@@ -77,7 +77,7 @@ bathy <- getNOAA.bathy(lon1 = -152, lon2 = 35, lat1 = 65, lat2 = 84, resolution 
 
 Acoustic data were collected continuously at 38 kHz. We selected data when the ship were stationary (\< 1 knot). To match acoustic records to CTD and remote sensing data, and to homogenize data spatio-temporally, I rasterized acoustic data per year. I used two different grids; the WGS84 projection (EPSG:4326) with grid cells of 2°lon x 1°lat, and the EASE-Grid 2.0 North (EPSG:6931)—which is the default grid for sea-ice data—with grid cells of 150 km x 150 km. For each cell I calculated the mean integrated nautical area scattering coefficient (s\~A\~; m^2^ nmi^-2^) and centre of mass over mesopelagic depths (200-1000 m). Then, I calculated the normalized backscatter anomaly for each grid cell per area—Beaufort Sea and Canadian Arctic Archipelago, Baffin Bay, and Svalbard—per year.
 
-```{r MVBS-loading-tidying, cache=TRUE, message=FALSE}
+```{r MVBS-loading-tidying, message=FALSE}
 # Load and tidy files
 # MVBS_raw <- list.files("C:/Users/cfer/PhD/Chapt 2 - Arctic Mesopelagic DSL/data/acoustics/90dB threshold", 
 MVBS_raw <- list.files("D:/Travail/PhD/Chapt 2 - Arctic Mesopelagic DSL/data/acoustics/90dB threshold", 
