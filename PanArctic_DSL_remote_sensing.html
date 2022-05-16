@@ -365,7 +365,7 @@ pre code {
 <h1 class="title toc-ignore">PanArctic DSL - Remote sensing</h1>
 <h4 class="author"><a href="mailto:pierre.priou@mi.mun.ca">Pierre
 Priou</a></h4>
-<h4 class="date">2022/05/15 at 17:53</h4>
+<h4 class="date">2022/05/15 at 23:06</h4>
 
 </div>
 
@@ -936,14 +936,15 @@ for (i in file_list) { # Loop through each file
                                                       lon = chl_tmp$lon,
                                                       time = chl_tmp$time,
                                                       chl = chl_tmp$chl)) %&gt;%
-      spTransform(., CRSobj = crs(arctic_laea)) %&gt;% # Change projection to EPSG:6931
+      spTransform(., CRSobj = crs(arctic_laea)) %&gt;% # Change proj. to EPSG:6931
       rasterize(., arctic_laea, fun = mean, na.rm = T) %&gt;% # Rasterize on the arctic_laea grid (with correct grid resolution)
       dropLayer(1) %&gt;% # Remove ID layer
       rasterToPoints() %&gt;% # Convert raster to data frame
       as.data.frame() %&gt;%
       rename(xc = x, yc = y) %&gt;% # Rename variables
       mutate(date = as.POSIXct(time , origin = &quot;1970-01-01 00:00:00&quot;, tz = &quot;UTC&quot;),
-             year = year(date)) 
+             year = year(date), 
+             cell_res = cell_res) 
     # Write csv
     write_csv(chl_tmp_laea, file = paste0(&quot;data/remote_sensing/ocean_colour_OCEANCOLOUR_ARC_CHL_L4_REP_OBSERVATIONS_009_088/ocean_colour_&quot;,
                                           date_file, &quot;.csv&quot;))
@@ -997,19 +998,22 @@ for (i in file_list) { # Loop through each file
 data into a single dataframe. Then, I calculate the average annual
 concentration of chl a per cell.</p>
 <pre class="r"><code>chl_grid_laea &lt;- list.files(&quot;data/remote_sensing/ocean_colour_OCEANCOLOUR_ARC_CHL_L4_REP_OBSERVATIONS_009_088&quot;, 
-                            pattern = &quot;*.csv&quot;, full.names = TRUE) %&gt;% # List files
+                            pattern = &quot;*.csv&quot;,
+                            full.names = TRUE) %&gt;% # List files
   map_dfr(.f = ~ read_csv(., show_col_types = FALSE)) %&gt;% # Read files 
-  mutate(area = factor(case_when(lon &gt; -155 &amp; lon &lt;= -95 &amp; lat &gt; 65 &amp; lat &lt;= 82 ~ &quot;BF_CAA&quot;,
-                                 lon &gt; -95 &amp; lon &lt;= -50 &amp; lat &gt; 66 &amp; lat &lt;= 82 ~ &quot;BB&quot;,
-                                 lon &gt;= -25 &amp; lon &lt;= 145 &amp; lat &gt; 77 &amp; lat &lt;= 90 ~ &quot;SV&quot;),
-                       levels = c(&quot;BF_CAA&quot;, &quot;BB&quot;, &quot;SV&quot;))) %&gt;%
-  group_by(year, area, xc, yc, lat, lon) %&gt;%
+  mutate(area = factor(
+    case_when(lon &gt; -155 &amp; lon &lt;= -95 &amp; lat &gt; 65 &amp; lat &lt;= 82 ~ &quot;BF_CAA&quot;,
+              lon &gt; -95 &amp; lon &lt;= -50 &amp; lat &gt; 66 &amp; lat &lt;= 82 ~ &quot;BB&quot;,
+              lon &gt;= -25 &amp; lon &lt;= 145 &amp; lat &gt; 77 &amp; lat &lt;= 90 ~ &quot;SV&quot;),
+    levels = c(&quot;BF_CAA&quot;, &quot;BB&quot;, &quot;SV&quot;))) %&gt;%
+  group_by(area, xc, yc, lat, lon) %&gt;%
   summarise(chl = mean(chl)) %&gt;%
   ungroup()</code></pre>
 </div>
 <div id="save-data" class="section level1">
 <h1>Save data</h1>
-<pre class="r"><code>save(seaice_grid_laea, seaice_grid_latlon, file = &quot;data/remote_sensing/seaice_grids.RData&quot;) # Save data
+<pre class="r"><code>save(seaice_grid_laea, seaice_grid_latlon, 
+     file = &quot;data/remote_sensing/seaice_grids.RData&quot;) # Save data
 save(phy_grid_laea, file = &quot;data/remote_sensing/physics_grids.RData&quot;) # Save data
 save(chl_grid_laea, file = &quot;data/remote_sensing/chl_grid.RData&quot;) # Save data</code></pre>
 </div>

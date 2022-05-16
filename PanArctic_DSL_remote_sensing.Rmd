@@ -582,14 +582,15 @@ for (i in file_list) { # Loop through each file
                                                       lon = chl_tmp$lon,
                                                       time = chl_tmp$time,
                                                       chl = chl_tmp$chl)) %>%
-      spTransform(., CRSobj = crs(arctic_laea)) %>% # Change projection to EPSG:6931
+      spTransform(., CRSobj = crs(arctic_laea)) %>% # Change proj. to EPSG:6931
       rasterize(., arctic_laea, fun = mean, na.rm = T) %>% # Rasterize on the arctic_laea grid (with correct grid resolution)
       dropLayer(1) %>% # Remove ID layer
       rasterToPoints() %>% # Convert raster to data frame
       as.data.frame() %>%
       rename(xc = x, yc = y) %>% # Rename variables
       mutate(date = as.POSIXct(time , origin = "1970-01-01 00:00:00", tz = "UTC"),
-             year = year(date)) 
+             year = year(date), 
+             cell_res = cell_res) 
     # Write csv
     write_csv(chl_tmp_laea, file = paste0("data/remote_sensing/ocean_colour_OCEANCOLOUR_ARC_CHL_L4_REP_OBSERVATIONS_009_088/ocean_colour_",
                                           date_file, ".csv"))
@@ -609,13 +610,15 @@ After rasterizing data I reload the csv files and combine the monthly data into 
 
 ```{r chl-tidy, message=FALSE}
 chl_grid_laea <- list.files("data/remote_sensing/ocean_colour_OCEANCOLOUR_ARC_CHL_L4_REP_OBSERVATIONS_009_088", 
-                            pattern = "*.csv", full.names = TRUE) %>% # List files
+                            pattern = "*.csv",
+                            full.names = TRUE) %>% # List files
   map_dfr(.f = ~ read_csv(., show_col_types = FALSE)) %>% # Read files 
-  mutate(area = factor(case_when(lon > -155 & lon <= -95 & lat > 65 & lat <= 82 ~ "BF_CAA",
-                                 lon > -95 & lon <= -50 & lat > 66 & lat <= 82 ~ "BB",
-                                 lon >= -25 & lon <= 145 & lat > 77 & lat <= 90 ~ "SV"),
-                       levels = c("BF_CAA", "BB", "SV"))) %>%
-  group_by(year, area, xc, yc, lat, lon) %>%
+  mutate(area = factor(
+    case_when(lon > -155 & lon <= -95 & lat > 65 & lat <= 82 ~ "BF_CAA",
+              lon > -95 & lon <= -50 & lat > 66 & lat <= 82 ~ "BB",
+              lon >= -25 & lon <= 145 & lat > 77 & lat <= 90 ~ "SV"),
+    levels = c("BF_CAA", "BB", "SV"))) %>%
+  group_by(area, xc, yc, lat, lon, cell_res) %>%
   summarise(chl = mean(chl)) %>%
   ungroup()
 ```
@@ -623,7 +626,8 @@ chl_grid_laea <- list.files("data/remote_sensing/ocean_colour_OCEANCOLOUR_ARC_CH
 # Save data
 
 ```{r save-data}
-save(seaice_grid_laea, seaice_grid_latlon, file = "data/remote_sensing/seaice_grids.RData") # Save data
+save(seaice_grid_laea, seaice_grid_latlon, 
+     file = "data/remote_sensing/seaice_grids.RData") # Save data
 save(phy_grid_laea, file = "data/remote_sensing/physics_grids.RData") # Save data
 save(chl_grid_laea, file = "data/remote_sensing/chl_grid.RData") # Save data
 ```
