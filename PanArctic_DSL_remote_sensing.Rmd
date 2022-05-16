@@ -618,7 +618,7 @@ chl_grid_laea <- list.files("data/remote_sensing/ocean_colour_OCEANCOLOUR_ARC_CH
               lon > -95 & lon <= -50 & lat > 66 & lat <= 82 ~ "BB",
               lon >= -25 & lon <= 145 & lat > 77 & lat <= 90 ~ "SV"),
     levels = c("BF_CAA", "BB", "SV"))) %>%
-  group_by(area, xc, yc, lat, lon, cell_res) %>%
+  group_by(year, area, xc, yc, cell_res) %>%
   summarise(chl = mean(chl)) %>%
   ungroup()
 ```
