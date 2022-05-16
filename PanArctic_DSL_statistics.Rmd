@@ -9,6 +9,12 @@ output:
     always_allow_html: true
 ---
 
+# Goals
+
+The goal of the statistics are to investigate the potential effects of primary production and advection on mesopelagic backscatter for each Arctic region. Therefore, I gathered remote sensing data of sea ice concentration and ocean colour, and modelled advection from Copernicus.
+
+Since remote sensing of primary production (chlorophyll *a*) can be biased by high concentration of CDOM (chromophoric dissolved organic matter) and the photoadptation of Arctic phytoplankton (Lewis et al. 2016), I use to variables as proxy for primary production. First, I use the satellite-derived monthly averaged chlrophyll *a* concentration from CMEMS (doi: [10.48670/moi-00066](https://doi.org/10.48670/moi-00066)), and I calculate the open water days from sea ice concentration from the EUMETSAT OSI SAF remote sensing dataset (doi: [10.24381/cds.3cd8b812](https://doi.org/10.24381/cds.3cd8b812)) which I use as a proxy for primary production. For advection I use data from the Copernicus Marine Environmental Monitoring Service Arctic Ocean Physics Reanalysis product which gives monthly average of current velocity in the Arctic Ocean.
+
 # Package loading
 
 ```{r package-loading, message=FALSE, warning=FALSE}
@@ -37,7 +43,8 @@ theme_set(theme_bw())
 theme_update(axis.text = element_text(size = 9),
              axis.title = element_text(size = 9),
              strip.text.x = element_text(size = 9, face = "plain", hjust = 0.5),
-             strip.background = element_rect(colour = "transparent", fill = "transparent"),
+             strip.background = element_rect(colour = "transparent",
+                                             fill = "transparent"),
              legend.title = element_text(size = 9),
              legend.margin = margin(0, 0, 0, 0),
              legend.box.margin = margin(0, 0, -8, 0),
@@ -46,22 +53,17 @@ theme_update(axis.text = element_text(size = 9),
 options(dplyr.summarise.inform = F) # Suppress summarise() warning
 ```
 
-I want to test whether temperature and salinity at mesopelagic depth, sea-ice concentration, open-water duration (a proxy for productivity) have an effect on the backscatter anomalies observed per year. I therefore combined gridded acoustic data—integrated mesopelagic NASC—with gridded CTD, and remote sensing data projected on either the WGS84 or the EASE-Grid 2.0 North.
-
 ```{r data-loading, message=FALSE}
-# Map projections
+# Laea projection
 cell_res <- 25 # Cell resolution in km
-arctic_laea <- raster(extent(-2700, 2700, -2700, 2700), crs = "EPSG:6931") # Seaice projection
-projection(arctic_laea) <- gsub("units=m", "units=km", projection(arctic_laea)) # Convert proj unit from m to km
+arctic_laea <- raster(extent(-2700, 2700, -2700, 2700), crs = "EPSG:6931")
+projection(arctic_laea) <- gsub("units=m", "units=km", 
+                                projection(arctic_laea)) # Convert from m to km
 res(arctic_laea) <- c(cell_res, cell_res) # Define the 100 km cell resolution
 
-arctic_latlon <- raster(extent(-155, 35, 66, 85), # Base projection for acoustic and CTD data
-                        crs = "EPSG:4326", 
-                        res = c(2, 1)) # cells of 2 degree longitude per 1 degree latitude
-
-# Coastline shapefiles
-coast_10m_laea <- readOGR("data/bathy/ne_10m_land.shp", verbose = F) %>% # Coastline in laea
-  spTransform(CRSobj = crs(arctic_latlon)) %>% # Make sure that the shapefile is in the right projection
+# Coastline shapefiles reprojected to laea
+coast_10m_laea <- readOGR("data/bathy/ne_10m_land.shp", verbose = F) %>% 
+  spTransform(CRSobj = crs("EPSG:4326")) %>% # Verify that the shapefile proj is the right one
   crop(extent(-180, 180, 0, 90)) %>% # Crop shapefile
   spTransform(CRSobj = crs(arctic_laea)) %>% # Project shapefile in laea
   fortify() %>% # Convert to a dataframe for ggplot
@@ -76,59 +78,170 @@ load("data/remote_sensing/chl_grid.RData") # Remote sensing sea ice data
 
 # Data preparation
 
-I combine data using the EASE-Grid 2.0 North (EPSG:6931) and normalize the covariates per IHO area. I combined the Beaufort Sea and West Arctic Ocean data to have more points for the regression due to their geographical proximity.
+I combine backscatter and environmental data which were gridded on the Lambert Azimuthal Equal Area grid (EPSG:6931). Since I do not have a lot of samples from the the Beaufort Sea and West Arctic Ocean, I combine those two regions due to their geographical proximity.
 
 ```{r combine-data}
-SA_laea <- SA_grid_laea %>%  # Tidy anomaly dataset for joining
+# Prepare datasets
+SA_laea <- SA_grid_laea %>%  # Gridded SA
   dplyr::select(-lat, -lon) 
-phy_laea <- phy_grid_laea %>% # Tidy remote sensing datasets for joining
+phy_laea <- phy_grid_laea %>% # Remote sensing: physics reanalysis
   dplyr::select(year, area, xc, yc, cell_res, depth, thetao, velocity, so)
-seaice_laea <- seaice_grid_laea %>%
+seaice_laea <- seaice_grid_laea %>% # Remote sensing: seaice concentration
   dplyr::select(year, area, xc, yc, cell_res, openwater_duration, mean_ice_conc)
-chl_laea <- chl_grid_laea %>%
+chl_laea <- chl_grid_laea %>% # Remote sensing: chlorophyll a
   dplyr::select(-lat, -lon)
 
-stat_laea <- left_join(SA_laea, phy_laea, by = c("year", "area", "xc", "yc", "cell_res")) %>% # Join acoustic and physics
-  left_join(., seaice_laea, by = c("year", "area", "xc", "yc", "cell_res")) #%>%
-  left_join(., chl_laea, by = c("year", "xc", "yc", "area")) %>%
-  # For cells that have NaN, get the mean of the surrounding cells
-  rowwise() #%>%
-  mutate(xc_na = if_else(is.na(openwater_duration) == T, xc, NaN),
-         yc_na = if_else(is.na(openwater_duration) == T, yc, NaN),
-         year_na = if_else(is.na(openwater_duration) == T, year, NaN), 
-         openwater_duration = if_else(is.na(openwater_duration) == T, mean(pull(subset(seaice_grid_laea,
-                                                                                       xc >= xc_na - 50 &
-                                                                                         xc <= xc_na + 50 & 
-                                                                                         yc >= yc_na - 50 & 
-                                                                                         yc <= yc_na + 50 & 
-                                                                                         year == year_na,
-                                                                                       select = openwater_duration),
-                                                                                openwater_duration),
-                                                                           na.rm = T),
-                                      openwater_duration),
-         mean_ice_conc = if_else(is.na(mean_ice_conc) == T, mean(pull(subset(seaice_grid_laea,
-                                                                                       xc >= xc_na - 50 &
-                                                                                         xc <= xc_na + 50 & 
-                                                                                         yc >= yc_na - 50 & 
-                                                                                         yc <= yc_na + 50 & 
-                                                                                         year == year_na,
-                                                                                       select = mean_ice_conc),
-                                                                                mean_ice_conc),
-                                                                           na.rm = T),
-                                      mean_ice_conc),
-         velocity = velocity * 100, # Convert to cm/s
-         IHO_area = factor(case_when(IHO_area == "East Arctic Ocean" ~ "EAO",
-                                     IHO_area == "West Arctic Ocean" ~ "WAO_BF",
-                                     IHO_area == "Beaufort Sea" ~ "WAO_BF",
-                                     IHO_area == "The Northwestern Passages" ~ "CAA",
-                                     IHO_area == "Baffin Bay" ~ "BB",
-                                     IHO_area == "Davis Strait" ~ "DS"),
-                            levels = c("WAO_BF", "BF", "CAA", "BB", "DS", "EAO"))) %>%
-  filter(depth == 222) %>% # Select data at 222 m depth and remove cells with no DSL
-  ungroup() %>%
-  dplyr::select(-xc_na, -yc_na, -year_na)
+stat_laea <- SA_laea %>%
+  left_join(., phy_laea, by = c("year", "xc", "yc", "area", "cell_res")) %>% 
+  left_join(., seaice_laea, by = c("year", "xc", "yc", "area", "cell_res")) %>%
+  left_join(., chl_laea, by = c("year", "xc", "yc", "area", "cell_res")) %>%
+  filter(depth == 222) # Select physics at 222 m depth
+```
 
-stat_laea %>% group_by(IHO_area) %>% summarise(n = n())
+There are NAs in the remote sensing dataset.
+
+```{r map-NA, fig.width=8, fig.height=6}
+plot_grid(stat_laea %>% 
+            ggplot(aes(x = xc,  y = yc)) +
+            geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group),
+                         fill = "grey80") +
+            geom_point(aes(col = chl)) +
+            scale_colour_cmocean(name = "algae", na.value = "red") + 
+            facet_wrap(~ year) +
+            coord_fixed(xlim = c(-2450, 600), ylim = c(-1500, 1800), expand = F) +
+            theme(axis.text = element_blank(), axis.ticks = element_blank(), 
+                  axis.title = element_blank()),
+          stat_laea %>% 
+            ggplot(aes(x = xc,  y = yc)) +
+            geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group),
+                         fill = "grey80") +
+            geom_point(aes(col = openwater_duration)) +
+            scale_colour_viridis_c("ow", na.value = "red") + 
+            facet_wrap(~ year) +
+            coord_fixed(xlim = c(-2450, 600), ylim = c(-1500, 1800), expand = F) +
+            theme(axis.text = element_blank(), axis.ticks = element_blank(), 
+                  axis.title = element_blank()),
+          ncol = 1, align = "hv", axis = "tblr")
+```
+
+This is because the coverage of acoustic data and remote sensing products slightly differ close to the coasts. For sea ice concentration (and open water duration) the NAs are close to land while for ocean colour they are in ice covered areas. I use the average value of neighbouring cells (8 cells around the pixel of interest) to fill missing values.
+
+```{r fill-NAs}
+stat_laea <- stat_laea %>%
+  rowwise() %>%
+  mutate( 
+    # Physics
+    xc_phy = if_else(is.na(openwater_duration) == T, xc, NaN),
+    yc_phy = if_else(is.na(openwater_duration) == T, yc, NaN),
+    year_phy = if_else(is.na(openwater_duration) == T, year, NaN), 
+    openwater_duration = if_else(
+      is.na(openwater_duration) == T,
+      mean(pull(subset(seaice_grid_laea, 
+                       xc >= xc_phy - cell_res & xc <= xc_phy + cell_res & 
+                         yc >= yc_phy - cell_res & yc <= yc_phy + cell_res & 
+                         year == year_phy,
+                       select = openwater_duration),
+                openwater_duration),
+           na.rm = T),
+      openwater_duration),
+    mean_ice_conc = if_else(
+      is.na(mean_ice_conc) == T, 
+      mean(pull(subset(seaice_grid_laea,
+                       xc >= xc_phy - cell_res & xc <= xc_phy + cell_res & 
+                         yc >= yc_phy - cell_res & yc <= yc_phy + cell_res & 
+                         year == year_phy,
+                       select = mean_ice_conc),
+                mean_ice_conc),
+           na.rm = T),
+      mean_ice_conc),
+    # Ocean colour
+    xc_chl = if_else(is.na(chl) == T, xc, NaN),
+    yc_chl = if_else(is.na(chl) == T, yc, NaN),
+    year_chl = if_else(is.na(chl) == T, year, NaN), 
+    chl = if_else(
+      is.na(chl) == T,
+      mean(pull(subset(chl_grid_laea, 
+                       xc >= xc_chl - cell_res & xc <= xc_chl + cell_res & 
+                         yc >= yc_chl - cell_res & yc <= yc_chl + cell_res & 
+                         year == year_chl,
+                       select = chl),
+                chl),
+           na.rm = T),
+      chl),
+    # Convert veloctity to cm/s
+    velocity = velocity * 100, 
+    IHO_area = factor(case_when(IHO_area == "East Arctic Ocean" ~ "EAO",
+                                IHO_area == "West Arctic Ocean" ~ "WAO_BF",
+                                IHO_area == "Beaufort Sea" ~ "WAO_BF",
+                                IHO_area == "The Northwestern Passages" ~ "CAA",
+                                IHO_area == "Baffin Bay" ~ "BB",
+                                IHO_area == "Davis Strait" ~ "DS"),
+                      levels = c("WAO_BF", "BF", "CAA", "BB", "DS", "EAO"))) %>%
+  filter(depth == 222) %>% # Select physics at 222 m depth
+  ungroup() %>%
+  dplyr::select(-xc_phy, -yc_phy, -year_phy, -xc_chl, -yc_chl, -year_chl)
+```
+
+Check if I replace NAs correctly.
+
+```{r map-NA-fix, fig.width=8, fig.height=6}
+plot_grid(stat_laea %>% 
+            ggplot(aes(x = xc,  y = yc)) +
+            geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group),
+                         fill = "grey80") +
+            geom_point(aes(col = chl)) +
+            scale_colour_cmocean(name = "algae", na.value = "red") + 
+            facet_wrap(~ year) +
+            coord_fixed(xlim = c(-2450, 600), ylim = c(-1500, 1800), expand = F) +
+            theme(axis.text = element_blank(), axis.ticks = element_blank(), 
+                  axis.title = element_blank()),
+          stat_laea %>%
+            ggplot(aes(x = xc,  y = yc)) +
+            geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group),
+                         fill = "grey80") +
+            geom_point(aes(col = openwater_duration)) +
+            scale_colour_viridis_c("ow", na.value = "red") +
+            facet_wrap(~ year) +
+            coord_fixed(xlim = c(-2450, 600), ylim = c(-1500, 1800), expand = F) +
+            theme(axis.text = element_blank(), axis.ticks = element_blank(),
+                  axis.title = element_blank()),
+          ncol = 1, align = "hv", axis = "tblr")
+```
+
+NA replacement worked well for ice concentration. Since the missing chl values are for areas with at least 76 % ice concentration and less than 8 days of open water, I use the median chl value in those conditions, which is 0.2600639mg m-3.
+
+```{r median-chl}
+stat_laea %>%
+  filter(mean_ice_conc > 76) %>%
+  summarise(median_chl = median(chl, na.rm = T))
+```
+
+```{r fill-NA-chl}
+stat_laea <- stat_laea %>%
+  rowwise() %>%
+  mutate(chl = if_else(is.na(chl) == T, 0.2600639, chl)) %>% 
+  ungroup()
+```
+
+```{r map-chl-NA}
+stat_laea %>% 
+  ggplot(aes(x = xc,  y = yc)) +
+  geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group),
+               fill = "grey80") +
+  geom_point(aes(col = chl)) +
+  scale_colour_cmocean(name = "algae", na.value = "red") + 
+  facet_wrap(~ year) +
+  coord_fixed(xlim = c(-2450, 600), ylim = c(-1500, 1800), expand = F) +
+  theme(axis.text = element_blank(), axis.ticks = element_blank(), 
+        axis.title = element_blank())
+```
+
+Check the total number of observations per group.
+
+```{r sample-numbers}
+test <- stat_laea %>%
+  group_by(IHO_area) %>% 
+  summarise(n = n())
 ```
 
 # Data exploration
@@ -138,11 +251,14 @@ Maps of all variables.
 ```{r map-SA-int, fig.height=3, fig.width=7}
 stat_laea %>% 
   ggplot(aes(x = xc,  y = yc)) +
-  geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), fill = "grey80") +
+  geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group),
+               fill = "grey80") +
   geom_point(aes(col = IHO_area)) +
   ggtitle("regions") +
   facet_wrap(~ year) +
-  coord_fixed(xlim = c(-2600, 1100), ylim = c(-1800, 1900), expand = F)
+  coord_fixed(xlim = c(-2600, 1100), ylim = c(-1800, 1900), expand = F) + 
+  theme(axis.text = element_blank(), axis.ticks = element_blank(), 
+        axis.title = element_blank())
 ```
 
 ```{r map-ow, fig.height=3, fig.width=7}
