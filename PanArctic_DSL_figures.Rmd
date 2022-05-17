@@ -13,23 +13,25 @@ output:
 
 ```{r package-loading, message=FALSE}
 # Load packages
-library(tidyverse)              # Tidy code
-library(lubridate)              # Deal with dates
-library(kableExtra)             # Pretty tables
-library(cowplot)                # Plots on a grid
-library(raster)                 # Data gridding
-library(rgdal)                  # Read shapefiles
-library(rworldxtra)             # Higher resolution coastline data
-library(marmap)                 # Bathymetry data of the Arctic Ocean
-library(ggforce)                # Draw polygons
-library(cmocean)                # Pretty color palettes
-library(ggpubr)                 # Display stats with ggplot
-library(RColorBrewer)           # Diverging color palette
-library(ggnewscale)             # Multiple color scales on a single plot
-library(lemon)                  # Repeated axis on facets
-library(DT)                     # Interactive tables
-library(ragg)                   # Fix issues with plotting alpha and coord_cartesian
-library(MetBrewer)              # Color palette
+library(tidyverse)  # Tidy code
+library(lubridate)  # Deal with dates
+library(kableExtra) # Pretty tables
+library(cowplot)    # Plots on a grid
+library(raster)     # Data gridding
+library(rgdal)      # Read shapefiles
+library(rworldxtra) # Higher resolution coastline data
+library(marmap)     # Bathymetry data of the Arctic Ocean
+library(ggforce)    # Draw polygons
+library(cmocean)    # Pretty color palettes
+library(ggpubr)     # Display stats with ggplot
+library(RColorBrewer) # Diverging color palette
+library(ggnewscale) # Multiple color scales on a single plot
+library(lemon)      # Repeated axis on facets
+library(DT)         # Interactive tables
+library(ragg)       # Fix issues with plotting alpha and coord_cartesian
+library(MetBrewer)  # Color palette
+library(sf)         # Spatial data
+library(fs)         # List files
 source("R/getNOAA.ice.bathy.R") # Load bathy data from NOAA
 source("R/rounder.R")
 # Custom figure theme
@@ -37,7 +39,8 @@ theme_set(theme_bw())
 theme_update(axis.text = element_text(size = 9),
              axis.title = element_text(size = 9),
              strip.text.x = element_text(size = 9, face = "plain", hjust = 0.5),
-             strip.background = element_rect(colour = "transparent", fill = "transparent"),
+             strip.background = element_rect(colour = "transparent", 
+                                             fill = "transparent"),
              legend.title = element_text(size = 9),
              legend.margin = margin(0, 0, 0, 0),
              legend.box.margin = margin(0, 0, -8, 0),
@@ -48,38 +51,28 @@ options(dplyr.summarise.inform = F) # Suppress summarise() warning
 
 ```{r data-loading, message=FALSE}
 # Map projection
-arctic_latlon <- raster(extent(-155, 35, 66, 85), # Base projection for acoustic and CTD data
-                        crs = "EPSG:4326", 
-                        res = c(2, 1)) # cells of 2 degree longitude per 1 degree latitude
-
+arctic_latlon <- raster(extent(-155, 35, 66, 85), crs = "EPSG:4326")
 # Coastline shapefiles
-coast_10m_latlon <- readOGR("data/bathy/ne_10m_land.shp", verbose = F) %>% # Coastline in laea
-  spTransform(CRSobj = crs(arctic_latlon)) %>% # Make sure that the shapefile is in the right projection
+coast_10m_latlon <- readOGR("data/bathy/ne_10m_land.shp", verbose = F) %>% 
+  spTransform(CRSobj = crs(arctic_latlon)) %>% # Verify shapefile proj.
   crop(extent(-180, 180, 0, 90)) %>% # Crop shapefile
   fortify() %>% # Convert to a dataframe for ggplot
   rename(lon = long)
-
 # Bathy data
 bathy_df <- getNOAA.ice.bathy(lon1 = -180, lon2 = 180, lat1 = 50, lat2 = 90,
                               resolution = 2, keep = T, path = "data/bathy/") %>%
   fortify.bathy() %>%
-  rename(lon = x, lat = y, depth = z) %>%
-  mutate(depth_d = factor(case_when(between(depth, -50, Inf) ~ "0-50",
-                                  between(depth, -100, -50) ~ "50-100",
-                                  between(depth, -200, -100) ~ "100-200",
-                                  between(depth, -500, -200) ~ "200-500",
-                                  between(depth, -1000, -500) ~ "500-1000",
-                                  between(depth, -2000, -1000) ~ "1000-2000",
-                                  between(depth, -4000, -2000) ~ "2000-4000",
-                                  between(depth, -Inf, -4000) ~ "4000-8000"),
-                        levels=c(">0","0-50","50-100","100-200","200-500","500-1000","1000-2000","2000-4000","4000-8000")))
+  rename(lon = x, lat = y, depth = z)
 
 # Arctic circle and areas of interest
 arctic_circle_latlon <- data.frame(lon = seq(-180, 180, 0.1)) %>%
   mutate(lat = 66.5)
-area_BF_CAA_latlon <- data.frame(lon = c(-158, -158, -93, -93, -158), lat = c(79, 68.5, 68.5, 79, 79))
-area_BB_latlon <- data.frame(lon = c(-86, -65, -51.5, -51.5, -86), lat = c(72, 65.5, 65.5, 83, 83))
-area_SV_latlon <- data.frame(lon = c(46, 46, 0, 0, 46), lat = c(85, 76, 76, 85, 85))
+area_BF_CAA_latlon <- data.frame(lon = c(-158, -158, -93, -93, -158), 
+                                 lat = c(79, 68.5, 68.5, 79, 79))
+area_BB_latlon <- data.frame(lon = c(-86, -65, -51.5, -51.5, -86), 
+                             lat = c(72, 65.5, 65.5, 83, 83))
+area_SV_latlon <- data.frame(lon = c(46, 46, 0, 0, 46),
+                             lat = c(85, 76, 76, 85, 85))
 
 # Acoustic data
 load("data/acoustics/MVBS_2015_2017.RData")
@@ -113,39 +106,44 @@ I re-project data from the WGS84 projection to the EASE-Grid 2.0 North projectio
 
 ```{r data-laea-projection, cache=TRUE}
 # Laea projection for bathy and all other files
-arctic_laea <- raster(extent(-2700, 2700, -2700, 2700), crs = "EPSG:6931") # Seaice projection
-projection(arctic_laea) <- gsub("units=m", "units=km", projection(arctic_laea)) # Convert proj unit from m to km
 cell_res <- 50 # Cell resolution in km
-res(arctic_laea) <- c(cell_res, cell_res) # Define the 100 km cell resolution
+arctic_laea <- raster(extent(-2700, 2700, -2700, 2700), crs = "EPSG:6931") 
+projection(arctic_laea) <- gsub("units=m", "units=km", # Convert from m to km
+                                projection(arctic_laea)) 
+res(arctic_laea) <- c(cell_res, cell_res) # Define cell resolution
 
-proj_bathy_laea <- raster(extent(-2700, 2700, -2700, 2700), crs = "EPSG:6931", res = c(5, 5)) # Seaice projection
-projection(proj_bathy_laea) <- gsub("units=m", "units=km", projection(arctic_laea)) # Convert proj unit from m to km
+proj_bathy_laea <- raster(extent(-2700, 2700, -2700, 2700), 
+                          crs = "EPSG:6931", res = c(5, 5)) # Seaice projection
+projection(proj_bathy_laea) <- gsub("units=m", "units=km", # Convert from m to km
+                                    projection(arctic_laea)) 
 
 # Project bathymetric data 
-bathy_laea <- SpatialPointsDataFrame(SpatialPoints(cbind(bathy_df$lon, bathy_df$lat), 
+bathy_laea <- SpatialPointsDataFrame(SpatialPoints(cbind(bathy_df$lon,
+                                                         bathy_df$lat),
                                                    proj4string = CRS("EPSG:4326")),
                                      data.frame(depth = bathy_df$depth)) %>%
-  spTransform(., CRSobj = crs(proj_bathy_laea)) %>% # Change projection to EPSG:6931
-  rasterize(., proj_bathy_laea, fun = mean, na.rm = T) %>% # Rasterize data in latlon
+  spTransform(., CRSobj = crs(proj_bathy_laea)) %>% # Change projection to laea
+  rasterize(., proj_bathy_laea, fun = mean, na.rm = T) %>% # Rasterize data
   dropLayer(1) %>% # Remove ID layer
   rasterToPoints() %>% # Convert raster to data frame
   as.data.frame() %>%
   rename(xc = x, yc = y) %>%
   ungroup() %>%
-  mutate(depth_d = factor(case_when(between(depth, -100, Inf) ~ "0-100",
-                                    between(depth, -200, -100) ~ "100-200",
-                                    between(depth, -500, -200) ~ "200-500",
-                                    between(depth, -1000, -500) ~ "500-1000",
-                                    between(depth, -2000, -1000) ~ "1000-2000",
-                                    between(depth, -3000, -2000) ~ "2000-3000",
-                                    between(depth, -4000, -3000) ~ "3000-4000",
-                                    between(depth, -Inf, -4000) ~ "4000-5500"),
-                          levels = c(">0", "0-100", "100-200", "200-500", "500-1000",
-                                     "1000-2000", "2000-3000", "3000-4000", "4000-5500")))
+  mutate(depth_d = factor(
+    case_when(between(depth, -100, Inf) ~ "0-100",
+              between(depth, -200, -100) ~ "100-200",
+              between(depth, -500, -200) ~ "200-500",
+              between(depth, -1000, -500) ~ "500-1000",
+              between(depth, -2000, -1000) ~ "1000-2000",
+              between(depth, -3000, -2000) ~ "2000-3000",
+              between(depth, -4000, -3000) ~ "3000-4000",
+              between(depth, -Inf, -4000) ~ "4000-5500"),
+    levels = c(">0", "0-100", "100-200", "200-500", "500-1000",
+               "1000-2000", "2000-3000", "3000-4000", "4000-5500")))
 
 # Coastline shapefile
-coast_10m_laea <- readOGR("data/bathy/ne_10m_land.shp", verbose = F) %>% # Coastline in laea
-  spTransform(CRSobj = crs(arctic_latlon)) %>% # Make sure that the shapefile is in the right projection
+coast_10m_laea <- readOGR("data/bathy/ne_10m_land.shp", verbose = F) %>% 
+  spTransform(CRSobj = crs(arctic_latlon)) %>% 
   crop(extent(-180, 180, 0, 90)) %>% # Crop shapefile
   spTransform(CRSobj = crs(arctic_laea)) %>% # Project shapefile in laea
   fortify() %>% # Convert to a dataframe for ggplot
@@ -166,12 +164,14 @@ MVBS_laea <- SpatialPoints(cbind(MVBS_latlon$lon, MVBS_latlon$lat),
   rename(xc = coords.x1, yc = coords.x2) # Rename variables
 
 # Arctic circle and areas of interest
-arctic_circle_laea <- SpatialPoints(cbind(arctic_circle_latlon$lon, arctic_circle_latlon$lat), 
+arctic_circle_laea <- SpatialPoints(cbind(arctic_circle_latlon$lon,
+                                          arctic_circle_latlon$lat), 
                                     proj4string = CRS("EPSG:4326")) %>%
   spTransform(., CRSobj = crs(arctic_laea)) %>% # Change projection to EPSG:6931
   as.data.frame() %>%
   rename(xc = coords.x1, yc = coords.x2) # Rename variables
-area_BF_CAA_laea <- SpatialPoints(cbind(c(-152, -152, -140, -122.5, -93, -93), c(78, 73, 68, 68, 68, 78)), 
+area_BF_CAA_laea <- SpatialPoints(cbind(c(-152, -152, -140, -122.5, -93, -93),
+                                        c(78, 73, 68, 68, 68, 78)), 
                                   proj4string = CRS("EPSG:4326")) %>%
   spTransform(., CRSobj = crs(arctic_laea)) %>% # Change projection to EPSG:6931
   as.data.frame() %>%
@@ -188,92 +188,77 @@ area_SV_laea <- SpatialPoints(cbind(c(40, 40, 0, 0), c(85, 78, 78, 85)),
   rename(xc = coords.x1, yc = coords.x2)
 
 # IHO regions
-IHO_EAO <- readOGR("data/arctic_regions/iho_eastern_arctic_ocean.shp", verbose = F) %>% # Eastern Arctic Ocean
-  spTransform(CRSobj = crs(arctic_latlon)) %>% # Make sure that the shapefile is in the right projection
+IHO_EAO <- readOGR("data/arctic_regions/iho_eastern_arctic_ocean.shp",
+                   verbose = F) %>% # Eastern Arctic Ocean
+  spTransform(CRSobj = crs(arctic_latlon)) %>% 
   spTransform(CRSobj = crs(arctic_laea)) %>% # Project shapefile in laea
   fortify() %>% # Convert to dataframe for ggplot
   rename(xc = long, yc = lat)
-IHO_WAO <- readOGR("data/arctic_regions/iho_western_arctic_ocean.shp", verbose = F) %>% # Western Arctic Ocean
-  spTransform(CRSobj = crs(arctic_latlon)) %>% # Make sure that the shapefile is in the right projection
+IHO_WAO <- readOGR("data/arctic_regions/iho_western_arctic_ocean.shp",
+                   verbose = F) %>% # Western Arctic Ocean
+  spTransform(CRSobj = crs(arctic_latlon)) %>% 
   spTransform(CRSobj = crs(arctic_laea)) %>% # Project shapefile in laea
   fortify() %>% # Convert to dataframe for ggplot
   rename(xc = long, yc = lat)
-IHO_BF <- readOGR("data/arctic_regions/iho_beaufort_sea.shp", verbose = F) %>% # Eastern Arctic Ocean
-  spTransform(CRSobj = crs(arctic_latlon)) %>% # Make sure that the shapefile is in the right projection
+IHO_BF <- readOGR("data/arctic_regions/iho_beaufort_sea.shp",
+                  verbose = F) %>% # Beaufort Sea
+  spTransform(CRSobj = crs(arctic_latlon)) %>% 
   spTransform(CRSobj = crs(arctic_laea)) %>% # Project shapefile in laea
   fortify() %>% # Convert to dataframe for ggplot
   rename(xc = long, yc = lat)
-IHO_CAA <- readOGR("data/arctic_regions/iho_northwestern_passages.shp", verbose = F) %>% # Eastern Arctic Ocean
-  spTransform(CRSobj = crs(arctic_latlon)) %>% # Make sure that the shapefile is in the right projection
+IHO_CAA <- readOGR("data/arctic_regions/iho_northwestern_passages.shp",
+                   verbose = F) %>% # Canadian Arctic Archipelago
+  spTransform(CRSobj = crs(arctic_latlon)) %>% 
   spTransform(CRSobj = crs(arctic_laea)) %>% # Project shapefile in laea
   fortify() %>% # Convert to dataframe for ggplot
   rename(xc = long, yc = lat)
-IHO_BB <- readOGR("data/arctic_regions/iho_baffin_bay.shp", verbose = F) %>% # Eastern Arctic Ocean
-  spTransform(CRSobj = crs(arctic_latlon)) %>% # Make sure that the shapefile is in the right projection
+IHO_BB <- readOGR("data/arctic_regions/iho_baffin_bay.shp",
+                  verbose = F) %>% # Baffin Bay
+  spTransform(CRSobj = crs(arctic_latlon)) %>% 
   spTransform(CRSobj = crs(arctic_laea)) %>% # Project shapefile in laea
   fortify() %>% # Convert to dataframe for ggplot
   rename(xc = long, yc = lat)
-IHO_DS <- readOGR("data/arctic_regions/iho_davis_strait.shp", verbose = F) %>% # Eastern Arctic Ocean
-  spTransform(CRSobj = crs(arctic_latlon)) %>% # Make sure that the shapefile is in the right projection
+IHO_DS <- readOGR("data/arctic_regions/iho_davis_strait.shp", 
+                  verbose = F) %>% # Davis Strait
+  spTransform(CRSobj = crs(arctic_latlon)) %>% 
   spTransform(CRSobj = crs(arctic_laea)) %>% # Project shapefile in laea
   fortify() %>% # Convert to dataframe for ggplot
   rename(xc = long, yc = lat)
-IHO_regions <- bind_rows(IHO_EAO, IHO_WAO, IHO_BF, IHO_CAA, IHO_BB, IHO_DS) # Combine IHO definitions
-
-# Remove unused variable
-rm(cell_res)
+# Combine IHO areas
+IHO_regions <- bind_rows(IHO_EAO, IHO_WAO, IHO_BF, IHO_CAA, IHO_BB, IHO_DS) 
+rm(IHO_EAO, IHO_WAO, IHO_BF, IHO_CAA, IHO_BB, IHO_DS)
+# IHO areas
+IHO_sf_latlon <- dir_ls("data/arctic_regions/", glob = "*.shp") %>% 
+  tibble(fname = .) %>%
+  mutate(data = map(fname, read_sf)) %>%
+  unnest(data) %>%
+  st_as_sf() %>%
+  st_transform(crs = crs(arctic_latlon)) %>%
+  st_make_valid()
 ```
 
 # Summary statistics
 
 ```{r summary-region}
-# Calculate percent of DSL in all grid cells across all areas
-DSL_all_area <- SA_grid_laea %>%
-  group_by(empty_clean, year) %>% # per year
-  summarise(n = n()) %>%
-  ungroup() %>%
-  group_by(year) %>%
-  mutate(total = sum(n)) %>%
-  ungroup() %>%
-  mutate(percent = round(n / total, 2) * 100) %>%
-  group_by(empty_clean) %>%
-  summarise(percent = mean(percent)) %>% # mean percentage across all years
-  filter(empty_clean == F) %>%
-  mutate(IHO_area = "All areas") %>%
-  dplyr::select(IHO_area, percent)
-
-# Calculate percent of DSL within each area
-DSL_area <- SA_grid_laea %>% 
-  group_by(IHO_area, empty_clean, year) %>% # per year
-  summarise(n = n()) %>%
-  ungroup() %>%
-  group_by(IHO_area, year) %>% 
-  mutate(total = sum(n)) %>%
-  ungroup() %>%
-  group_by(IHO_area) %>% # per area per year
-  mutate(percent = round(n / total, 2) * 100) %>%
-  ungroup() %>%
-  group_by(IHO_area, empty_clean) %>% # per area
-  summarise(percent = round(mean(percent))) %>% # mean percentage across all years
-  filter(empty_clean == F) %>%
-  dplyr::select(IHO_area, percent) %>%
-  bind_rows(., DSL_all_area)
-
-# Calculate median SA across all areas
+# Calculate median and mean SA across all areas
 SA_all_area <- SA_grid_laea %>%
   # filter(empty_clean == F) %>%
   group_by(year) %>% # per year
   summarise(n = n(),
-            NASC_median = median(NASC_int),
-            NASC_mad = mad(NASC_int), 
-            CM_median = median(CM),
-            CM_mad = mad(CM)) %>%
+            NASC_median = median(NASC_int, na.rm = T),
+            NASC_mad = mad(NASC_int, na.rm = T), 
+            NASC_mean = mean(NASC_int, na.rm = T),
+            NASC_sd = sd(NASC_int, na.rm = T), 
+            CM_median = median(CM, na.rm = T),
+            CM_mad = mad(CM, na.rm = T)) %>%
   ungroup() %>%
   summarise(n = sum(n), # Mean across all areas and years
-            NASC_median = round(mean(NASC_median), 1),
-            NASC_mad = round(mean(NASC_mad), 1),
-            CM_median = round(mean(CM_median)),
-            CM_mad = round(mean(CM_mad))) %>%
+            NASC_median = round(mean(NASC_median, na.rm = T), 1),
+            NASC_mad = round(mean(NASC_mad, na.rm = T), 1),
+            NASC_mean = round(mean(NASC_mean, na.rm = T), 1),
+            NASC_sd = round(mean(NASC_sd, na.rm = T), 1),
+            CM_median = round(mean(CM_median, na.rm = T)),
+            CM_mad = round(mean(CM_mad, na.rm = T))) %>%
   mutate(IHO_area = "All areas")
 
 # Calculate median SA within each area
@@ -282,36 +267,42 @@ SA_grid_laea %>%
   mutate(IHO_area == as.character(IHO_area)) %>%
   group_by(IHO_area, year) %>%  # median per year
   summarise(n = n(),
-            NASC_median = round(median(NASC_int), 1),
-            NASC_mad = round(mad(NASC_int), 1),
-            CM_median = round(median(CM)),
-            CM_mad = round(mad(CM))) %>%
+            NASC_median = median(NASC_int, na.rm = T),
+            NASC_mad = mad(NASC_int, na.rm = T), 
+            NASC_mean = mean(NASC_int, na.rm = T),
+            NASC_sd = sd(NASC_int, na.rm = T), 
+            CM_median = median(CM, na.rm = T),
+            CM_mad = mad(CM, na.rm = T)) %>%
   ungroup() %>%
   group_by(IHO_area) %>% # Mean per area
   summarise(n = sum(n), # Mean across all areas and years
-            NASC_median = round(mean(NASC_median), 1),
-            NASC_mad = round(mean(NASC_mad), 1),
-            CM_median = round(mean(CM_median)),
-            CM_mad = round(mean(CM_mad))) %>%
+            NASC_median = round(mean(NASC_median, na.rm = T), 1),
+            NASC_mad = round(mean(NASC_mad, na.rm = T), 1),
+            NASC_mean = round(mean(NASC_mean, na.rm = T), 1),
+            NASC_sd = round(mean(NASC_sd, na.rm = T), 1),
+            CM_median = round(mean(CM_median, na.rm = T)),
+            CM_mad = round(mean(CM_mad, na.rm = T))) %>%
   ungroup() %>% 
   bind_rows(., SA_all_area) %>%
-  left_join(., DSL_area, by = "IHO_area") %>%
-  mutate(IHO_area = factor(case_when(IHO_area == "East Arctic Ocean" ~ "East Arctic\nOcean",
-                                     IHO_area == "West Arctic Ocean" ~ "West Arctic\nOcean",
-                                     IHO_area == "Beaufort Sea" ~ "Beaufort Sea",
-                                     IHO_area == "The Northwestern Passages" ~ "Can. Arctic\nArchipelago",
-                                     IHO_area == "Baffin Bay" ~ "Baffin Bay",
-                                     IHO_area == "Davis Strait" ~ "Davis Strait",
-                                     IHO_area == "All areas" ~ "All areas"),
-                           levels = c("West Arctic\nOcean", "Beaufort Sea", "Can. Arctic\nArchipelago",
-                                      "Baffin Bay", "Davis Strait", "East Arctic\nOcean", "All areas"))) %>%
+  mutate(IHO_area = factor(
+    case_when(IHO_area == "East Arctic Ocean" ~ "East Arctic\nOcean",
+              IHO_area == "West Arctic Ocean" ~ "West Arctic\nOcean",
+              IHO_area == "Beaufort Sea" ~ "Beaufort Sea",
+              IHO_area == "The Northwestern Passages" ~ "Can. Arctic\nArchipelago",
+              IHO_area == "Baffin Bay" ~ "Baffin Bay",
+              IHO_area == "Davis Strait" ~ "Davis Strait",
+              IHO_area == "All areas" ~ "All areas"),
+    levels = c("West Arctic\nOcean", "Beaufort Sea", "Can. Arctic\nArchipelago",
+               "Baffin Bay", "Davis Strait", "East Arctic\nOcean", 
+               "All areas"))) %>%
   # dplyr::select(-CM_median, -CM_mad) %>%
-  datatable(rownames = F)
+  kbl() %>%
+  kable_classic()
 ```
 
 # Plots
 
-## Base map with areas reprojcted
+## Base map with IHO areas reprojcted
 
 ```{r map-areas, fig.height=4, fig.width=6}
 # Bathymetric map of the Arctic with location of acoustic and trawl
@@ -496,6 +487,9 @@ p_Sv_grid_laea
 ### Lines
 
 ```{r, fig.width=6.5, fig.height=3.5}
+col_pal <- c("#03051AFF", "#3F1B44FF", "#841E5AFF",
+             "#CB1B4FFF", "#F06043FF", "#F6AA82FF") #viridisLite::rocket(n = 7)
+
 # Find cells with no DSL
 empty_DSL <- SA_grid_laea %>% 
   group_by(xc, yc, year, empty_clean) %>%
@@ -503,7 +497,7 @@ empty_DSL <- SA_grid_laea %>%
 # Calculate median Sv profiles per area
 Sv_prof_median <- Sv_grid_laea %>%
   left_join(., empty_DSL, by = c("year", "xc", "yc")) %>% # Add DSL presence
-  filter(empty_clean == F) %>% # Filter for DSL
+  # filter(empty_clean == F) %>% # Filter for DSL
   mutate(depth_round = rounder(depth, -10)) %>% # round down to nearest 20
   group_by(depth_round, IHO_area) %>%
   summarise(sv_lin50 = median(sv_lin_median),
@@ -541,8 +535,10 @@ p_Sv_prof_lines <- Sv_prof_median %>%
   # geom_rect(aes(xmin = 0, xmax = 200, ymin = -Inf, ymax = Inf), col = NA, fill = "grey87", alpha = 0.05) + # Mesopelagic zone
   scale_x_reverse("Depth (m)", breaks = seq(0, 1000, 200)) + 
   scale_y_continuous(expression("S"[V]*" (dB re 1 m"^-1*")"), breaks = seq(-200, 0, 10)) +
-  scale_colour_manual(values = met.brewer("Johnson", n = 6, direction = -1)) +
-  scale_fill_manual(values = met.brewer("Johnson", n = 6, direction = -1)) +
+  scale_colour_manual(values = col_pal) +
+  scale_fill_manual(values = col_pal) +
+  # scale_colour_manual(values = met.brewer("Johnson", n = 6, direction = -1)) +
+  # scale_fill_manual(values = met.brewer("Johnson", n = 6, direction = -1)) +
   coord_flip(ylim = c(-105, -65), xlim = c(1000, 0), expand = F) +
   facet_grid(~ IHO_area) +
   theme(panel.border = element_blank(),
@@ -631,67 +627,79 @@ p_Sv_prof_boxplot
 ## Figure 3. Boxplot mesopelagic NASC & Map detections
 
 ```{r fig3-boxplot-NASC, fig.width=6, fig.height=5}
-map_DSL <- SA_grid_laea %>%  # Map of DSL detections
-  mutate(DSL = factor(if_else(empty_clean == T, F, T), levels = c(T, F))) %>%
-  arrange(DSL) %>%
+# Map NASC
+map_DSL <- SA_grid_laea %>% 
+  mutate(NASC_int_d = cut(NASC_int, c(0, 1, 10, 100, 1000, 10000, Inf))) %>%
   ggplot(aes(x = xc,  y = yc)) +
   geom_raster(data = bathy_laea, aes(x = xc, y = yc, fill = depth_d)) + # bathy
-  scale_fill_cmocean("Depth (m)", name = "deep", discrete = T, na.value = NA, alpha = 0.4) +
-  geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), fill = "grey80") + # Coast
-  geom_point(aes(col = DSL), size = 0.6) +
-  scale_color_manual("DSL presence", values = c("#1170aa", "#fc7d0b")) +
+  scale_fill_grey("Depth (m)", start = 0.85, end = 0.3) +
+  geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), 
+               fill = "grey20") + # Coast
+  geom_point(aes(col = NASC_int_d), size = 0.6) +
+  scale_color_viridis_d(option = "plasma", 
+                        labels = c("< 1", "1-10", "11-100", "101-1000", 
+                                   "1001-10000", "> 10000")) +
   facet_wrap(~ year) +
   coord_fixed(xlim = c(-2450, 600), ylim = c(-1500, 1800), expand = F) +
   # coord_fixed(xlim = c(-2600, 1100), ylim = c(-1600, 1900), expand = F) +
   guides(fill = "none",
-         colour = guide_legend(override.aes = list(size = 2))) + # Increase symbol size in legend
+         colour = guide_legend(override.aes = list(size = 2), 
+                               nrow = 1)) + # Increase symbol size in legend
   theme(legend.position = "top",
+        legend.title = element_blank(),
         axis.text = element_blank(),
         axis.ticks = element_blank(),
         axis.title = element_blank())
-
-col_pal <- c("#1170aa", "#fc7d0b", "#76B7B2") # Custom colour palette
-
-p_boxplot_SA <- SA_grid_laea %>% # Boxplot of SA per region
-  mutate(IHO_area = factor(case_when(IHO_area == "East Arctic Ocean" ~ "East Arctic\nOcean",
-                                     IHO_area == "West Arctic Ocean" ~ "West Arctic\nOcean",
-                                     IHO_area == "Beaufort Sea" ~ "Beaufort Sea",
-                                     IHO_area == "The Northwestern Passages" ~ "Can. Arctic\nArchipelago",
-                                     IHO_area == "Baffin Bay" ~ "Baffin Bay",
-                                     IHO_area == "Davis Strait" ~ "Davis Strait"),
-                           levels = c("West Arctic\nOcean", "Beaufort Sea", "Can. Arctic\nArchipelago",
-                                      "Baffin Bay", "Davis Strait", "East Arctic\nOcean"))) %>%
-  filter(empty_clean == F) %>%
-  ggplot(aes(x = IHO_area, y = SA_int_clean)) + 
+# Bxplot SA
+# p_boxplot_SA <- 
+  SA_grid_laea %>% # Boxplot of SA per region
+  mutate(IHO_area = factor(
+    case_when(IHO_area == "East Arctic Ocean" ~ "East Arctic\nOcean",
+              IHO_area == "West Arctic Ocean" ~ "West Arctic\nOcean",
+              IHO_area == "Beaufort Sea" ~ "Beaufort Sea",
+              IHO_area == "The Northwestern Passages" ~ "Can. Arctic\nArchipelago",
+              IHO_area == "Baffin Bay" ~ "Baffin Bay",
+              IHO_area == "Davis Strait" ~ "Davis Strait"),
+    levels = c("West Arctic\nOcean", "Beaufort Sea", "Can. Arctic\nArchipelago",
+               "Baffin Bay", "Davis Strait", "East Arctic\nOcean"))) %>%
+  ggplot(aes(x = IHO_area, y = SA_int)) + 
   geom_boxplot(position = position_dodge(preserve = "single")) +
   scale_y_continuous(expression("S"[A]*" (dB re 1 m"^2*" nmi"^-2*")")) +
-  scale_fill_manual(values = col_pal) +
-  theme(axis.title.x = element_blank(), 
-        legend.title = element_blank(),
-        legend.position = c(0.075, 0.78),
+  theme(panel.border = element_blank(),
+        axis.title.x = element_blank(),
+        axis.line = element_line(),
+        legend.title = element_blank(), 
+        # legend.position = "none",
         plot.margin = unit(c(0.1, 0.1, 0, 0), "in"))
-
-p_map_SA_DSL <- plot_grid(map_DSL, p_boxplot_SA, ncol = 1, align = "v", axis = "lr") 
-ggsave("plots/Fig3_map_boxplot_SA.png", p_map_SA_DSL, height = 5, width = 6, dpi = 600, units = "in")
+# Combine plots
+p_map_SA_DSL <- plot_grid(map_DSL, p_boxplot_SA, 
+                          ncol = 1, align = "v", axis = "lr") 
+# Save and display plots
+ggsave("plots/Fig3_map_boxplot_SA.png", p_map_SA_DSL,
+       height = 5, width = 6, dpi = 600, units = "in")
 p_map_SA_DSL
 ```
 
 ```{r fig3-map-points}
 map_DSL <- SA_grid_laea %>%  # Map of DSL detections
   mutate(NASC_int_d = cut(NASC_int, c(0, 1, 10, 100, 1000, 10000, Inf))) %>%
-  mutate(DSL = factor(if_else(empty_clean == T, "Absent", "Present"), levels = c("Present", "Absent"))) %>%
-  arrange(DSL) %>%
   ggplot(aes(x = xc,  y = yc)) +
-  geom_raster(data = bathy_laea, aes(x = xc, y = yc, fill = depth_d)) + # bathy
-  scale_fill_cmocean("Depth (m)", name = "deep", discrete = T, na.value = NA, alpha = 0.4) +
-  geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), fill = "grey80") + # Coast
+  geom_raster(data = bathy_laea, 
+              aes(x = xc, y = yc, fill = depth_d)) + # bathy
+  scale_fill_grey("Depth (m)", start = 0.8, end = 0.3) +
+  # new_scale_fill() +
+  geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), 
+               fill = "grey20") + # Coast
   geom_point(aes(col = NASC_int_d), size = 0.6) +
-  scale_color_viridis_d(option = "plasma", labels = c("< 1", "1-10", "11-100", "101-1000", "1001-10000", "> 10000")) +
+  scale_color_viridis_d(option = "plasma", 
+                        labels = c("< 1", "1-10", "11-100", "101-1000", 
+                                   "1001-10000", "> 10000")) +
   facet_wrap(~ year) +
   coord_fixed(xlim = c(-2450, 600), ylim = c(-1500, 1800), expand = F) +
   # coord_fixed(xlim = c(-2600, 1100), ylim = c(-1600, 1900), expand = F) +
+  # Increase symbol size in legend
   guides(fill = "none",
-         colour = guide_legend(override.aes = list(size = 2), nrow = 1)) + # Increase symbol size in legend
+         colour = guide_legend(override.aes = list(size = 2), nrow = 1)) + 
   theme(legend.position = "top",
         legend.title = element_blank(),
         axis.text = element_blank(),
@@ -699,77 +707,116 @@ map_DSL <- SA_grid_laea %>%  # Map of DSL detections
         axis.title = element_blank())
 
 pointrange_NASC <- SA_grid_laea %>% # Pointrange of SA per region
-  mutate(IHO_area = factor(case_when(IHO_area == "East Arctic Ocean" ~ "East Arctic\nOcean",
-                                     IHO_area == "West Arctic Ocean" ~ "West Arctic\nOcean",
-                                     IHO_area == "Beaufort Sea" ~ "Beaufort Sea",
-                                     IHO_area == "The Northwestern Passages" ~ "Can. Arctic\nArchipelago",
-                                     IHO_area == "Baffin Bay" ~ "Baffin Bay",
-                                     IHO_area == "Davis Strait" ~ "Davis Strait"),
-                           levels = c("West Arctic\nOcean", "Beaufort Sea", "Can. Arctic\nArchipelago",
-                                      "Baffin Bay", "Davis Strait", "East Arctic\nOcean"))) %>%
-  filter(empty_clean == F) %>%
+  mutate(IHO_area = factor(
+    case_when(
+    IHO_area == "East Arctic Ocean" ~ "East Arctic\nOcean",
+    IHO_area == "West Arctic Ocean" ~ "West Arctic\nOcean",
+    IHO_area == "Beaufort Sea" ~ "Beaufort Sea",
+    IHO_area == "The Northwestern Passages" ~ "Can. Arctic\nArchipelago",
+    IHO_area == "Baffin Bay" ~ "Baffin Bay",
+    IHO_area == "Davis Strait" ~ "Davis Strait"),
+    levels = c("West Arctic\nOcean", "Beaufort Sea", "Can. Arctic\nArchipelago",
+               "Baffin Bay", "Davis Strait", "East Arctic\nOcean"))) %>%
   group_by(IHO_area, year) %>%  # median per year
-  summarise(NASC_median = median(NASC_int_clean),
-            NASC_mad = mad(NASC_int_clean)) %>%
-  ungroup() %>% 
+  summarise(NASC_median = median(NASC_int, na.rm = T),
+            NASC_mean = mean(NASC_int, na.rm = T),
+            NASC_q025 = quantile(NASC_int, 0.025),
+            NASC_q975 = quantile(NASC_int, 0.975)) %>%
+  ungroup() %>%
   group_by(IHO_area) %>% # Mean per area
-  summarise(NASC_median = mean(NASC_median),
-            NASC_mad = mean(NASC_mad)) %>%
-  ungroup() %>% 
-  ggplot(aes(x = IHO_area, y = NASC_median, col = IHO_area)) + 
-  geom_pointrange(aes(ymin = NASC_median - NASC_mad, ymax = NASC_median + NASC_mad)) +
-  scale_colour_manual(values = met.brewer("Johnson", n = 6, direction = -1)) +
-  scale_y_continuous(expression("Median s"[A]*" (m"^2*" nmi"^-2*")")) +
+  summarise(NASC_median = mean(NASC_median, na.rm = T),
+            NASC_mean = mean(NASC_mean, na.rm = T),
+            NASC_q025 = min(NASC_q025, na.rm = T),
+            NASC_q975 = max(NASC_q975, na.rm = T)) %>%
+  ungroup() %>%
+  ggplot(aes(x = IHO_area)) +
+  geom_point(aes(y = NASC_mean), shape = 18, size = 4, col = "#E26362") +
+  geom_pointrange(aes(y = NASC_median, ymin = NASC_q025, ymax = NASC_q975),
+                  size = 0.25, col = "grey20") +
+  scale_y_continuous(
+    expression("s"[A]*" (m"^2*" nmi"^-2*")"), 
+    breaks = c(1, 5, 10, 50, 100, 500, 1000, 5000, 10000, 50000),
+    trans = "log10") +
   theme(panel.border = element_blank(),
         axis.title.x = element_blank(),
         axis.line = element_line(),
-        legend.title = element_blank(), 
-        legend.position = "none",
         plot.margin = unit(c(0.1, 0.1, 0, 0), "in"))
-
-p_map_pointrange_NASC <- plot_grid(map_DSL, pointrange_NASC, ncol = 1, align = "v", axis = "lr") 
-ggsave("plots/Fig3_map_pointrange_NASC.png", p_map_pointrange_NASC, height = 5, width = 6, dpi = 600, units = "in")
+# Combine plots
+p_map_pointrange_NASC <- plot_grid(map_DSL, pointrange_NASC, 
+                                   ncol = 1, align = "v", axis = "lr") 
+# Save and display plot
+ggsave("plots/Fig3_map_pointrange_NASC.png", p_map_pointrange_NASC, 
+       height = 5, width = 6, dpi = 600, units = "in")
 p_map_pointrange_NASC
 ```
 
 ## Table 1. Abundance mesopelagic fish
 
-```{r table1-heatmap-abundance, fig.align='center', fig.width=4.5, fig.height=3.25}
-relative_abundance_area <- trawl_station %>%
-  group_by(area) %>%
-  summarise(total_fish = sum(number_fish)) %>% # Calculate total number of fish caught per area
+```{r table1-heatmap-abundance}
+trawl_area <- trawl %>%
+  # Find IHO area for each trawl deployment
+  st_as_sf(coords = c("lon", "lat"), crs = st_crs(arctic_latlon), remove = F) %>%
+  st_join(., IHO_sf_latlon, join = st_within) %>% # Append IHO region
+  st_drop_geometry() %>%
+  mutate(name = if_else(name == "The Northwestern Passages" & lon > -90, "Baffin Bay",
+                if_else(name == "Arctic Ocean" & name_3 == "West Arctic Ocean", "West Arctic Ocean",
+                if_else(name == "Arctic Ocean" & name_3 == "East Arctic Ocean", "East Arctic Ocean", name)))) %>%
+  rename(IHO_area = name, area = area.x) %>%
+  dplyr::select(-fname, -id, -longitude, -latitude, -min_x, -min_y, -max_x, 
+                -max_y, -area.y, -mrgid, -bearings, -name_1, -mrgid_1, -name_2,
+                -mrgid_2, -name_3, -mrgid_3) %>%
+  # Calculate number of individual for each species per IHO region
+  group_by(IHO_area, fish_species) %>% 
+  summarise(number_fish = sum(number_fish)) %>%
   ungroup() %>%
-  right_join(., trawl_area, by = c("area")) %>% # Join with relative abundance dataset
-  mutate(area = factor(case_when(area == "BF_CAA" ~ "Beaufort Sea &\nCan. Arct. Archipelago",
-                                 area == "BB" ~ "Baffin Bay",
-                                 area == "SV" ~ "Svalbard"),
-                       levels = c("Beaufort Sea &\nCan. Arct. Archipelago", "Baffin Bay", "Svalbard"))) %>%
-  unite(area_label, area, total_fish, sep = "\nn = ", remove = F) %>% # Create labels for x axis
+  # Calculate total number of fish per IHO region
+  group_by(IHO_area) %>%
+  mutate(total_fish = sum(number_fish)) %>% 
+  ungroup() %>%
+  # Calculate relative abundance per station
+  mutate(RA = (number_fish / total_fish) * 100) %>%
+  mutate(IHO_area = factor(
+    case_when(
+      IHO_area == "East Arctic Ocean" ~ "East Arctic\nOcean\nn = 464",
+      IHO_area == "West Arctic Ocean" ~ "West Arctic\nOcean",
+      IHO_area == "Beaufort Sea" ~ "Beaufort Sea\nn = 54",
+      IHO_area == "The Northwestern Passages" ~ "Can. Arctic\nArchipelago\nn = 889",
+      IHO_area == "Baffin Bay" ~ "Baffin Bay\nn = 211",
+      IHO_area == "Davis Strait" ~ "Davis Strait\nn = 21"),
+    levels = c("West Arctic\nOcean",
+               "Beaufort Sea\nn = 54",
+               "Can. Arctic\nArchipelago\nn = 889", 
+               "Baffin Bay\nn = 211", 
+               "Davis Strait\nn = 21", 
+               "East Arctic\nOcean\nn = 464"))) %>%
   # Format species name appropriately
-  mutate(fish_species = str_replace(fish_species, pattern = "_", replacement = " "),
-         fish_species = str_replace(fish_species, pattern = " sp", replacement = " sp."),
+  mutate(fish_species = str_replace(fish_species, pattern = "_", 
+                                    replacement = " "),
+         fish_species = str_replace(fish_species, pattern = " sp",
+                                    replacement = " sp."),
          fish_species = str_to_sentence(fish_species),
-         fish_species = if_else(fish_species == "Notolepis rissoi", "Arctozenus risso", fish_species),
-         fish_species = factor(fish_species, levels = c("Icelus bicornis",
-                                                        "Anarhichas lupus",
-                                                        "Reinhardtius hippoglossoides",
-                                                        "Arctozenus risso",
-                                                        "Melanogrammus aeglefinus",
-                                                        "Gadus morhua",
-                                                        "Leptoclinus maculatus",
-                                                        "Sebastes sp.",
-                                                        "Myctophidae",
-                                                        "Liparidae",
-                                                        "Boreogadus saida")),
-         color_text = if_else(RA_area >= 40, "white", "black"),
-         RA_area_round = 10 * floor(RA_area / 10),
-         area_label = factor(area_label, levels = c("Beaufort Sea &\nCan. Arct. Archipelago\nn = 923",
-                                                    "Baffin Bay\nn = 232",
-                                                    "Svalbard\nn = 464"))) %>%
+         fish_species = if_else(fish_species == "Notolepis rissoi",
+                                "Arctozenus risso", fish_species),
+         fish_species = factor(fish_species, 
+                               levels = c("Icelus bicornis",
+                                          "Anarhichas lupus",
+                                          "Reinhardtius hippoglossoides",
+                                          "Arctozenus risso",
+                                          "Melanogrammus aeglefinus",
+                                          "Gadus morhua",
+                                          "Leptoclinus maculatus",
+                                          "Sebastes sp.",
+                                          "Myctophidae",
+                                          "Liparidae",
+                                          "Boreogadus saida")),
+         color_text = if_else(RA >= 40, "white", "black")) %>%
   # Plot
   ggplot() +
-  geom_tile(aes(x = area_label, y = fish_species, fill = RA_area_round), color = "white", lwd = 0.6) +
-  geom_text(aes(x = area_label, y = fish_species, label = sprintf("%0.1f", round(RA_area, 1)), color = color_text), size = 3) +
+  geom_tile(aes(x = IHO_area, y = fish_species, fill = RA),
+            color = "white", lwd = 0.6) +
+  geom_text(aes(x = IHO_area, y = fish_species, 
+                label = sprintf("%0.1f", round(RA, 1)),
+                color = color_text), size = 3) +
   scale_x_discrete(expand = c(0, 0)) +
   scale_y_discrete(labels = c("Twohorn sculpin",
                               "Atlantic wolffish",
@@ -784,7 +831,9 @@ relative_abundance_area <- trawl_station %>%
                               "Polar cod"),
                    expand = c(0, 0)) +
   scale_colour_identity() +
-  scale_fill_viridis_c("Relative\nabundance (%)  ", option = "mako", breaks = seq(0, 100, 20), limits = c(0, 100), direction = -1) +
+  scale_fill_viridis_c("Relative\nabundance (%)  ", option = "rocket", 
+                       breaks = seq(0, 100, 20), limits = c(0, 100), 
+                       direction = -1) +
   guides(fill = guide_colorbar(label.position = "top")) +
   theme(axis.title = element_blank(),
         legend.position = "top",
@@ -793,7 +842,10 @@ relative_abundance_area <- trawl_station %>%
         legend.key.height = unit(0.1, "in"),
         legend.key.width = unit(0.3, "in"),
         legend.box.margin = margin(0,0,-5,0))
-relative_abundance_area
+# Save and display plot
+ggsave("plots/Table1_relative_abundance_IHO.png", trawl_area, 
+       height = 3.5, width = 5, dpi = 600, units = "in")
+trawl_area
 ```
 
 # Supplementary data
