@@ -250,7 +250,9 @@ SA_all_area <- SA_grid_laea %>%
             NASC_mean = mean(NASC_int, na.rm = T),
             NASC_sd = sd(NASC_int, na.rm = T), 
             CM_median = median(CM, na.rm = T),
-            CM_mad = mad(CM, na.rm = T)) %>%
+            CM_mad = mad(CM, na.rm = T),
+            CM_mean = mean(CM, na.rm = T),
+            CM_sd = sd(CM, na.rm = T)) %>%
   ungroup() %>%
   summarise(n = sum(n), # Mean across all areas and years
             NASC_median = round(mean(NASC_median, na.rm = T), 1),
@@ -258,7 +260,9 @@ SA_all_area <- SA_grid_laea %>%
             NASC_mean = round(mean(NASC_mean, na.rm = T), 1),
             NASC_sd = round(mean(NASC_sd, na.rm = T), 1),
             CM_median = round(mean(CM_median, na.rm = T)),
-            CM_mad = round(mean(CM_mad, na.rm = T))) %>%
+            CM_mad = round(mean(CM_mad, na.rm = T)),
+            CM_mean = round(mean(CM_mean, na.rm = T)),
+            CM_sd = round(mean(CM_sd, na.rm = T))) %>%
   mutate(IHO_area = "All areas")
 
 # Calculate median SA within each area
@@ -272,16 +276,20 @@ SA_grid_laea %>%
             NASC_mean = mean(NASC_int, na.rm = T),
             NASC_sd = sd(NASC_int, na.rm = T), 
             CM_median = median(CM, na.rm = T),
-            CM_mad = mad(CM, na.rm = T)) %>%
+            CM_mad = mad(CM, na.rm = T),
+            CM_mean = mean(CM, na.rm = T),
+            CM_sd = sd(CM, na.rm = T)) %>%
   ungroup() %>%
   group_by(IHO_area) %>% # Mean per area
-  summarise(n = sum(n), # Mean across all areas and years
+ summarise(n = sum(n), # Mean across all areas and years
             NASC_median = round(mean(NASC_median, na.rm = T), 1),
             NASC_mad = round(mean(NASC_mad, na.rm = T), 1),
             NASC_mean = round(mean(NASC_mean, na.rm = T), 1),
             NASC_sd = round(mean(NASC_sd, na.rm = T), 1),
             CM_median = round(mean(CM_median, na.rm = T)),
-            CM_mad = round(mean(CM_mad, na.rm = T))) %>%
+            CM_mad = round(mean(CM_mad, na.rm = T)),
+            CM_mean = round(mean(CM_mean, na.rm = T)),
+            CM_sd = round(mean(CM_sd, na.rm = T))) %>%
   ungroup() %>% 
   bind_rows(., SA_all_area) %>%
   mutate(IHO_area = factor(
@@ -626,6 +634,8 @@ p_Sv_prof_boxplot
 
 ## Figure 3. Boxplot mesopelagic NASC & Map detections
 
+### Boxplot
+
 ```{r fig3-boxplot-NASC, fig.width=6, fig.height=5}
 # Map NASC
 map_DSL <- SA_grid_laea %>% 
@@ -680,6 +690,7 @@ ggsave("plots/Fig3_map_boxplot_SA.png", p_map_SA_DSL,
 p_map_SA_DSL
 ```
 
+### Points 
 ```{r fig3-map-points}
 map_DSL <- SA_grid_laea %>%  # Map of DSL detections
   mutate(NASC_int_d = cut(NASC_int, c(0, 1, 10, 100, 1000, 10000, Inf))) %>%
@@ -691,7 +702,7 @@ map_DSL <- SA_grid_laea %>%  # Map of DSL detections
   geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), 
                fill = "grey20") + # Coast
   geom_point(aes(col = NASC_int_d), size = 0.6) +
-  scale_color_viridis_d(option = "plasma", 
+  scale_color_viridis_d(option = "turbo", 
                         labels = c("< 1", "1-10", "11-100", "101-1000", 
                                    "1001-10000", "> 10000")) +
   facet_wrap(~ year) +
@@ -730,7 +741,7 @@ pointrange_NASC <- SA_grid_laea %>% # Pointrange of SA per region
             NASC_q975 = max(NASC_q975, na.rm = T)) %>%
   ungroup() %>%
   ggplot(aes(x = IHO_area)) +
-  geom_point(aes(y = NASC_mean), shape = 18, size = 4, col = "#E26362") +
+  geom_point(aes(y = NASC_mean), shape = 18, size = 4, col = "#F05C22") +
   geom_pointrange(aes(y = NASC_median, ymin = NASC_q025, ymax = NASC_q975),
                   size = 0.25, col = "grey20") +
   scale_y_continuous(
@@ -738,6 +749,7 @@ pointrange_NASC <- SA_grid_laea %>% # Pointrange of SA per region
     breaks = c(1, 5, 10, 50, 100, 500, 1000, 5000, 10000, 50000),
     trans = "log10") +
   theme(panel.border = element_blank(),
+        panel.grid.major.y = element_line(colour = "grey90"),
         axis.title.x = element_blank(),
         axis.line = element_line(),
         plot.margin = unit(c(0.1, 0.1, 0, 0), "in"))
