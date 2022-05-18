@@ -1,7 +1,7 @@
 ---
 title: "PanArctic DSL - Statistics"
 author: "[Pierre Priou](mailto:pierre.priou@mi.mun.ca)"
-date: "2022/05/16 at 18:43"
+date: "2022/05/18 at 16:21"
 output: 
   html_document:
     keep_md: yes
@@ -58,7 +58,7 @@ options(dplyr.summarise.inform = F) # Suppress summarise() warning
 
 ```r
 # Laea projection
-cell_res <- 25 # Cell resolution in km
+cell_res <- 50 # Cell resolution in km
 arctic_laea <- raster(extent(-2700, 2700, -2700, 2700), crs = "EPSG:6931")
 projection(arctic_laea) <- gsub("units=m", "units=km", 
                                 projection(arctic_laea)) # Convert from m to km
@@ -367,196 +367,43 @@ plot_grid(SA_diff %>%
             geom_boxplot(aes(x = year, y = CM)))
 ```
 
-![](PanArctic_DSL_statistics_files/figure-html/all-interannual-spatial-prep-1.png)<!-- -->
+![](PanArctic_DSL_statistics_files/figure-html/all-interannual-spatial-plot-1.png)<!-- -->
+
 
 ```r
-# Check assumptions
-## Outliers
-SA_diff %>%
-  group_by(year) %>%
-  identify_outliers(NASC_int) 
+# Normality: QQ plot
+plot_grid(ggqqplot(SA_diff, "NASC_int", facet.by = "year"),
+          ggqqplot(SA_diff, "CM", facet.by = "year"),
+          ggqqplot(SA_diff, "NASC_int", facet.by = "IHO_area"),
+          ggqqplot(SA_diff, "CM", facet.by = "IHO_area"), 
+          ncol = 1)
 ```
 
-```
-## # A tibble: 14 × 7
-##    year  IHO_area NASC_int SA_int    CM is.outlier is.extreme
-##    <fct> <fct>       <dbl>  <dbl> <dbl> <lgl>      <lgl>     
-##  1 2015  BB           947.   29.8  313. TRUE       TRUE      
-##  2 2015  BB          1529.   31.8  292. TRUE       TRUE      
-##  3 2016  BB           765.   28.8  353. TRUE       FALSE     
-##  4 2016  BB           548.   27.4  330. TRUE       FALSE     
-##  5 2016  BB          1030.   30.1  338. TRUE       TRUE      
-##  6 2016  BB           512.   27.1  340. TRUE       FALSE     
-##  7 2016  EAO         2435.   33.9  471. TRUE       TRUE      
-##  8 2016  DS          1036.   30.2  364. TRUE       TRUE      
-##  9 2017  CAA          481.   26.8  289. TRUE       FALSE     
-## 10 2017  CAA          650.   28.1  393. TRUE       FALSE     
-## 11 2017  CAA          543.   27.4  303. TRUE       FALSE     
-## 12 2017  EAO        14314.   41.6  412. TRUE       TRUE      
-## 13 2017  EAO        67316.   48.3  392. TRUE       TRUE      
-## 14 2017  EAO          650.   28.1  310. TRUE       FALSE
-```
-
-```r
-SA_diff %>%
-  group_by(year) %>%
-  identify_outliers(CM) 
-```
-
-```
-## # A tibble: 5 × 7
-##   year  IHO_area NASC_int SA_int    CM is.outlier is.extreme
-##   <fct> <fct>       <dbl>  <dbl> <dbl> <lgl>      <lgl>     
-## 1 2015  WAO_BF      0.412  -3.85  602. TRUE       FALSE     
-## 2 2015  WAO_BF      7.72    8.88  591. TRUE       FALSE     
-## 3 2015  WAO_BF      0.545  -2.63  564. TRUE       FALSE     
-## 4 2015  WAO_BF      5.78    7.62  572. TRUE       FALSE     
-## 5 2015  WAO_BF      0.770  -1.13  581. TRUE       FALSE
-```
-
-```r
-SA_diff %>%
-  group_by(IHO_area) %>%
-  identify_outliers(NASC_int) 
-```
-
-```
-## # A tibble: 14 × 7
-##    IHO_area year  NASC_int SA_int    CM is.outlier is.extreme
-##    <fct>    <fct>    <dbl>  <dbl> <dbl> <lgl>      <lgl>     
-##  1 WAO_BF   2016      59.0   17.7  382. TRUE       FALSE     
-##  2 WAO_BF   2017      50.6   17.0  300. TRUE       FALSE     
-##  3 WAO_BF   2017      56.7   17.5  365. TRUE       FALSE     
-##  4 BB       2015     947.    29.8  313. TRUE       TRUE      
-##  5 BB       2015    1529.    31.8  292. TRUE       TRUE      
-##  6 BB       2016     765.    28.8  353. TRUE       FALSE     
-##  7 BB       2016     548.    27.4  330. TRUE       FALSE     
-##  8 BB       2016    1030.    30.1  338. TRUE       TRUE      
-##  9 DS       2016    1036.    30.2  364. TRUE       TRUE      
-## 10 DS       2017     229.    23.6  341. TRUE       FALSE     
-## 11 EAO      2016    2435.    33.9  471. TRUE       TRUE      
-## 12 EAO      2017   14314.    41.6  412. TRUE       TRUE      
-## 13 EAO      2017   67316.    48.3  392. TRUE       TRUE      
-## 14 EAO      2017     650.    28.1  310. TRUE       TRUE
-```
-
-```r
-SA_diff %>%
-  group_by(IHO_area) %>%
-  identify_outliers(CM) 
-```
-
-```
-## # A tibble: 3 × 7
-##   IHO_area year  NASC_int SA_int    CM is.outlier is.extreme
-##   <fct>    <fct>    <dbl>  <dbl> <dbl> <lgl>      <lgl>     
-## 1 BB       2015      28.8   14.6  415. TRUE       FALSE     
-## 2 BB       2016      48.0   16.8  427. TRUE       FALSE     
-## 3 BB       2016      47.4   16.8  401. TRUE       FALSE
-```
-
-```r
-## Normality: Checked by looking at the anova residuals with QQ plot
-ggqqplot(SA_diff, "NASC_int", facet.by = "year")
-```
-
-![](PanArctic_DSL_statistics_files/figure-html/all-interannual-spatial-prep-2.png)<!-- -->
-
-```r
-ggqqplot(SA_diff, "CM", facet.by = "year")
-```
-
-![](PanArctic_DSL_statistics_files/figure-html/all-interannual-spatial-prep-3.png)<!-- -->
-
-```r
-ggqqplot(SA_diff, "NASC_int", facet.by = "IHO_area")
-```
-
-![](PanArctic_DSL_statistics_files/figure-html/all-interannual-spatial-prep-4.png)<!-- -->
-
-```r
-ggqqplot(SA_diff, "CM", facet.by = "IHO_area")
-```
-
-![](PanArctic_DSL_statistics_files/figure-html/all-interannual-spatial-prep-5.png)<!-- -->
-
-```r
-## Homogeneity of variance
-plot(lm(NASC_int ~ year, data = SA_diff), 1)
-```
-
-![](PanArctic_DSL_statistics_files/figure-html/all-interannual-spatial-prep-6.png)<!-- -->
-
-```r
-plot(lm(CM ~ year, data = SA_diff), 1)
-```
-
-![](PanArctic_DSL_statistics_files/figure-html/all-interannual-spatial-prep-7.png)<!-- -->
-
-```r
-plot(lm(NASC_int ~ IHO_area, data = SA_diff), 1)
-```
-
-![](PanArctic_DSL_statistics_files/figure-html/all-interannual-spatial-prep-8.png)<!-- -->
-
-```r
-plot(lm(CM ~ IHO_area, data = SA_diff), 1)
-```
-
-![](PanArctic_DSL_statistics_files/figure-html/all-interannual-spatial-prep-9.png)<!-- -->
+![](PanArctic_DSL_statistics_files/figure-html/normality-check-1.png)<!-- -->
 
 I used a non parametric Kruskal-Wallis test to test for interannual and spatial variability because the variance is not homogenous and not very normal.
 
 
 ```r
-SA_diff %>% # Kruskal wallis interannual difference SA
-  kruskal_test(NASC_int ~ year)
+bind_rows(kruskal_test(SA_diff, NASC_int ~ IHO_area),
+          kruskal_test(SA_diff, NASC_int ~ year),
+          kruskal_test(SA_diff, CM ~ IHO_area),
+          kruskal_test(SA_diff, CM ~ year)) %>%
+  mutate(var = c("IHO_area", "year", "IHO_area", "year"))
 ```
 
 ```
-## # A tibble: 1 × 6
-##   .y.          n statistic    df      p method        
-## * <chr>    <int>     <dbl> <int>  <dbl> <chr>         
-## 1 NASC_int   139      9.06     2 0.0108 Kruskal-Wallis
+## # A tibble: 4 × 7
+##   .y.          n statistic    df        p method         var     
+##   <chr>    <int>     <dbl> <int>    <dbl> <chr>          <chr>   
+## 1 NASC_int   139     29.8      4 5.39e- 6 Kruskal-Wallis IHO_area
+## 2 NASC_int   139      9.06     2 1.08e- 2 Kruskal-Wallis year    
+## 3 CM         139     61.2      4 1.63e-12 Kruskal-Wallis IHO_area
+## 4 CM         139      4.16     2 1.25e- 1 Kruskal-Wallis year
 ```
 
-```r
-SA_diff %>% # Kruskal wallis interannual difference CM
-  kruskal_test(CM ~ year)
-```
-
-```
-## # A tibble: 1 × 6
-##   .y.       n statistic    df     p method        
-## * <chr> <int>     <dbl> <int> <dbl> <chr>         
-## 1 CM      139      4.16     2 0.125 Kruskal-Wallis
-```
-
-```r
-SA_diff %>% # Kruskal wallis interannual difference SA
-  kruskal_test(NASC_int ~ IHO_area)
-```
-
-```
-## # A tibble: 1 × 6
-##   .y.          n statistic    df          p method        
-## * <chr>    <int>     <dbl> <int>      <dbl> <chr>         
-## 1 NASC_int   139      29.8     4 0.00000539 Kruskal-Wallis
-```
-
-```r
-SA_diff %>% # Kruskal wallis interannual difference CM
-  kruskal_test(CM ~ IHO_area)
-```
-
-```
-## # A tibble: 1 × 6
-##   .y.       n statistic    df        p method        
-## * <chr> <int>     <dbl> <int>    <dbl> <chr>         
-## 1 CM      139      61.2     4 1.63e-12 Kruskal-Wallis
-```
-
-The center of mass did not vary significantly between years (H = 1.652899, p = 0.438) but varied significantly among areas (*H* = 57.8495, *p* \< 0.001). Mesopelagic backscatter S\~A\~ varied significantly between areas (*H* = 26.19394, *p* \< 0.001) but not years (*H* = 8.6464, *p* = 0.013). Thus, in the S\~A\~ HGAM a random effect for change in S\~A\~ per area is likely needed.
+Mesopelagic backscatter S\~A\~ varied significantly between areas (*H* = 29.792952, *p* \< 0.001) and years (*H* = 29.792952, *p* = 0.011). 
+The center of mass varied significantly between areas (*H* = 61.185994, *p* < 0.001) but not between years (*H* = 4.164743, *p* = 0.125).
 
 ## Within areas
 
@@ -580,7 +427,7 @@ SA_diff %>% # Kruskal wallis interannual difference SA within group
 ## 5 EAO      NASC_int    28     4.98      2 0.083  Kruskal-Wallis
 ```
 
-There was no interannual differences in SA within each region (WAO_BF - H = 4.8395483, *p* = 0.0889; CAA - H = 6.9278752, *p* = 0.0313; BB - H = 0.0968, *p* = 0.0889; DS - H = 0.9470, *p* = 0.0889; EAO - H = 5.0263899, *p* = 0.0810). Therefore, there seems to be no need for a random effect for interannual variability within years.
+There were some interannual differences in SA within some region (WAO_BF - H = 6.4670868, *p* = 0.0394; CAA - H = 11.8260406, *p* = 0.0027; BB - H = 5.0981791, *p* = 0.0782; DS - H = 0.3282051, *p* = 0.8490; EAO - H = 4.9779498, *p* = 0.0830). 
 
 # HGAM - Gamma NASC
 
@@ -666,9 +513,11 @@ ggcorrplot(corr, type = "lower", lab = T, title = "corr")
 
 # Velocity and chlorophyll
 
+I do not expect regional functional responses to derive from a global functional responses as species assemblages and environmental conditions are different between the regions in the Arctic. 
+
 ## Model fitting
 
-In model GS the random intercept is already included in the `s(bs = "fs")` term.
+In model S the random intercept is already included in the `s(bs = "fs")` term.
 
 
 ```r
@@ -678,26 +527,25 @@ GAM_G <- gam(NASC_int ~
                s(v, k = 5, bs = "tp") + # Global smoothers
                s(chl, k = 5, bs = "tp") + # Global smoothers
                s(IHO, bs = "re") + # Random intercept
+               s(year, bs = "re") + # Random intercept
                # Second order effects
                s(IHO, year, bs = "re"), # Random effect
             data = SA_df, family = Gamma(link = "log"), method = "REML")
-# Model GS
-GAM_GS <- gam(NASC_int ~ 
+# Model S
+GAM_S <- gam(NASC_int ~ 
                 # First order effects
-                s(v, k = 5, bs = "tp") + # Global smoothers
-                s(chl, k = 5, bs = "tp") + # Global smoothers
                 s(IHO, bs = "re") + # Random intercept
+                s(year, bs = "re") + # Random intercept
                 # Second order effects
                 s(v, IHO, bs = "fs", k = 5) + # Group-level smoothers
                 s(chl, IHO, bs = "fs", k = 5) + # Group-level smoothers
                 s(IHO, year, bs = "re"), # Random effect
               data = SA_df, family = Gamma(link = "log"), method = "REML")
-# Model GI
-GAM_GI <- gam(NASC_int ~
+# Model I
+GAM_I <- gam(NASC_int ~
                 # First order effects
-                s(v, k = 5, bs = "tp") + # Global smoothers
-                s(chl, k = 5, bs = "tp") + # Global smoothers
                 s(IHO, bs = "re") + # Random intercept
+                s(year, bs = "re") + # Random intercept
                 # Secnd order effects
                 s(v, by = IHO, k = 5, bs = "tp") + # Group-level smoother
                 s(chl, by = IHO, k = 5, bs = "tp") + # Group-level smoother
@@ -705,23 +553,23 @@ GAM_GI <- gam(NASC_int ~
                data = SA_df, family = Gamma(link = "log"), method = "REML")
 
 # Summary metrics
-GAM_AIC <- AIC(GAM_G, GAM_GS, GAM_GI) %>% 
+GAM_AIC <- AIC(GAM_G, GAM_S, GAM_I) %>% 
   rownames_to_column() %>%
   rename(model = rowname)
 # Metrics data frame
-data.frame(model = c("GAM_G", "GAM_GS", "GAM_GI"),
+data.frame(model = c("GAM_G", "GAM_S", "GAM_I"),
            reml = round(c(GAM_G$gcv.ubre,
-                          GAM_GS$gcv.ubre, 
-                          GAM_GI$gcv.ubre), 
+                          GAM_S$gcv.ubre, 
+                          GAM_I$gcv.ubre), 
                         2), 
            dev_expl = round(c(
              (1 - (GAM_G$deviance / GAM_G$null.deviance)) * 100,
-             (1 - (GAM_GS$deviance / GAM_GS$null.deviance)) * 100,
-             (1 - (GAM_GI$deviance / GAM_GI$null.deviance)) * 100),
+             (1 - (GAM_S$deviance / GAM_S$null.deviance)) * 100,
+             (1 - (GAM_I$deviance / GAM_I$null.deviance)) * 100),
              2),
            r2 = round(c(summary(GAM_G)$r.sq,
-                        summary(GAM_GS)$r.sq, 
-                        summary(GAM_GI)$r.sq),
+                        summary(GAM_S)$r.sq, 
+                        summary(GAM_I)$r.sq),
                       2)) %>%
   full_join(., GAM_AIC, by = "model") %>%
   mutate(df = round(df, 3),
@@ -734,8 +582,8 @@ data.frame(model = c("GAM_G", "GAM_GS", "GAM_GI"),
 ```
 
 ```{=html}
-<div id="htmlwidget-dedba048c03d5f738938" style="width:100%;height:auto;" class="datatables html-widget"></div>
-<script type="application/json" data-for="htmlwidget-dedba048c03d5f738938">{"x":{"filter":"none","vertical":false,"data":[["GAM_GI","GAM_GS","GAM_G"],[31.229,31.595,20.698],[75.99,74.33,63.3],[0.15,0,0.02],[778.45,795.98,811.65],[1567.222,1577.743,1611.396],[0,10.52,44.17],[0.994834117,0.0051658828,3e-10]],"container":"<table class=\"cell-border stribe\">\n  <thead>\n    <tr>\n      <th>model<\/th>\n      <th>df<\/th>\n      <th>dev_expl<\/th>\n      <th>r2<\/th>\n      <th>reml<\/th>\n      <th>AIC<\/th>\n      <th>dAIC<\/th>\n      <th>w_AIC<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[1,2,3,4,5,6,7]}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
+<div id="htmlwidget-462aac1eb70ceb139f74" style="width:100%;height:auto;" class="datatables html-widget"></div>
+<script type="application/json" data-for="htmlwidget-462aac1eb70ceb139f74">{"x":{"filter":"none","vertical":false,"data":[["GAM_I","GAM_S","GAM_G"],[31.319,31.691,20.64],[76.04,74.52,63.35],[0.15,0.01,0.02],[780.52,798.05,811.53],[1566.783,1576.827,1611.085],[0,10.04,44.3],[0.9934518301,0.0065481697,2e-10]],"container":"<table class=\"cell-border stribe\">\n  <thead>\n    <tr>\n      <th>model<\/th>\n      <th>df<\/th>\n      <th>dev_expl<\/th>\n      <th>r2<\/th>\n      <th>reml<\/th>\n      <th>AIC<\/th>\n      <th>dAIC<\/th>\n      <th>w_AIC<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[1,2,3,4,5,6,7]}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
 ```
 
 
@@ -750,30 +598,31 @@ summary(GAM_G)
 ## 
 ## Formula:
 ## NASC_int ~ s(v, k = 5, bs = "tp") + s(chl, k = 5, bs = "tp") + 
-##     s(IHO, bs = "re") + s(IHO, year, bs = "re")
+##     s(IHO, bs = "re") + s(year, bs = "re") + s(IHO, year, bs = "re")
 ## 
 ## Parametric coefficients:
 ##             Estimate Std. Error t value Pr(>|t|)    
-## (Intercept)   4.7769     0.6119   7.807 2.98e-12 ***
+## (Intercept)   4.7607     0.6893   6.906 2.91e-10 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
 ## Approximate significance of smooth terms:
-##               edf Ref.df      F p-value  
-## s(v)        1.958  2.433  1.615   0.201  
-## s(chl)      2.421  2.921  2.010   0.129  
-## s(IHO)      2.232  4.000 15.564   0.312  
-## s(IHO,year) 9.383 14.000  9.706   0.027 *
+##                edf Ref.df      F p-value  
+## s(v)        1.9411  2.413  1.540   0.219  
+## s(chl)      2.4178  2.917  1.980   0.135  
+## s(IHO)      2.4051  4.000 16.204   0.290  
+## s(year)     0.8369  2.000  8.404   0.435  
+## s(IHO,year) 8.3290 14.000  8.825   0.071 .
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
-## R-sq.(adj) =  0.0171   Deviance explained = 63.3%
-## -REML = 811.65  Scale est. = 2.4581    n = 132
+## R-sq.(adj) =  0.0175   Deviance explained = 63.3%
+## -REML = 811.53  Scale est. = 2.4459    n = 132
 ```
 
 
 ```r
-summary(GAM_GS)
+summary(GAM_S)
 ```
 
 ```
@@ -782,34 +631,33 @@ summary(GAM_GS)
 ## Link function: log 
 ## 
 ## Formula:
-## NASC_int ~ s(v, k = 5, bs = "tp") + s(chl, k = 5, bs = "tp") + 
-##     s(IHO, bs = "re") + s(v, IHO, bs = "fs", k = 5) + s(chl, 
-##     IHO, bs = "fs", k = 5) + s(IHO, year, bs = "re")
+## NASC_int ~ s(IHO, bs = "re") + s(year, bs = "re") + s(v, IHO, 
+##     bs = "fs", k = 5) + s(chl, IHO, bs = "fs", k = 5) + s(IHO, 
+##     year, bs = "re")
 ## 
 ## Parametric coefficients:
 ##             Estimate Std. Error t value Pr(>|t|)    
-## (Intercept)    4.722      0.367   12.87   <2e-16 ***
+## (Intercept)   4.3417     0.3045   14.26   <2e-16 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
 ## Approximate significance of smooth terms:
-##                   edf Ref.df     F  p-value    
-## s(v)        1.0065499   1.01 0.908 0.345074    
-## s(chl)      1.0001102   1.00 3.143 0.079087 .  
-## s(IHO)      0.0004368   4.00 0.000 0.540801    
-## s(v,IHO)    5.4681916  23.00 1.629 0.000155 ***
-## s(chl,IHO)  7.9875412  23.00 6.270 2.06e-06 ***
-## s(IHO,year) 8.5840549  14.00 2.454 1.20e-05 ***
+##                  edf Ref.df     F  p-value    
+## s(IHO)      0.003697      4 0.001  0.39143    
+## s(year)     0.378316      2 0.577  0.47643    
+## s(v,IHO)    6.233543     24 2.119 1.63e-05 ***
+## s(chl,IHO)  9.130503     24 8.379 1.05e-05 ***
+## s(IHO,year) 8.390496     14 2.570  0.00131 ** 
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
-## R-sq.(adj) =  0.00459   Deviance explained = 74.3%
-## -REML = 795.98  Scale est. = 1.3962    n = 132
+## R-sq.(adj) =  0.0147   Deviance explained = 74.5%
+## -REML = 798.05  Scale est. = 1.3958    n = 132
 ```
 
 
 ```r
-summary(GAM_GI)
+summary(GAM_I)
 ```
 
 ```
@@ -818,38 +666,36 @@ summary(GAM_GI)
 ## Link function: log 
 ## 
 ## Formula:
-## NASC_int ~ s(v, k = 5, bs = "tp") + s(chl, k = 5, bs = "tp") + 
-##     s(IHO, bs = "re") + s(v, by = IHO, k = 5, bs = "tp") + s(chl, 
-##     by = IHO, k = 5, bs = "tp") + s(year, IHO, bs = "re")
+## NASC_int ~ s(IHO, bs = "re") + s(year, bs = "re") + s(v, by = IHO, 
+##     k = 5, bs = "tp") + s(chl, by = IHO, k = 5, bs = "tp") + 
+##     s(year, IHO, bs = "re")
 ## 
 ## Parametric coefficients:
 ##             Estimate Std. Error t value Pr(>|t|)    
-## (Intercept)   4.7646     0.2631   18.11   <2e-16 ***
+## (Intercept)   4.7637     0.2646   18.01   <2e-16 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
 ## Approximate significance of smooth terms:
-##                        edf    Ref.df     F  p-value    
-## s(v)             1.000e+00 1.000e+00 0.597 0.441594    
-## s(chl)           1.001e+00 1.001e+00 0.199 0.656911    
-## s(IHO)           1.549e-04 4.000e+00 0.000 0.957234    
-## s(v):IHOWAO_BF   1.000e+00 1.001e+00 2.481 0.118212    
-## s(v):IHOCAA      8.359e-05 1.518e-04 0.000 0.500000    
-## s(v):IHOBB       2.367e+00 2.837e+00 3.408 0.031009 *  
-## s(v):IHODS       1.000e+00 1.000e+00 0.037 0.847099    
-## s(v):IHOEAO      3.636e+00 3.897e+00 4.491 0.001933 ** 
-## s(chl):IHOWAO_BF 1.000e+00 1.000e+00 5.175 0.024914 *  
-## s(chl):IHOCAA    1.000e+00 1.000e+00 0.426 0.515294    
-## s(chl):IHOBB     3.068e+00 3.471e+00 3.631 0.008215 ** 
-## s(chl):IHODS     8.770e-05 1.597e-04 0.000 0.500000    
-## s(chl):IHOEAO    3.133e+00 3.527e+00 9.469 8.24e-05 ***
-## s(year,IHO)      6.852e+00 1.400e+01 1.805 0.000135 ***
+##                        edf Ref.df      F  p-value    
+## s(IHO)           0.0002226  4.000  0.000 0.957120    
+## s(year)          0.0006072  2.000  0.000 0.392403    
+## s(v):IHOWAO_BF   1.0002436  1.000  6.568 0.011785 *  
+## s(v):IHOCAA      1.0000557  1.000  0.591 0.443559    
+## s(v):IHOBB       2.3765142  2.846  5.187 0.004870 ** 
+## s(v):IHODS       1.0000822  1.000  5.493 0.020951 *  
+## s(v):IHOEAO      3.6433287  3.901  8.906 4.25e-06 ***
+## s(chl):IHOWAO_BF 1.0002167  1.000 18.424 3.96e-05 ***
+## s(chl):IHOCAA    1.0000452  1.000  0.181 0.671754    
+## s(chl):IHOBB     3.0756807  3.477  4.898 0.002910 ** 
+## s(chl):IHODS     1.0000671  1.000  0.199 0.656808    
+## s(chl):IHOEAO    3.1422889  3.535 22.692  < 2e-16 ***
+## s(year,IHO)      6.9162423 14.000  1.837 0.000143 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
-## Rank: 67/69
 ## R-sq.(adj) =  0.149   Deviance explained =   76%
-## -REML = 778.45  Scale est. = 1.1674    n = 132
+## -REML = 780.52  Scale est. = 1.1647    n = 132
 ```
 
 ## Model checking
@@ -860,104 +706,102 @@ First I check the basis size k. `k-indexes` are \> 1 or close to 1 so the basis 
 
 
 ```r
-appraise(GAM_GS)
+appraise(GAM_S, method = "simulate")
 ```
 
-![](PanArctic_DSL_statistics_files/figure-html/GAMGS-basis-size-residuals-1.png)<!-- -->
+![](PanArctic_DSL_statistics_files/figure-html/GAMS-basis-size-residuals-1.png)<!-- -->
 
 ```r
-k.check(GAM_GS)
+k.check(GAM_S)
 ```
 
 ```
-##             k'          edf   k-index p-value
-## s(v)         4 1.0065499359 0.9204424  0.6325
-## s(chl)       4 1.0001101984 0.9260238  0.6075
-## s(IHO)       5 0.0004368472        NA      NA
-## s(v,IHO)    25 5.4681915561 0.9204424  0.5900
-## s(chl,IHO)  25 7.9875412221 0.9260238  0.6400
-## s(IHO,year) 15 8.5840548767        NA      NA
+##             k'         edf   k-index p-value
+## s(IHO)       5 0.003696704        NA      NA
+## s(year)      3 0.378315941        NA      NA
+## s(v,IHO)    25 6.233542809 0.9151066   0.600
+## s(chl,IHO)  25 9.130503054 0.9331309   0.705
+## s(IHO,year) 15 8.390495801        NA      NA
 ```
 
 
 ```r
-appraise(GAM_GI)
+appraise(GAM_I, method = "simulate")
 ```
 
-![](PanArctic_DSL_statistics_files/figure-html/GAMGI-basis-size-residuals-1.png)<!-- -->
+![](PanArctic_DSL_statistics_files/figure-html/GAMI-basis-size-residuals-1.png)<!-- -->
 
 ```r
-k.check(GAM_GI)
+k.check(GAM_I)
 ```
 
 ```
 ##                  k'          edf   k-index p-value
-## s(v)              4 1.000086e+00 0.9836785  0.8325
-## s(chl)            4 1.000594e+00 0.9135958  0.5250
-## s(IHO)            5 1.549404e-04        NA      NA
-## s(v):IHOWAO_BF    4 1.000352e+00 0.9836785  0.8325
-## s(v):IHOCAA       4 8.358556e-05 0.9836785  0.8725
-## s(v):IHOBB        4 2.367328e+00 0.9836785  0.8625
-## s(v):IHODS        4 1.000051e+00 0.9836785  0.8650
-## s(v):IHOEAO       4 3.636028e+00 0.9836785  0.8725
-## s(chl):IHOWAO_BF  4 1.000201e+00 0.9135958  0.5550
-## s(chl):IHOCAA     4 1.000092e+00 0.9135958  0.5675
-## s(chl):IHOBB      4 3.067986e+00 0.9135958  0.4725
-## s(chl):IHODS      4 8.770214e-05 0.9135958  0.5675
-## s(chl):IHOEAO     4 3.132766e+00 0.9135958  0.5250
-## s(year,IHO)      15 6.851543e+00        NA      NA
+## s(IHO)            5 0.0002226381        NA      NA
+## s(year)           3 0.0006071662        NA      NA
+## s(v):IHOWAO_BF    4 1.0002435729 0.9836039  0.8500
+## s(v):IHOCAA       4 1.0000557295 0.9836039  0.8000
+## s(v):IHOBB        4 2.3765142171 0.9836039  0.8200
+## s(v):IHODS        4 1.0000822373 0.9836039  0.8500
+## s(v):IHOEAO       4 3.6433287279 0.9836039  0.8450
+## s(chl):IHOWAO_BF  4 1.0002167355 0.9141431  0.5400
+## s(chl):IHOCAA     4 1.0000452010 0.9141431  0.5825
+## s(chl):IHOBB      4 3.0756807106 0.9141431  0.5425
+## s(chl):IHODS      4 1.0000670778 0.9141431  0.5425
+## s(chl):IHOEAO     4 3.1422889020 0.9141431  0.5400
+## s(year,IHO)      15 6.9162422536        NA      NA
 ```
 
 ### Resiudals against covariates
 
 
 ```r
-GAM_GS_resid <- bind_cols(SA_df, residuals.gam(GAM_GS)) %>%
+GAM_S_resid <- bind_cols(SA_df, residuals.gam(GAM_S)) %>%
   rename(resid = "...15")
-plot_grid(GAM_GS_resid %>%
+plot_grid(GAM_S_resid %>%
             ggplot(aes(x = v, y = resid)) + 
             geom_hline(yintercept = 0, col = "red") +
             labs(x = "velocity") +
             geom_point(), 
-          GAM_GS_resid %>%
+          GAM_S_resid %>%
             ggplot(aes(x = chl, y = resid)) + 
             geom_hline(yintercept = 0, col = "red") +
             labs(x = "chlorophyll") +
             geom_point(), 
-          GAM_GS_resid %>%
+          GAM_S_resid %>%
             ggplot(aes(x = IHO, y = resid)) + 
             geom_hline(yintercept = 0, col = "red") +
             labs(x = "area") +
             geom_boxplot(fill = NA), 
-          GAM_GS_resid %>%
+          GAM_S_resid %>%
             ggplot(aes(x = year, y = resid)) + 
             geom_hline(yintercept = 0, col = "red") +
             labs(x = "year") +
             geom_boxplot(fill = NA))
 ```
 
-![](PanArctic_DSL_statistics_files/figure-html/GAMGS-residuals-covariates-1.png)<!-- -->
+![](PanArctic_DSL_statistics_files/figure-html/GAMS-residuals-covariates-1.png)<!-- -->
 
 
 ```r
-GAM_GI_resid <- bind_cols(SA_df, residuals.gam(GAM_GI)) %>%
+GAM_I_resid <- bind_cols(SA_df, residuals.gam(GAM_I)) %>%
   rename(resid = "...15")
-plot_grid(GAM_GI_resid %>%
+plot_grid(GAM_I_resid %>%
             ggplot(aes(x = v, y = resid)) + 
             geom_hline(yintercept = 0, col = "red") +
             labs(x = "velocity") +
             geom_point(), 
-          GAM_GI_resid %>%
+          GAM_I_resid %>%
             ggplot(aes(x = chl, y = resid)) + 
             geom_hline(yintercept = 0, col = "red") +
             labs(x = "chlorophyll") +
             geom_point(), 
-          GAM_GI_resid %>%
+          GAM_I_resid %>%
             ggplot(aes(x = IHO, y = resid)) + 
             geom_hline(yintercept = 0, col = "red") +
             labs(x = "area") +
             geom_boxplot(fill = NA), 
-          GAM_GI_resid %>%
+          GAM_I_resid %>%
             ggplot(aes(x = year, y = resid)) + 
             geom_hline(yintercept = 0, col = "red") +
             labs(x = "year") +
@@ -966,7 +810,7 @@ plot_grid(GAM_GI_resid %>%
 
 ![](PanArctic_DSL_statistics_files/figure-html/veloGI-residuals-covariates-1.png)<!-- -->
 
-I select `model GI` because it explains the most deviance, has the best metrics and the better residuals.
+I select `model I` because it explains the most deviance, has the best metrics and the better residuals.
 
 ## Term selection
 
@@ -975,18 +819,17 @@ I turn on the double penalty (`select = TRUE`) and check the covariates that has
 
 ```r
 # Model GI
-GAM_GI_p <- gam(NASC_int ~
-                # First order effects
-                s(v, k = 5, bs = "tp") + # Global smoothers
-                s(chl, k = 5, bs = "tp") + # Global smoothers
-                s(IHO, bs = "re") + # Random intercept
-                # Second order effects
-                s(v, by = IHO, k = 5, bs = "tp") + # Group-level smoother
-                s(chl, by = IHO, k = 5, bs = "tp") + # Group-level smoother
-                s(year, IHO, bs = "re"), # Random effect
-               data = SA_df, family = Gamma(link = "log"), method = "REML",
-               select = T)
-summary(GAM_GI_p)
+GAM_I_p <- gam(NASC_int ~
+                  # First order effects
+                  s(IHO, bs = "re") + # Random intercept
+                  s(year, bs = "re") + # Random intercept
+                  # Secnd order effects
+                  s(v, by = IHO, k = 5, bs = "tp") + # Group-level smoother
+                  s(chl, by = IHO, k = 5, bs = "tp") + # Group-level smoother
+                  s(year, IHO, bs = "re"), # Random effect
+                data = SA_df, family = Gamma(link = "log"), method = "REML", 
+                select = TRUE)
+summary(GAM_I_p)
 ```
 
 ```
@@ -995,40 +838,125 @@ summary(GAM_GI_p)
 ## Link function: log 
 ## 
 ## Formula:
-## NASC_int ~ s(v, k = 5, bs = "tp") + s(chl, k = 5, bs = "tp") + 
-##     s(IHO, bs = "re") + s(v, by = IHO, k = 5, bs = "tp") + s(chl, 
-##     by = IHO, k = 5, bs = "tp") + s(year, IHO, bs = "re")
+## NASC_int ~ s(IHO, bs = "re") + s(year, bs = "re") + s(v, by = IHO, 
+##     k = 5, bs = "tp") + s(chl, by = IHO, k = 5, bs = "tp") + 
+##     s(year, IHO, bs = "re")
 ## 
 ## Parametric coefficients:
 ##             Estimate Std. Error t value Pr(>|t|)    
-## (Intercept)   4.6507     0.2288   20.33   <2e-16 ***
+## (Intercept)    4.698      0.232   20.25   <2e-16 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
 ## Approximate significance of smooth terms:
 ##                        edf Ref.df      F  p-value    
-## s(v)             1.961e+00      4  3.894  0.00314 ** 
-## s(chl)           5.766e-05      4  0.000  0.51589    
-## s(IHO)           9.007e-04      4  0.000  0.38618    
-## s(v):IHOWAO_BF   1.536e-04      4  0.000  0.73977    
-## s(v):IHOCAA      1.275e-04      4  0.000  0.75710    
-## s(v):IHOBB       5.102e-05      4  0.000  0.69049    
-## s(v):IHODS       1.309e+00      4  3.051  0.00623 ** 
-## s(v):IHOEAO      1.655e+00      4  2.189  0.00790 ** 
-## s(chl):IHOWAO_BF 9.486e-01      4 26.269 2.32e-05 ***
-## s(chl):IHOCAA    1.551e-04      4  0.000  0.86424    
-## s(chl):IHOBB     1.012e+00      4  1.174  0.12452    
-## s(chl):IHODS     7.175e-05      4  0.000  0.81508    
-## s(chl):IHOEAO    2.675e+00      4 34.360  < 2e-16 ***
-## s(year,IHO)      8.623e+00     14  2.312 5.36e-05 ***
+## s(IHO)           1.470e-04      4  0.000   0.4761    
+## s(year)          3.758e-04      2  0.000   0.3899    
+## s(v):IHOWAO_BF   1.356e+00      4  1.587   0.0319 *  
+## s(v):IHOCAA      1.430e-04      4  0.000   0.5556    
+## s(v):IHOBB       1.666e+00      4  1.699   0.0236 *  
+## s(v):IHODS       8.069e-01      4  1.777   0.0240 *  
+## s(v):IHOEAO      9.605e-01      4  5.864 8.75e-06 ***
+## s(chl):IHOWAO_BF 9.433e-01      4 22.629 3.67e-05 ***
+## s(chl):IHOCAA    9.561e-05      4  0.000   0.9497    
+## s(chl):IHOBB     9.494e-01      4  1.116   0.1450    
+## s(chl):IHODS     8.477e-05      4  0.000   0.8313    
+## s(chl):IHOEAO    2.691e+00      4 35.642  < 2e-16 ***
+## s(year,IHO)      8.686e+00     14  2.402 3.86e-05 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
-## R-sq.(adj) =  0.126   Deviance explained = 72.8%
-## -REML = 793.15  Scale est. = 1.34      n = 132
+## R-sq.(adj) =  0.094   Deviance explained = 72.7%
+## -REML = 793.28  Scale est. = 1.3435    n = 132
 ```
 
-All covariates are important.
+`s(IHO)`, and `s(year)` can be dropped. I refit the model without those terms.
+
+
+```r
+# Model GI
+GAM_I2 <- gam(NASC_int ~
+                  # First order effects
+                  # s(IHO, bs = "re") + # Random intercept
+                  # s(year, bs = "re") + # Random intercept
+                  # Secnd order effects
+                  s(v, by = IHO, k = 5, bs = "tp") + # Group-level smoother
+                  s(chl, by = IHO, k = 5, bs = "tp") + # Group-level smoother
+                  s(year, IHO, bs = "re"), # Random effect
+                data = SA_df, family = Gamma(link = "log"), method = "REML")
+summary(GAM_I2)
+```
+
+```
+## 
+## Family: Gamma 
+## Link function: log 
+## 
+## Formula:
+## NASC_int ~ s(v, by = IHO, k = 5, bs = "tp") + s(chl, by = IHO, 
+##     k = 5, bs = "tp") + s(year, IHO, bs = "re")
+## 
+## Parametric coefficients:
+##             Estimate Std. Error t value Pr(>|t|)    
+## (Intercept)   4.7636     0.2645   18.01   <2e-16 ***
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## 
+## Approximate significance of smooth terms:
+##                    edf Ref.df      F  p-value    
+## s(v):IHOWAO_BF   1.001  1.003  6.557 0.011841 *  
+## s(v):IHOCAA      1.000  1.000  0.591 0.443556    
+## s(v):IHOBB       2.377  2.846  5.187 0.004870 ** 
+## s(v):IHODS       1.000  1.001  5.491 0.020974 *  
+## s(v):IHOEAO      3.643  3.901  8.906 4.25e-06 ***
+## s(chl):IHOWAO_BF 1.000  1.000 18.429 3.96e-05 ***
+## s(chl):IHOCAA    1.000  1.000  0.181 0.671749    
+## s(chl):IHOBB     3.076  3.477  4.898 0.002910 ** 
+## s(chl):IHODS     1.000  1.000  0.198 0.656963    
+## s(chl):IHOEAO    3.142  3.535 22.693  < 2e-16 ***
+## s(year,IHO)      6.917 14.000  1.837 0.000142 ***
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## 
+## R-sq.(adj) =  0.149   Deviance explained =   76%
+## -REML = 780.52  Scale est. = 1.1647    n = 132
+```
+
+Compare models.
+
+
+```r
+GAM_AIC2 <- AIC(GAM_I, GAM_I2) %>% 
+  rownames_to_column() %>%
+  rename(model = rowname)
+# Metrics data frame
+data.frame(model = c("GAM_I", "GAM_I2"),
+           reml = round(c(GAM_I$gcv.ubre,
+                          GAM_I2$gcv.ubre), 
+                        2), 
+           dev_expl = round(c(
+             (1 - (GAM_I$deviance / GAM_I$null.deviance)) * 100,
+             (1 - (GAM_I2$deviance / GAM_I2$null.deviance)) * 100),
+             2),
+           r2 = round(c(summary(GAM_I)$r.sq,
+                        summary(GAM_I2)$r.sq),
+                      2)) %>%
+  full_join(., GAM_AIC2, by = "model") %>%
+  mutate(df = round(df, 3),
+         AIC = round(AIC, 3),
+         dAIC = round(AIC - min(AIC), 2),
+         w_AIC = round(Weights(AIC), 10)) %>%
+  dplyr::select(model, df, dev_expl, r2, reml, AIC, dAIC, w_AIC) %>%
+  arrange(dAIC) %>% 
+  datatable(class = "cell-border stribe", rownames = F)
+```
+
+```{=html}
+<div id="htmlwidget-446195ec14d11dfb2de1" style="width:100%;height:auto;" class="datatables html-widget"></div>
+<script type="application/json" data-for="htmlwidget-446195ec14d11dfb2de1">{"x":{"filter":"none","vertical":false,"data":[["GAM_I","GAM_I2"],[31.319,31.322],[76.04,76.04],[0.15,0.15],[780.52,780.52],[1566.783,1566.787],[0,0],[0.5004999998,0.4995000002]],"container":"<table class=\"cell-border stribe\">\n  <thead>\n    <tr>\n      <th>model<\/th>\n      <th>df<\/th>\n      <th>dev_expl<\/th>\n      <th>r2<\/th>\n      <th>reml<\/th>\n      <th>AIC<\/th>\n      <th>dAIC<\/th>\n      <th>w_AIC<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[1,2,3,4,5,6,7]}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
+```
+
+The models are equivalent, so I stick with the more parsimonious model `GAM_I`.
 
 ## Model predictions
 
@@ -1115,12 +1043,12 @@ Get GAM predictions for the new data. I then calculate the average functional re
 
 
 ```r
-ilink <- family(GAM_GI)$linkinv # Get link function
-pred <- predict(GAM_GI, SA_new, type = "link", se.fit = TRUE) %>% # Predict data
+ilink_I <- family(GAM_I)$linkinv # Get link function
+pred_I <- predict(GAM_I, SA_new, type = "link", se.fit = TRUE) %>% # Predict data
   bind_cols(., SA_new) %>%
-  transform(lwr_ci = ilink(fit - (2 * se.fit)), # Calculate lower CI
-            upr_ci = ilink(fit + (2 * se.fit)), # Calculate upper CI
-            fitted = ilink(fit)) %>% # Calculate fit
+  transform(lwr_ci = ilink_I(fit - (2 * se.fit)), # Calculate lower CI
+            upr_ci = ilink_I(fit + (2 * se.fit)), # Calculate upper CI
+            fitted = ilink_I(fit)) %>% # Calculate fit
   group_by(IHO, var, v, chl) %>%
   summarise(NASC_fit = mean(fitted), # Calculate average functional response
             NASC_lwr_ci = mean(lwr_ci),
@@ -1128,8 +1056,29 @@ pred <- predict(GAM_GI, SA_new, type = "link", se.fit = TRUE) %>% # Predict data
   mutate(SA_fit = 10 * log10(NASC_fit), # Convert to SA
          SA_lwr_ci = 10 * log10(NASC_lwr_ci),
          SA_upr_ci = 10 * log10(NASC_upr_ci))
+```
+
+
+```r
+ilink_I2 <- family(GAM_I2)$linkinv # Get link function
+pred_I2 <- predict(GAM_I2, SA_new, type = "link", se.fit = TRUE) %>% # Predict data
+  bind_cols(., SA_new) %>%
+  transform(lwr_ci = ilink_I(fit - (2 * se.fit)), # Calculate lower CI
+            upr_ci = ilink_I(fit + (2 * se.fit)), # Calculate upper CI
+            fitted = ilink_I(fit)) %>% # Calculate fit
+  group_by(IHO, var, v, chl) %>%
+  summarise(NASC_fit = mean(fitted), # Calculate average functional response
+            NASC_lwr_ci = mean(lwr_ci),
+            NASC_upr_ci = mean(upr_ci)) %>%
+  mutate(SA_fit = 10 * log10(NASC_fit), # Convert to SA
+         SA_lwr_ci = 10 * log10(NASC_lwr_ci),
+         SA_upr_ci = 10 * log10(NASC_upr_ci))
+```
+
+
+```r
 # Save data
-save(pred, GAM_GI, file = "data/statistics/GAM_results.RData")
+save(pred_I, pred_I2, GAM_I, GAM_I2, file = "data/statistics/GAM_results.RData")
 ```
 
 ## Model visualization
@@ -1138,24 +1087,24 @@ Quick partial effects plot with `gratia::draw`.
 
 
 ```r
-draw(GAM_GS, residuals = TRUE, scales = "free")
+draw(GAM_I2, residuals = TRUE, scales = "free")
 ```
 
-![](PanArctic_DSL_statistics_files/figure-html/draw-GAMGI-1.png)<!-- -->
+![](PanArctic_DSL_statistics_files/figure-html/draw-GAMI-1.png)<!-- -->
 
 Plot to see if predictions worked well.
 
 
 ```r
 plot_grid(
-  pred %>%
+  pred_I %>%
     filter(var == "v") %>%
     ggplot() +
     geom_line(aes(x = v, y = NASC_fit)) +
     geom_ribbon(aes(x = v, ymin = NASC_lwr_ci, ymax = NASC_upr_ci), alpha = 0.1) +
     geom_point(data = SA_df, aes(x = v, y = NASC_int, group = IHO)) + 
     facet_wrap(~ IHO, scales = "free"),
-  pred %>%
+  pred_I %>%
     filter(var == "chl") %>%
     ggplot() +
     geom_line(aes(x = chl, y = NASC_fit)) +
@@ -1165,13 +1114,13 @@ plot_grid(
   ncol = 1)
 ```
 
-![](PanArctic_DSL_statistics_files/figure-html/GAMGI-ggplot-1.png)<!-- -->
+![](PanArctic_DSL_statistics_files/figure-html/GAMI-ggplot-1.png)<!-- -->
 
 Pretty plot.
 
 
 ```r
-pred_plot <- pred %>%
+pred_plot <- pred_I %>%
   mutate(IHO = factor(
     case_when(IHO == "EAO" ~ "East Arctic\nOcean",
               IHO == "WAO_BF" ~ "West Arctic Ocean\n&Beaufort Sea",
@@ -1180,7 +1129,7 @@ pred_plot <- pred %>%
               IHO == "DS" ~ "Davis Strait"),
     levels = c("West Arctic Ocean\n&Beaufort Sea", "Can. Arctic\nArchipelago",
                "Baffin Bay", "Davis Strait", "East Arctic\nOcean")))
-GAM_velo <- pred_plot %>%
+GAMI_velo <- pred_I %>%
   filter(var == "v") %>%
   ggplot() +
   geom_line(aes(x = v, y = SA_fit, col = IHO), size = 0.8) +
@@ -1195,7 +1144,7 @@ GAM_velo <- pred_plot %>%
         axis.line = element_line(),
         legend.title = element_blank(), 
         legend.position = "top")
-GAM_chl <- pred_plot %>%
+GAMI_chl <- pred_I %>%
   filter(var == "chl") %>%
   ggplot() +
   geom_line(aes(x = chl, y = SA_fit, col = IHO), size = 0.8) +
@@ -1211,7 +1160,7 @@ GAM_chl <- pred_plot %>%
         legend.title = element_blank(), 
         legend.position = "none")
 # Combine plots
-plot_grid(GAM_velo, GAM_chl, ncol = 1, rel_heights = c(1,0.8))
+plot_grid(GAMI_velo, GAMI_chl, ncol = 1, rel_heights = c(1,0.8))
 ```
 
-![](PanArctic_DSL_statistics_files/figure-html/GAMGI-pretty-ggplot-1.png)<!-- -->
+![](PanArctic_DSL_statistics_files/figure-html/GAMI-pretty-ggplot-1.png)<!-- -->

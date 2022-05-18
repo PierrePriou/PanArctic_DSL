@@ -56,7 +56,7 @@ options(dplyr.summarise.inform = F) # Suppress summarise() warning
 
 ```{r data-loading, message=FALSE}
 # Laea projection
-cell_res <- 25 # Cell resolution in km
+cell_res <- 50 # Cell resolution in km
 arctic_laea <- raster(extent(-2700, 2700, -2700, 2700), crs = "EPSG:6931")
 projection(arctic_laea) <- gsub("units=m", "units=km", 
                                 projection(arctic_laea)) # Convert from m to km
@@ -317,7 +317,7 @@ SA_diff <- SA_grid_laea %>%
 
 I check whether there are inter-annual and spatial variability in S\~A\~ and the centre of mass across years and areas.
 
-```{r all-interannual-spatial-prep}
+```{r all-interannual-spatial-plot}
 # Visualize data
 plot_grid(SA_diff %>% 
             ggplot() +
@@ -325,49 +325,29 @@ plot_grid(SA_diff %>%
           SA_diff %>% 
             ggplot() +
             geom_boxplot(aes(x = year, y = CM)))
+```
 
-# Check assumptions
-## Outliers
-SA_diff %>%
-  group_by(year) %>%
-  identify_outliers(NASC_int) 
-SA_diff %>%
-  group_by(year) %>%
-  identify_outliers(CM) 
-SA_diff %>%
-  group_by(IHO_area) %>%
-  identify_outliers(NASC_int) 
-SA_diff %>%
-  group_by(IHO_area) %>%
-  identify_outliers(CM) 
-
-## Normality: Checked by looking at the anova residuals with QQ plot
-ggqqplot(SA_diff, "NASC_int", facet.by = "year")
-ggqqplot(SA_diff, "CM", facet.by = "year")
-ggqqplot(SA_diff, "NASC_int", facet.by = "IHO_area")
-ggqqplot(SA_diff, "CM", facet.by = "IHO_area")
-
-## Homogeneity of variance
-plot(lm(NASC_int ~ year, data = SA_diff), 1)
-plot(lm(CM ~ year, data = SA_diff), 1)
-plot(lm(NASC_int ~ IHO_area, data = SA_diff), 1)
-plot(lm(CM ~ IHO_area, data = SA_diff), 1)
+```{r normality-check, fig.height=8}
+# Normality: QQ plot
+plot_grid(ggqqplot(SA_diff, "NASC_int", facet.by = "year"),
+          ggqqplot(SA_diff, "CM", facet.by = "year"),
+          ggqqplot(SA_diff, "NASC_int", facet.by = "IHO_area"),
+          ggqqplot(SA_diff, "CM", facet.by = "IHO_area"), 
+          ncol = 1)
 ```
 
 I used a non parametric Kruskal-Wallis test to test for interannual and spatial variability because the variance is not homogenous and not very normal.
 
 ```{r all-kruskal-wallis}
-SA_diff %>% # Kruskal wallis interannual difference SA
-  kruskal_test(NASC_int ~ year)
-SA_diff %>% # Kruskal wallis interannual difference CM
-  kruskal_test(CM ~ year)
-SA_diff %>% # Kruskal wallis interannual difference SA
-  kruskal_test(NASC_int ~ IHO_area)
-SA_diff %>% # Kruskal wallis interannual difference CM
-  kruskal_test(CM ~ IHO_area)
+bind_rows(kruskal_test(SA_diff, NASC_int ~ IHO_area),
+          kruskal_test(SA_diff, NASC_int ~ year),
+          kruskal_test(SA_diff, CM ~ IHO_area),
+          kruskal_test(SA_diff, CM ~ year)) %>%
+  mutate(var = c("IHO_area", "year", "IHO_area", "year"))
 ```
 
-The center of mass did not vary significantly between years (H = 1.652899, p = 0.438) but varied significantly among areas (*H* = 57.8495, *p* \< 0.001). Mesopelagic backscatter S\~A\~ varied significantly between areas (*H* = 26.19394, *p* \< 0.001) but not years (*H* = 8.6464, *p* = 0.013). Thus, in the S\~A\~ HGAM a random effect for change in S\~A\~ per area is likely needed.
+Mesopelagic backscatter S\~A\~ varied significantly between areas (*H* = 29.792952, *p* \< 0.001) and years (*H* = 29.792952, *p* = 0.011). 
+The center of mass varied significantly between areas (*H* = 61.185994, *p* < 0.001) but not between years (*H* = 4.164743, *p* = 0.125).
 
 ## Within areas
 
@@ -379,7 +359,7 @@ SA_diff %>% # Kruskal wallis interannual difference SA within group
   kruskal_test(NASC_int ~ year)
 ```
 
-There was no interannual differences in SA within each region (WAO_BF - H = 4.8395483, *p* = 0.0889; CAA - H = 6.9278752, *p* = 0.0313; BB - H = 0.0968, *p* = 0.0889; DS - H = 0.9470, *p* = 0.0889; EAO - H = 5.0263899, *p* = 0.0810). Therefore, there seems to be no need for a random effect for interannual variability within years.
+There were some interannual differences in SA within some region (WAO_BF - H = 6.4670868, *p* = 0.0394; CAA - H = 11.8260406, *p* = 0.0027; BB - H = 5.0981791, *p* = 0.0782; DS - H = 0.3282051, *p* = 0.8490; EAO - H = 4.9779498, *p* = 0.0830). 
 
 # HGAM - Gamma NASC
 
@@ -438,9 +418,11 @@ ggcorrplot(corr, type = "lower", lab = T, title = "corr")
 
 # Velocity and chlorophyll
 
+I do not expect regional functional responses to derive from a global functional responses as species assemblages and environmental conditions are different between the regions in the Arctic. 
+
 ## Model fitting
 
-In model GS the random intercept is already included in the `s(bs = "fs")` term.
+In model S the random intercept is already included in the `s(bs = "fs")` term.
 
 ```{r HGAM-fit}
 # Model G
@@ -449,26 +431,25 @@ GAM_G <- gam(NASC_int ~
                s(v, k = 5, bs = "tp") + # Global smoothers
                s(chl, k = 5, bs = "tp") + # Global smoothers
                s(IHO, bs = "re") + # Random intercept
+               s(year, bs = "re") + # Random intercept
                # Second order effects
                s(IHO, year, bs = "re"), # Random effect
             data = SA_df, family = Gamma(link = "log"), method = "REML")
-# Model GS
-GAM_GS <- gam(NASC_int ~ 
+# Model S
+GAM_S <- gam(NASC_int ~ 
                 # First order effects
-                s(v, k = 5, bs = "tp") + # Global smoothers
-                s(chl, k = 5, bs = "tp") + # Global smoothers
                 s(IHO, bs = "re") + # Random intercept
+                s(year, bs = "re") + # Random intercept
                 # Second order effects
                 s(v, IHO, bs = "fs", k = 5) + # Group-level smoothers
                 s(chl, IHO, bs = "fs", k = 5) + # Group-level smoothers
                 s(IHO, year, bs = "re"), # Random effect
               data = SA_df, family = Gamma(link = "log"), method = "REML")
-# Model GI
-GAM_GI <- gam(NASC_int ~
+# Model I
+GAM_I <- gam(NASC_int ~
                 # First order effects
-                s(v, k = 5, bs = "tp") + # Global smoothers
-                s(chl, k = 5, bs = "tp") + # Global smoothers
                 s(IHO, bs = "re") + # Random intercept
+                s(year, bs = "re") + # Random intercept
                 # Secnd order effects
                 s(v, by = IHO, k = 5, bs = "tp") + # Group-level smoother
                 s(chl, by = IHO, k = 5, bs = "tp") + # Group-level smoother
@@ -476,23 +457,23 @@ GAM_GI <- gam(NASC_int ~
                data = SA_df, family = Gamma(link = "log"), method = "REML")
 
 # Summary metrics
-GAM_AIC <- AIC(GAM_G, GAM_GS, GAM_GI) %>% 
+GAM_AIC <- AIC(GAM_G, GAM_S, GAM_I) %>% 
   rownames_to_column() %>%
   rename(model = rowname)
 # Metrics data frame
-data.frame(model = c("GAM_G", "GAM_GS", "GAM_GI"),
+data.frame(model = c("GAM_G", "GAM_S", "GAM_I"),
            reml = round(c(GAM_G$gcv.ubre,
-                          GAM_GS$gcv.ubre, 
-                          GAM_GI$gcv.ubre), 
+                          GAM_S$gcv.ubre, 
+                          GAM_I$gcv.ubre), 
                         2), 
            dev_expl = round(c(
              (1 - (GAM_G$deviance / GAM_G$null.deviance)) * 100,
-             (1 - (GAM_GS$deviance / GAM_GS$null.deviance)) * 100,
-             (1 - (GAM_GI$deviance / GAM_GI$null.deviance)) * 100),
+             (1 - (GAM_S$deviance / GAM_S$null.deviance)) * 100,
+             (1 - (GAM_I$deviance / GAM_I$null.deviance)) * 100),
              2),
            r2 = round(c(summary(GAM_G)$r.sq,
-                        summary(GAM_GS)$r.sq, 
-                        summary(GAM_GI)$r.sq),
+                        summary(GAM_S)$r.sq, 
+                        summary(GAM_I)$r.sq),
                       2)) %>%
   full_join(., GAM_AIC, by = "model") %>%
   mutate(df = round(df, 3),
@@ -508,12 +489,12 @@ data.frame(model = c("GAM_G", "GAM_GS", "GAM_GI"),
 summary(GAM_G)
 ```
 
-```{r GAMGS-summary}
-summary(GAM_GS)
+```{r GAMS-summary}
+summary(GAM_S)
 ```
 
-```{r GAMGI-summary}
-summary(GAM_GI)
+```{r GAMI-summary}
+summary(GAM_I)
 ```
 
 ## Model checking
@@ -522,37 +503,37 @@ summary(GAM_GI)
 
 First I check the basis size k. `k-indexes` are \> 1 or close to 1 so the basis size is large enough. The residual plot look good too.
 
-```{r GAMGS-basis-size-residuals}
-appraise(GAM_GS)
-k.check(GAM_GS)
+```{r GAMS-basis-size-residuals}
+appraise(GAM_S, method = "simulate")
+k.check(GAM_S)
 ```
 
-```{r GAMGI-basis-size-residuals}
-appraise(GAM_GI)
-k.check(GAM_GI)
+```{r GAMI-basis-size-residuals}
+appraise(GAM_I, method = "simulate")
+k.check(GAM_I)
 ```
 
 ### Resiudals against covariates
 
-```{r GAMGS-residuals-covariates, message=FALSE}
-GAM_GS_resid <- bind_cols(SA_df, residuals.gam(GAM_GS)) %>%
+```{r GAMS-residuals-covariates, message=FALSE}
+GAM_S_resid <- bind_cols(SA_df, residuals.gam(GAM_S)) %>%
   rename(resid = "...15")
-plot_grid(GAM_GS_resid %>%
+plot_grid(GAM_S_resid %>%
             ggplot(aes(x = v, y = resid)) + 
             geom_hline(yintercept = 0, col = "red") +
             labs(x = "velocity") +
             geom_point(), 
-          GAM_GS_resid %>%
+          GAM_S_resid %>%
             ggplot(aes(x = chl, y = resid)) + 
             geom_hline(yintercept = 0, col = "red") +
             labs(x = "chlorophyll") +
             geom_point(), 
-          GAM_GS_resid %>%
+          GAM_S_resid %>%
             ggplot(aes(x = IHO, y = resid)) + 
             geom_hline(yintercept = 0, col = "red") +
             labs(x = "area") +
             geom_boxplot(fill = NA), 
-          GAM_GS_resid %>%
+          GAM_S_resid %>%
             ggplot(aes(x = year, y = resid)) + 
             geom_hline(yintercept = 0, col = "red") +
             labs(x = "year") +
@@ -560,53 +541,97 @@ plot_grid(GAM_GS_resid %>%
 ```
 
 ```{r veloGI-residuals-covariates, message=FALSE}
-GAM_GI_resid <- bind_cols(SA_df, residuals.gam(GAM_GI)) %>%
+GAM_I_resid <- bind_cols(SA_df, residuals.gam(GAM_I)) %>%
   rename(resid = "...15")
-plot_grid(GAM_GI_resid %>%
+plot_grid(GAM_I_resid %>%
             ggplot(aes(x = v, y = resid)) + 
             geom_hline(yintercept = 0, col = "red") +
             labs(x = "velocity") +
             geom_point(), 
-          GAM_GI_resid %>%
+          GAM_I_resid %>%
             ggplot(aes(x = chl, y = resid)) + 
             geom_hline(yintercept = 0, col = "red") +
             labs(x = "chlorophyll") +
             geom_point(), 
-          GAM_GI_resid %>%
+          GAM_I_resid %>%
             ggplot(aes(x = IHO, y = resid)) + 
             geom_hline(yintercept = 0, col = "red") +
             labs(x = "area") +
             geom_boxplot(fill = NA), 
-          GAM_GI_resid %>%
+          GAM_I_resid %>%
             ggplot(aes(x = year, y = resid)) + 
             geom_hline(yintercept = 0, col = "red") +
             labs(x = "year") +
             geom_boxplot(fill = NA))
 ```
 
-I select `model GI` because it explains the most deviance, has the best metrics and the better residuals.
+I select `model I` because it explains the most deviance, has the best metrics and the better residuals.
 
 ## Term selection
 
 I turn on the double penalty (`select = TRUE`) and check the covariates that has been shrunk.
 
-```{r GAM-selection}
+```{r shrink-GAMI-selection}
 # Model GI
-GAM_GI_p <- gam(NASC_int ~
-                # First order effects
-                s(v, k = 5, bs = "tp") + # Global smoothers
-                s(chl, k = 5, bs = "tp") + # Global smoothers
-                s(IHO, bs = "re") + # Random intercept
-                # Second order effects
-                s(v, by = IHO, k = 5, bs = "tp") + # Group-level smoother
-                s(chl, by = IHO, k = 5, bs = "tp") + # Group-level smoother
-                s(year, IHO, bs = "re"), # Random effect
-               data = SA_df, family = Gamma(link = "log"), method = "REML",
-               select = T)
-summary(GAM_GI_p)
+GAM_I_p <- gam(NASC_int ~
+                  # First order effects
+                  s(IHO, bs = "re") + # Random intercept
+                  s(year, bs = "re") + # Random intercept
+                  # Secnd order effects
+                  s(v, by = IHO, k = 5, bs = "tp") + # Group-level smoother
+                  s(chl, by = IHO, k = 5, bs = "tp") + # Group-level smoother
+                  s(year, IHO, bs = "re"), # Random effect
+                data = SA_df, family = Gamma(link = "log"), method = "REML", 
+                select = TRUE)
+summary(GAM_I_p)
 ```
 
-All covariates are important.
+`s(IHO)`, and `s(year)` can be dropped. I refit the model without those terms.
+
+```{r refit-GAMI}
+# Model GI
+GAM_I2 <- gam(NASC_int ~
+                  # First order effects
+                  # s(IHO, bs = "re") + # Random intercept
+                  # s(year, bs = "re") + # Random intercept
+                  # Secnd order effects
+                  s(v, by = IHO, k = 5, bs = "tp") + # Group-level smoother
+                  s(chl, by = IHO, k = 5, bs = "tp") + # Group-level smoother
+                  s(year, IHO, bs = "re"), # Random effect
+                data = SA_df, family = Gamma(link = "log"), method = "REML")
+summary(GAM_I2)
+```
+
+Compare models.
+
+```{r compare-GAMI}
+GAM_AIC2 <- AIC(GAM_I, GAM_I2) %>% 
+  rownames_to_column() %>%
+  rename(model = rowname)
+# Metrics data frame
+data.frame(model = c("GAM_I", "GAM_I2"),
+           reml = round(c(GAM_I$gcv.ubre,
+                          GAM_I2$gcv.ubre), 
+                        2), 
+           dev_expl = round(c(
+             (1 - (GAM_I$deviance / GAM_I$null.deviance)) * 100,
+             (1 - (GAM_I2$deviance / GAM_I2$null.deviance)) * 100),
+             2),
+           r2 = round(c(summary(GAM_I)$r.sq,
+                        summary(GAM_I2)$r.sq),
+                      2)) %>%
+  full_join(., GAM_AIC2, by = "model") %>%
+  mutate(df = round(df, 3),
+         AIC = round(AIC, 3),
+         dAIC = round(AIC - min(AIC), 2),
+         w_AIC = round(Weights(AIC), 10)) %>%
+  dplyr::select(model, df, dev_expl, r2, reml, AIC, dAIC, w_AIC) %>%
+  arrange(dAIC) %>% 
+  datatable(class = "cell-border stribe", rownames = F)
+
+```
+
+The models are equivalent, so I stick with the more parsimonious model `GAM_I`.
 
 ## Model predictions
 
@@ -673,13 +698,13 @@ SA_new <- bind_rows(SA_WAO_BF, SA_CAA, SA_BB, SA_DS, SA_EAO)
 
 Get GAM predictions for the new data. I then calculate the average functional response for all years.
 
-```{r GAMGI-pred}
-ilink <- family(GAM_GI)$linkinv # Get link function
-pred <- predict(GAM_GI, SA_new, type = "link", se.fit = TRUE) %>% # Predict data
+```{r GAMI-pred}
+ilink_I <- family(GAM_I)$linkinv # Get link function
+pred_I <- predict(GAM_I, SA_new, type = "link", se.fit = TRUE) %>% # Predict data
   bind_cols(., SA_new) %>%
-  transform(lwr_ci = ilink(fit - (2 * se.fit)), # Calculate lower CI
-            upr_ci = ilink(fit + (2 * se.fit)), # Calculate upper CI
-            fitted = ilink(fit)) %>% # Calculate fit
+  transform(lwr_ci = ilink_I(fit - (2 * se.fit)), # Calculate lower CI
+            upr_ci = ilink_I(fit + (2 * se.fit)), # Calculate upper CI
+            fitted = ilink_I(fit)) %>% # Calculate fit
   group_by(IHO, var, v, chl) %>%
   summarise(NASC_fit = mean(fitted), # Calculate average functional response
             NASC_lwr_ci = mean(lwr_ci),
@@ -687,30 +712,49 @@ pred <- predict(GAM_GI, SA_new, type = "link", se.fit = TRUE) %>% # Predict data
   mutate(SA_fit = 10 * log10(NASC_fit), # Convert to SA
          SA_lwr_ci = 10 * log10(NASC_lwr_ci),
          SA_upr_ci = 10 * log10(NASC_upr_ci))
+```
+
+```{r GAMI2-pred}
+ilink_I2 <- family(GAM_I2)$linkinv # Get link function
+pred_I2 <- predict(GAM_I2, SA_new, type = "link", se.fit = TRUE) %>% # Predict data
+  bind_cols(., SA_new) %>%
+  transform(lwr_ci = ilink_I(fit - (2 * se.fit)), # Calculate lower CI
+            upr_ci = ilink_I(fit + (2 * se.fit)), # Calculate upper CI
+            fitted = ilink_I(fit)) %>% # Calculate fit
+  group_by(IHO, var, v, chl) %>%
+  summarise(NASC_fit = mean(fitted), # Calculate average functional response
+            NASC_lwr_ci = mean(lwr_ci),
+            NASC_upr_ci = mean(upr_ci)) %>%
+  mutate(SA_fit = 10 * log10(NASC_fit), # Convert to SA
+         SA_lwr_ci = 10 * log10(NASC_lwr_ci),
+         SA_upr_ci = 10 * log10(NASC_upr_ci))
+```
+
+```{r save-GAM}
 # Save data
-save(pred, GAM_GI, file = "data/statistics/GAM_results.RData")
+save(pred_I, pred_I2, GAM_I, GAM_I2, file = "data/statistics/GAM_results.RData")
 ```
 
 ## Model visualization
 
 Quick partial effects plot with `gratia::draw`.
 
-```{r draw-GAMGI}
-draw(GAM_GS, residuals = TRUE, scales = "free")
+```{r draw-GAMI}
+draw(GAM_I2, residuals = TRUE, scales = "free")
 ```
 
 Plot to see if predictions worked well.
 
-```{r GAMGI-ggplot, fig.height=8, fig.width=8}
+```{r GAMI-ggplot, fig.height=8, fig.width=8}
 plot_grid(
-  pred %>%
+  pred_I %>%
     filter(var == "v") %>%
     ggplot() +
     geom_line(aes(x = v, y = NASC_fit)) +
     geom_ribbon(aes(x = v, ymin = NASC_lwr_ci, ymax = NASC_upr_ci), alpha = 0.1) +
     geom_point(data = SA_df, aes(x = v, y = NASC_int, group = IHO)) + 
     facet_wrap(~ IHO, scales = "free"),
-  pred %>%
+  pred_I %>%
     filter(var == "chl") %>%
     ggplot() +
     geom_line(aes(x = chl, y = NASC_fit)) +
@@ -722,8 +766,8 @@ plot_grid(
 
 Pretty plot.
 
-```{r GAMGI-pretty-ggplot, fig.height=8, fig.width=7}
-pred_plot <- pred %>%
+```{r GAMI-pretty-ggplot, fig.height=8, fig.width=7}
+pred_plot <- pred_I %>%
   mutate(IHO = factor(
     case_when(IHO == "EAO" ~ "East Arctic\nOcean",
               IHO == "WAO_BF" ~ "West Arctic Ocean\n&Beaufort Sea",
@@ -732,7 +776,7 @@ pred_plot <- pred %>%
               IHO == "DS" ~ "Davis Strait"),
     levels = c("West Arctic Ocean\n&Beaufort Sea", "Can. Arctic\nArchipelago",
                "Baffin Bay", "Davis Strait", "East Arctic\nOcean")))
-GAM_velo <- pred_plot %>%
+GAMI_velo <- pred_I %>%
   filter(var == "v") %>%
   ggplot() +
   geom_line(aes(x = v, y = SA_fit, col = IHO), size = 0.8) +
@@ -747,7 +791,7 @@ GAM_velo <- pred_plot %>%
         axis.line = element_line(),
         legend.title = element_blank(), 
         legend.position = "top")
-GAM_chl <- pred_plot %>%
+GAMI_chl <- pred_I %>%
   filter(var == "chl") %>%
   ggplot() +
   geom_line(aes(x = chl, y = SA_fit, col = IHO), size = 0.8) +
@@ -763,5 +807,5 @@ GAM_chl <- pred_plot %>%
         legend.title = element_blank(), 
         legend.position = "none")
 # Combine plots
-plot_grid(GAM_velo, GAM_chl, ncol = 1, rel_heights = c(1,0.8))
+plot_grid(GAMI_velo, GAMI_chl, ncol = 1, rel_heights = c(1,0.8))
 ```
