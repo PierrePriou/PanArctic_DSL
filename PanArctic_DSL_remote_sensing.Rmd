@@ -562,24 +562,18 @@ phy_grid_laea %>% # Map current velocity at 222 m
 
 Data downloaded from Copernicus Marine. The ocean colour data comes from the [OCEANCOLOUR_ARC_CHL_L4_REP_OBSERVATIONS_009_088](https://resources.marine.copernicus.eu/product-detail/OCEANCOLOUR_ARC_CHL_L4_REP_OBSERVATIONS_009_088/INFORMATION) dataset. Data is monthly averaged and has a cell resolution of 1 x 1 km on a WGS 84 / Plate Carree (EPSG:32662) projection.
 
-## Data tidying and gridding
-
 I load the data and project it on the arctic laea grid (EPSG:6931 25 x 25 km). The time variable is seconds since 1970-01-01 00:00:00.
 
 ```{r chl-to-csv, cache=TRUE}
 cell_res <- 50 # Cell resolution in km
-arctic_laea <- raster(extent(-2700, 2700, -2700, 2700),
-                      crs = "EPSG:6931") # Seaice projection
-projection(arctic_laea) <- gsub("units=m", "units=km",
-                                projection(arctic_laea)) 
-res(arctic_laea) <- c(cell_res, cell_res) 
+arctic_laea <- raster(extent(-2700, 2700, -2700, 2700), crs = "EPSG:6931") # Seaice projection
+projection(arctic_laea) <- gsub("units=m", "units=km", projection(arctic_laea)) # Convert proj unit from m to km
+res(arctic_laea) <- c(cell_res, cell_res) # Define the 100 km cell resolution
 
-# List files per yeaR
-file_list <- list.files("data/remote_sensing/ocean_colour/nc_OCEANCOLOUR_ARC_CHL_L4_REP_OBSERVATIONS_009_088",
-                        pattern = ".nc", full.names = T)
-
+file_list <- list.files("data/remote_sensing/ocean_colour_OCEANCOLOUR_ARC_CHL_L4_REP_OBSERVATIONS_009_088",
+                        pattern = ".nc", full.names = T) # List files per year
 for (i in file_list) { # Loop through each file
-  date_file <- str_remove(i, pattern = "data/remote_sensing/ocean_colour/nc_OCEANCOLOUR_ARC_CHL_L4_REP_OBSERVATIONS_009_088/") %>%
+  date_file <- str_remove(i, pattern = "data/remote_sensing/ocean_colour_OCEANCOLOUR_ARC_CHL_L4_REP_OBSERVATIONS_009_088/") %>%
     str_remove(., pattern = "_chl_CMEMS.nc") # Extract date
   chl_tmp <- tidync(i) %>%
     activate("D2,D1,D0") %>% # chlorophyll data
@@ -588,24 +582,23 @@ for (i in file_list) { # Loop through each file
   
   if (nrow(chl_tmp > 0)){
     # Rasterize data in laea
-    chl_tmp_laea <- SpatialPointsDataFrame(
-      SpatialPoints(cbind(chl_tmp$lon, chl_tmp$lat),
-                    proj4string = CRS("EPSG:4326")), 
-      data.frame(lat = chl_tmp$lat,
-                 lon = chl_tmp$lon,
-                 time = chl_tmp$time,
-                 chl = chl_tmp$chl)) %>%
+    chl_tmp_laea <- SpatialPointsDataFrame(SpatialPoints(cbind(chl_tmp$lon, chl_tmp$lat), proj4string = CRS("EPSG:4326")), 
+                                           data.frame(lat = chl_tmp$lat,
+                                                      lon = chl_tmp$lon,
+                                                      time = chl_tmp$time,
+                                                      chl = chl_tmp$chl)) %>%
       spTransform(., CRSobj = crs(arctic_laea)) %>% # Change proj. to EPSG:6931
-      rasterize(., arctic_laea, fun = mean, na.rm = T) %>% # Rasterize on laea
+      rasterize(., arctic_laea, fun = mean, na.rm = T) %>% # Rasterize on the arctic_laea grid (with correct grid resolution)
       dropLayer(1) %>% # Remove ID layer
       rasterToPoints() %>% # Convert raster to data frame
       as.data.frame() %>%
       rename(xc = x, yc = y) %>% # Rename variables
-      mutate(cell_res = cell_res) 
+      mutate(date = as.POSIXct(time , origin = "1970-01-01 00:00:00", tz = "UTC"),
+             year = year(date), 
+             cell_res = cell_res) 
     # Write csv
-    write_csv(chl_tmp_laea, 
-              file = paste0("data/remote_sensing/ocean_colour/ocean_colour_",
-                            date_file, "_", cell_res, "km.csv"))
+    write_csv(chl_tmp_laea, file = paste0("data/remote_sensing/ocean_colour_OCEANCOLOUR_ARC_CHL_L4_REP_OBSERVATIONS_009_088/ocean_colour_",
+                                          date_file, ".csv"))
     print(paste0("Processing of ", date_file, " chl data finished."))
     rm(chl_tmp_laea) # Remove temporary file
     
@@ -615,53 +608,25 @@ for (i in file_list) { # Loop through each file
   
   rm(chl_tmp) # Remove temporary variables
 }
-
 rm(date_file, i, file_list)
 ```
 
 After rasterizing data I reload the csv files and combine the monthly data into a single dataframe. Then, I calculate the average annual concentration of chl a per cell.
 
 ```{r chl-tidy, message=FALSE}
-chl_grid_laea <- list.files("data/remote_sensing/ocean_colour/", 
+chl_grid_laea <- list.files("data/remote_sensing/ocean_colour_OCEANCOLOUR_ARC_CHL_L4_REP_OBSERVATIONS_009_088", 
                             pattern = "*.csv",
                             full.names = TRUE) %>% # List files
   map_dfr(.f = ~ read_csv(., show_col_types = FALSE)) %>% # Read files 
-  mutate(date = as.POSIXct(time , origin = "1970-01-01 00:00:00", tz = "UTC"),
-         year = year(date), 
-         area = factor(
-           case_when(lon > -155 & lon <= -95 & lat > 65 & lat <= 82 ~ "BF_CAA",
-                     lon > -95 & lon <= -50 & lat > 66 & lat <= 82 ~ "BB",
-                     lon >= -25 & lon <= 145 & lat > 77 & lat <= 90 ~ "SV"),
-           levels = c("BF_CAA", "BB", "SV"))) %>%
+  mutate(area = factor(
+    case_when(lon > -155 & lon <= -95 & lat > 65 & lat <= 82 ~ "BF_CAA",
+              lon > -95 & lon <= -50 & lat > 66 & lat <= 82 ~ "BB",
+              lon >= -25 & lon <= 145 & lat > 77 & lat <= 90 ~ "SV"),
+    levels = c("BF_CAA", "BB", "SV"))) %>%
   group_by(year, area, xc, yc, cell_res) %>%
   summarise(chl = mean(chl)) %>%
   ungroup()
 ```
-
-## Plot
-
-Plot chlorophyll in 2015, 2016, 2017.
-
-```{r plot-chl}
-coast_10m_laea <- readOGR("data/bathy/ne_10m_land.shp", verbose = F) %>% 
-  spTransform(CRSobj = crs("EPSG:4326")) %>% 
-  crop(extent(-180, 180, 0, 90)) %>% # Crop shapefile
-  spTransform(CRSobj = crs(arctic_laea)) %>% # Project shapefile in laea
-  fortify() %>% # Convert to a dataframe for ggplot
-  rename(xc = long, yc = lat)
-
-chl_grid_laea %>% 
-  ggplot() +
-  geom_tile(aes(x = xc, y = yc, fill = chl)) +
-  scale_fill_cmocean("Chl", name = "algae", limits = c(0, 4)) +
-  geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group),
-               fill = "grey20") +
-  facet_wrap(~ year, ncol = 3) +
-  coord_fixed(xlim = c(-2450, 600), ylim = c(-1500, 1800), expand = F) +
-  theme(legend.position = "top")
-```
-
-
 
 # Save data
 

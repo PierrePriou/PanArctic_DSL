@@ -73,6 +73,7 @@ coast_10m_laea <- readOGR("data/bathy/ne_10m_land.shp", verbose = F) %>%
 # Gridded acoustic, CTD, and sea ice data
 load("data/acoustics/SA_grids.RData") # Acoustic data
 load("data/remote_sensing/physics_grids.RData") # Modelled physics data 
+load("data/remote_sensing/physics_grids_266_318.RData") # Modelled physics data 
 load("data/remote_sensing/seaice_grids.RData") # Remote sensing sea ice data
 load("data/remote_sensing/chl_grid.RData") # Remote sensing sea ice data
 ```
@@ -87,14 +88,24 @@ SA_laea <- SA_grid_laea %>%  # Gridded SA
   dplyr::select(-lat, -lon) 
 phy_laea <- phy_grid_laea %>% # Remote sensing: physics reanalysis
   dplyr::select(year, area, xc, yc, cell_res, depth, thetao, velocity, so)
+phy_laea2 <- phy_grid_laea_266_318 %>% # Remote sensing: physics reanalysis
+  dplyr::select(year, area, xc, yc, cell_res, depth, thetao, velocity, so)
+phy_laea3 <- phy_grid_laea %>% 
+  bind_rows(phy_grid_laea_266_318) %>% # Remote sensing: physics reanalysis
+  dplyr::select(year, area, xc, yc, cell_res, depth, velocity) %>%
+  filter(depth %in% c(222, 266, 318, 380)) %>%
+  group_by(year, area, xc, yc, cell_res) %>%
+  summarise(velocity = mean(velocity)) %>%
+  mutate(depth = round(mean(c(222, 266, 318, 380))))
 seaice_laea <- seaice_grid_laea %>% # Remote sensing: seaice concentration
   dplyr::select(year, area, xc, yc, cell_res, openwater_duration, mean_ice_conc)
 
 stat_laea <- SA_laea %>%
-  left_join(., phy_laea, by = c("year", "xc", "yc", "area", "cell_res")) %>% 
+  # left_join(., phy_laea, by = c("year", "xc", "yc", "area", "cell_res")) %>%
+  left_join(., phy_laea2, by = c("year", "xc", "yc", "area", "cell_res")) %>%
+  # left_join(., phy_laea3, by = c("year", "xc", "yc", "area", "cell_res")) %>%
   left_join(., seaice_laea, by = c("year", "xc", "yc", "area", "cell_res")) %>%
-  left_join(., chl_grid_laea, by = c("year", "xc", "yc", "area", "cell_res")) %>%
-  filter(depth == 222) # Select physics at 222 m depth
+  left_join(., chl_grid_laea, by = c("year", "xc", "yc", "area", "cell_res")) 
 ```
 
 There are NAs in the remote sensing dataset.
@@ -114,8 +125,8 @@ plot_grid(stat_laea %>%
             ggplot(aes(x = xc,  y = yc)) +
             geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group),
                          fill = "grey80") +
-            geom_point(aes(col = openwater_duration)) +
-            scale_colour_viridis_c("ow", na.value = "red") + 
+            geom_point(aes(col = velocity)) +
+            scale_colour_viridis_c("v", na.value = "red") + 
             facet_wrap(~ year) +
             coord_fixed(xlim = c(-2450, 600), ylim = c(-1500, 1800), expand = F) +
             theme(axis.text = element_blank(), axis.ticks = element_blank(), 
@@ -176,7 +187,6 @@ stat_laea <- stat_laea %>%
                                 IHO_area == "Baffin Bay" ~ "BB",
                                 IHO_area == "Davis Strait" ~ "DS"),
                       levels = c("WAO_BF", "CAA", "BB", "DS", "EAO"))) %>%
-  filter(depth == 222) %>% # Select physics at 222 m depth
   ungroup() %>%
   dplyr::select(-xc_phy, -yc_phy, -year_phy, -xc_chl, -yc_chl, -year_chl)
 ```
@@ -211,7 +221,8 @@ NA replacement worked well for ice concentration. There are still missing chl va
 
 ```{r exclude-NA-chl}
 stat_laea <- stat_laea %>%
-  filter(is.na(chl) == F) 
+  filter(is.na(chl) == F & is.na(velocity) == F) %>%
+  filter(depth == 318) 
 ```
 
 ```{r map-chl-NA}
@@ -346,8 +357,7 @@ bind_rows(kruskal_test(SA_diff, NASC_int ~ IHO_area),
   mutate(var = c("IHO_area", "year", "IHO_area", "year"))
 ```
 
-Mesopelagic backscatter S\~A\~ varied significantly between areas (*H* = 29.792952, *p* \< 0.001) and years (*H* = 29.792952, *p* = 0.011). 
-The center of mass varied significantly between areas (*H* = 61.185994, *p* < 0.001) but not between years (*H* = 4.164743, *p* = 0.125).
+Mesopelagic backscatter S\~A\~ varied significantly between areas (*H* = 29.792952, *p* \< 0.001) and years (*H* = 29.792952, *p* = 0.011). The center of mass varied significantly between areas (*H* = 61.185994, *p* \< 0.001) but not between years (*H* = 4.164743, *p* = 0.125).
 
 ## Within areas
 
@@ -359,7 +369,7 @@ SA_diff %>% # Kruskal wallis interannual difference SA within group
   kruskal_test(NASC_int ~ year)
 ```
 
-There were some interannual differences in SA within some region (WAO_BF - H = 6.4670868, *p* = 0.0394; CAA - H = 11.8260406, *p* = 0.0027; BB - H = 5.0981791, *p* = 0.0782; DS - H = 0.3282051, *p* = 0.8490; EAO - H = 4.9779498, *p* = 0.0830). 
+There were some interannual differences in SA within some region (WAO_BF - H = 6.4670868, *p* = 0.0394; CAA - H = 11.8260406, *p* = 0.0027; BB - H = 5.0981791, *p* = 0.0782; DS - H = 0.3282051, *p* = 0.8490; EAO - H = 4.9779498, *p* = 0.0830).
 
 # HGAM - Gamma NASC
 
@@ -367,7 +377,7 @@ There were some interannual differences in SA within some region (WAO_BF - H = 6
 
 ```{r GAM-prep}
 SA_df <- stat_laea %>%
-  dplyr::select(year, xc, yc, IHO_area, NASC_int, SA_int, velocity, thetao, so, openwater_duration, mean_ice_conc, chl) %>%
+  dplyr::select(year, xc, yc, IHO_area, NASC_int, SA_int, velocity, openwater_duration, mean_ice_conc, chl) %>%
   group_by(IHO_area) %>%
   mutate(year = factor(year),
          NASC_int_n = (NASC_int - min(NASC_int)) / (max(NASC_int) - min(NASC_int)),
@@ -375,10 +385,8 @@ SA_df <- stat_laea %>%
   ungroup() %>%
   rename(IHO = IHO_area, 
          v = velocity,
-         t = thetao,
          o = openwater_duration,
-         si = mean_ice_conc,
-         s = so)
+         si = mean_ice_conc)
 ```
 
 Plot data.
@@ -418,7 +426,7 @@ ggcorrplot(corr, type = "lower", lab = T, title = "corr")
 
 # Velocity and chlorophyll
 
-I do not expect regional functional responses to derive from a global functional responses as species assemblages and environmental conditions are different between the regions in the Arctic. 
+I do not expect regional functional responses to derive from a global functional responses as species assemblages and environmental conditions are different between the regions in the Arctic.
 
 ## Model fitting
 
@@ -438,7 +446,9 @@ GAM_G <- gam(NASC_int ~
 # Model S
 GAM_S <- gam(NASC_int ~ 
                 # First order effects
-                s(IHO, bs = "re") + # Random intercept
+               s(v, k = 5, bs = "tp") + # Global smoothers
+               s(chl, k = 5, bs = "tp") + # Global smoothers
+               s(IHO, bs = "re") + # Random intercept
                 s(year, bs = "re") + # Random intercept
                 # Second order effects
                 s(v, IHO, bs = "fs", k = 5) + # Group-level smoothers
@@ -448,6 +458,8 @@ GAM_S <- gam(NASC_int ~
 # Model I
 GAM_I <- gam(NASC_int ~
                 # First order effects
+               # s(v, k = 5, bs = "tp") + # Global smoothers
+               # s(chl, k = 5, bs = "tp") + # Global smoothers
                 s(IHO, bs = "re") + # Random intercept
                 s(year, bs = "re") + # Random intercept
                 # Secnd order effects
@@ -517,7 +529,7 @@ k.check(GAM_I)
 
 ```{r GAMS-residuals-covariates, message=FALSE}
 GAM_S_resid <- bind_cols(SA_df, residuals.gam(GAM_S)) %>%
-  rename(resid = "...15")
+  rename(resid = "...13")
 plot_grid(GAM_S_resid %>%
             ggplot(aes(x = v, y = resid)) + 
             geom_hline(yintercept = 0, col = "red") +
@@ -542,7 +554,7 @@ plot_grid(GAM_S_resid %>%
 
 ```{r veloGI-residuals-covariates, message=FALSE}
 GAM_I_resid <- bind_cols(SA_df, residuals.gam(GAM_I)) %>%
-  rename(resid = "...15")
+  rename(resid = "...13")
 plot_grid(GAM_I_resid %>%
             ggplot(aes(x = v, y = resid)) + 
             geom_hline(yintercept = 0, col = "red") +
@@ -573,17 +585,19 @@ I turn on the double penalty (`select = TRUE`) and check the covariates that has
 
 ```{r shrink-GAMI-selection}
 # Model GI
-GAM_I_p <- gam(NASC_int ~
-                  # First order effects
-                  s(IHO, bs = "re") + # Random intercept
-                  s(year, bs = "re") + # Random intercept
-                  # Secnd order effects
-                  s(v, by = IHO, k = 5, bs = "tp") + # Group-level smoother
-                  s(chl, by = IHO, k = 5, bs = "tp") + # Group-level smoother
-                  s(year, IHO, bs = "re"), # Random effect
-                data = SA_df, family = Gamma(link = "log"), method = "REML", 
-                select = TRUE)
-summary(GAM_I_p)
+GAM_S_p <- gam(NASC_int ~ 
+                # First order effects
+               s(v, k = 5, bs = "tp") + # Global smoothers
+               s(chl, k = 5, bs = "tp") + # Global smoothers
+               s(IHO, bs = "re") + # Random intercept
+                s(year, bs = "re") + # Random intercept
+                # Second order effects
+                s(v, IHO, bs = "fs", k = 5) + # Group-level smoothers
+                s(chl, IHO, bs = "fs", k = 5) + # Group-level smoothers
+                s(IHO, year, bs = "re"), # Random effect
+              data = SA_df, family = Gamma(link = "log"), method = "REML",
+              select = T)
+summary(GAM_S_p)
 ```
 
 `s(IHO)`, and `s(year)` can be dropped. I refit the model without those terms.
@@ -699,8 +713,8 @@ SA_new <- bind_rows(SA_WAO_BF, SA_CAA, SA_BB, SA_DS, SA_EAO)
 Get GAM predictions for the new data. I then calculate the average functional response for all years.
 
 ```{r GAMI-pred}
-ilink_I <- family(GAM_I)$linkinv # Get link function
-pred_I <- predict(GAM_I, SA_new, type = "link", se.fit = TRUE) %>% # Predict data
+ilink_I <- family(GAM_S)$linkinv # Get link function
+pred_I <- predict(GAM_S, SA_new, type = "link", se.fit = TRUE) %>% # Predict data
   bind_cols(., SA_new) %>%
   transform(lwr_ci = ilink_I(fit - (2 * se.fit)), # Calculate lower CI
             upr_ci = ilink_I(fit + (2 * se.fit)), # Calculate upper CI
