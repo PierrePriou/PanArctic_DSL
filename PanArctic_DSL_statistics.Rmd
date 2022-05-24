@@ -612,7 +612,7 @@ plot_grid(GAM_GS_resid %>%
             geom_boxplot(fill = NA))
 ```
 
-```{r veloGI-residuals-covariates, message=FALSE}
+```{r GAMGI-residuals-covariates, message=FALSE}
 GAM_GI_resid <- bind_cols(SA_df, residuals.gam(GAM_GI)) %>%
   rename(resid = "...9")
 plot_grid(GAM_GI_resid %>%
@@ -635,6 +635,20 @@ plot_grid(GAM_GI_resid %>%
             geom_hline(yintercept = 0, col = "red") +
             labs(x = "year") +
             geom_boxplot(fill = NA))
+```
+
+### Autotcorrelation
+
+```{r GAMGS-acf-pacf}
+par(mfrow = c(1, 2))
+acf(resid(GAM_GS), lag.max = 36, main = "ACF")
+pacf(resid(GAM_GS), lag.max = 36, main = "pACF")
+```
+
+```{r GAMGI-acf-pacf}
+par(mfrow = c(1, 2))
+acf(resid(GAM_GI), lag.max = 36, main = "ACF")
+pacf(resid(GAM_GI), lag.max = 36, main = "pACF")
 ```
 
 ## Term selection
