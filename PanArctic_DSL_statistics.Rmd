@@ -147,12 +147,12 @@ stat_laea <- stat_laea %>%
     # Convert veloctity to cm/s
     velocity = velocity * 100, 
     IHO_area = factor(case_when(IHO_area == "East Arctic Ocean" ~ "EAO",
-                                IHO_area == "West Arctic Ocean" ~ "WAO_BF",
-                                IHO_area == "Beaufort Sea" ~ "WAO_BF",
+                                IHO_area == "West Arctic Ocean" ~ "WAO",
+                                IHO_area == "Beaufort Sea" ~ "BF",
                                 IHO_area == "The Northwestern Passages" ~ "CAA",
                                 IHO_area == "Baffin Bay" ~ "BB",
                                 IHO_area == "Davis Strait" ~ "DS"),
-                      levels = c("WAO_BF", "CAA", "BB", "DS", "EAO"))) %>%
+                      levels = c("WAO", "BF", "CAA", "BB", "DS", "EAO"))) %>%
   ungroup() %>%
   dplyr::select(-xc_chl, -yc_chl, -year_chl)
 ```
@@ -840,62 +840,54 @@ plot_grid(GAM_GS2_resid %>%
 I predict the model to get the smooths in the response scale (NASC). I need to create a specific data frame for this with the factors of interest `IHO` and `year`, and covariates `v` and `chl`.
 
 ```{r summary-SA-df}
-SA_df %>%
+val <- SA_df %>%
   dplyr::select(IHO, year, v, chl) %>%
-  # group_by(IHO, year) %>%
   group_by(IHO) %>%
-  get_summary_stats(type = "common")
+  summarise(min_v = min(v),
+            max_v = max(v),
+            median_v = median(v),
+            min_chl = min(chl),
+            max_chl = max(chl),
+            median_chl = median(chl))
+val
 ```
 
 ```{r data-frame-pred}
-res = 20 # resolution for predictions
-# WAO and BF
-SA_WAO_BF <- data.frame(
-  IHO = factor(rep(rep(rep("WAO_BF", res), 3), 2)),
-  year = factor(rep(c(rep(2015, res), rep(2016, res), rep(2017, res)), 2)),
-  var = c(rep("v", res * 3), rep("chl", res * 3)),
-  v = c(rep(seq(0.575, 5.395, length.out = res), 3), # Velocity
-        rep(2.415, res * 3)), # Dummy
-  chl = c(rep(0.245, res * 3), # Dummy
-          rep(seq(0.111, 0.857, length.out = res), 3))) # Chlorophyll
-# CAA
-SA_CAA <- data.frame(
-  IHO = factor(rep(rep(rep("CAA", res), 3), 2)),
-  year = factor(rep(c(rep(2015, res), rep(2016, res), rep(2017, res)), 2)),
-  var = c(rep("v", res * 3), rep("chl", res * 3)),
-  v = c(rep(seq(0.473, 3.387, length.out = res), 3), # Velocity
-        rep(0.874, res * 3)), # Dummy
-  chl = c(rep(0.405, res * 3), # Dummy
-          rep(seq(0.234, 0.806, length.out = res), 3))) # Chlorophyll
-# BB
-SA_BB <- data.frame(
-  IHO = factor(rep(rep(rep("BB", res), 3), 2)),
-  year = factor(rep(c(rep(2015, res), rep(2016, res), rep(2017, res)), 2)),
-  var = c(rep("v", res * 3), rep("chl", res * 3)),
-  v = c(rep(seq(0.119, 4.069, length.out = res), 3), # Velocity
-        rep(1.814, res * 3)), # Dummy
-  chl = c(rep(1.005, res * 3), # Dummy
-          rep(seq(0.283, 2.539, length.out = res), 3))) # Chlorophyll
-# DS
-SA_DS <- data.frame(
-  IHO = factor(rep(rep(rep("DS", res), 3), 2)),
-  year = factor(rep(c(rep(2015, res), rep(2016, res), rep(2017, res)), 2)),
-  var = c(rep("v", res * 3), rep("chl", res * 3)),
-  v = c(rep(seq(0.370, 2.743, length.out = res), 3), # Velocity
-        rep(1.495, res * 3)), # Dummy
-  chl = c(rep(0.413, res * 3), # Dummy
-          rep(seq(0.319, 0.685, length.out = res), 3))) # Chlorophyll
-# EAO
-SA_EAO <- data.frame(
-  IHO = factor(rep(rep(rep("EAO", res), 3), 2)),
-  year = factor(rep(c(rep(2015, res), rep(2016, res), rep(2017, res)), 2)),
-  var = c(rep("v", res * 3), rep("chl", res * 3)),
-  v = c(rep(seq(0.450, 5.204, length.out = res), 3), # Velocity
-        rep(2.070, res * 3)), # Dummy
-  chl = c(rep(1.355, res * 3), # Dummy
-          rep(seq(0.089, 4.063, length.out = res), 3))) # Chlorophyll
-# Combine datasets
-SA_new <- bind_rows(SA_WAO_BF, SA_CAA, SA_BB, SA_DS, SA_EAO)
+# Resolution for predictions
+res = 20
+# IHO areas
+IHO_area <- levels(SA_df$IHO)
+# Empty data frame that we populate with new values
+SA_new <- data.frame()
+
+for (i in IHO_area) {
+  # Select data from which we build the 
+  val_tmp <- val %>% 
+    filter(IHO == i)
+  # Temporary data frame for each region
+  SA_tmp <- data.frame(
+    IHO = rep(rep(rep(i, res), 3), 2),
+    year = rep(c(rep(2015, res), rep(2016, res), rep(2017, res)), 2),
+    var = c(rep("v", res * 3), rep("chl", res * 3)),
+    # Velocity
+    v = c(rep(seq(subset(val, IHO == i)$min_v,
+                  subset(val, IHO == i)$max_v,
+                  length.out = res), 3),
+          rep(subset(val, IHO == "WAO")$median_v, res * 3)),
+    # Chlorophyll
+    chl = c(rep(subset(val, IHO == i)$median_chl, res * 3),
+            rep(seq(subset(val, IHO == i)$min_chl, 
+                    subset(val, IHO == i)$max_chl,
+                    length.out = res), 3)))
+  # Append data
+  SA_new <- bind_rows(SA_new, SA_tmp)
+  if (i == last(IHO_area)){
+    print("New data frame built.")
+  }
+}
+# Reorder factors
+SA_new <- SA_new %>%
+  mutate(IHO = factor(IHO, levels = c("WAO", "BF", "CAA", "BB", "DS", "EAO")))
 ```
 
 Get GAM predictions (`GAM_GS` and `GAM_GI`) for the new data. I then calculate the average functional response for all years.
