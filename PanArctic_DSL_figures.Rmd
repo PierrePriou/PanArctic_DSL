@@ -690,7 +690,8 @@ ggsave("plots/Fig3_map_boxplot_SA.png", p_map_SA_DSL,
 p_map_SA_DSL
 ```
 
-### Points 
+### Points
+
 ```{r fig3-map-points}
 map_DSL <- SA_grid_laea %>%  # Map of DSL detections
   mutate(NASC_int_d = cut(NASC_int, c(0, 1, 10, 100, 1000, 10000, Inf))) %>%
@@ -858,6 +859,23 @@ trawl_area <- trawl %>%
 ggsave("plots/Table1_relative_abundance_IHO.png", trawl_area, 
        height = 3.5, width = 5, dpi = 600, units = "in")
 trawl_area
+```
+
+### Map trawl locations
+
+```{r}
+
+```
+
+## Figure 4. Latitude mesopelagic backscatter
+
+```{r scatterplot-lat-sa}
+# lat_SA <- 
+lm <- 
+  SA_grid_laea %>%
+  ggplot() + 
+  geom_point(aes(x = lat, y = SA_int)) +
+  geom_smooth(aes(x = lat, y = SA_int), method = "lm")
 ```
 
 # Supplementary data
