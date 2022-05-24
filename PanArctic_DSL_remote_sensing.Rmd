@@ -44,7 +44,7 @@ options(dplyr.summarise.inform = F)
 
 ```{r laea-projection}
 # Laea projection
-cell_res <- 50 
+cell_res <- 100
 arctic_laea <- raster(extent(-2700, 2700, -2700, 2700), crs = "EPSG:6931")
 projection(arctic_laea) <- gsub("units=m", "units=km", projection(arctic_laea))
 res(arctic_laea) <- c(cell_res, cell_res)
@@ -591,7 +591,7 @@ Data is projected on the EPSG:6931 projection. I also calculate temperature (x -
 
 ```{r EPSG-6931-physics-grid}
 # Projection, cell resolution in km
-cell_res <- 50 
+cell_res <- 100
 arctic_laea <- raster(extent(-2700, 2700, -2700, 2700), crs = "EPSG:6931") 
 projection(arctic_laea) <- gsub("units=m", "units=km", projection(arctic_laea)) 
 res(arctic_laea) <- c(cell_res, cell_res)
@@ -688,7 +688,7 @@ I load the data and project it on the arctic laea grid (EPSG:6931 25 x 25 km). T
 
 ```{r chl-to-csv, cache=TRUE}
 # Sea ice projection
-cell_res <- 50 
+cell_res <- 100
 arctic_laea <- raster(extent(-2700, 2700, -2700, 2700), crs = "EPSG:6931") 
 projection(arctic_laea) <- gsub("units=m", "units=km", projection(arctic_laea)) 
 res(arctic_laea) <- c(cell_res, cell_res)
@@ -756,7 +756,7 @@ After rasterizing data I reload the csv files and combine the monthly data into 
 ```{r chl-tidy, message=FALSE}
 # List files
 chl_grid_laea <- list.files("data/remote_sensing/ocean_colour", 
-                            pattern = "*.csv",
+                            pattern = paste0(cell_res, "km"),
                             full.names = T) %>% 
   # Read files
   map_dfr(.f = ~ read_csv(., show_col_types = F)) %>% 
@@ -774,7 +774,10 @@ chl_grid_laea <- list.files("data/remote_sensing/ocean_colour",
 
 ```{r save-data}
 # Save data
-save(seaice_grid_laea, file = "data/remote_sensing/seaice_grids.RData") 
-save(phy_grid_laea, file = "data/remote_sensing/physics_grids.RData")
-save(chl_grid_laea, file = "data/remote_sensing/chl_grid.RData")
+save(seaice_grid_laea,
+     file = paste0("data/remote_sensing/seaice_grids_", cell_res, "km.RData"))
+save(phy_grid_laea, 
+     file = paste0("data/remote_sensing/physics_grids_", cell_res, "km.RData"))
+save(chl_grid_laea, 
+     file = paste0("data/remote_sensing/chl_grids_", cell_res, "km.RData"))
 ```

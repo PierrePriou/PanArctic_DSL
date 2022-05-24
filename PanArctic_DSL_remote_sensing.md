@@ -1,7 +1,7 @@
 ---
 title: "PanArctic DSL - Remote sensing"
 author: "[Pierre Priou](mailto:pierre.priou@mi.mun.ca)"
-date: "2022/05/19 at 17:05"
+date: "2022/05/24 at 15:40"
 output: 
   html_document:
     keep_md: yes
@@ -46,7 +46,7 @@ options(dplyr.summarise.inform = F)
 
 ```r
 # Laea projection
-cell_res <- 50 
+cell_res <- 12.5
 arctic_laea <- raster(extent(-2700, 2700, -2700, 2700), crs = "EPSG:6931")
 projection(arctic_laea) <- gsub("units=m", "units=km", projection(arctic_laea))
 res(arctic_laea) <- c(cell_res, cell_res)
@@ -636,7 +636,7 @@ Data is projected on the EPSG:6931 projection. I also calculate temperature (x -
 
 ```r
 # Projection, cell resolution in km
-cell_res <- 50 
+cell_res <- 12.5
 arctic_laea <- raster(extent(-2700, 2700, -2700, 2700), crs = "EPSG:6931") 
 projection(arctic_laea) <- gsub("units=m", "units=km", projection(arctic_laea)) 
 res(arctic_laea) <- c(cell_res, cell_res)
@@ -737,7 +737,7 @@ I load the data and project it on the arctic laea grid (EPSG:6931 25 x 25 km). T
 
 ```r
 # Sea ice projection
-cell_res <- 50 
+cell_res <- 12.5
 arctic_laea <- raster(extent(-2700, 2700, -2700, 2700), crs = "EPSG:6931") 
 projection(arctic_laea) <- gsub("units=m", "units=km", projection(arctic_laea)) 
 res(arctic_laea) <- c(cell_res, cell_res)
@@ -867,7 +867,10 @@ chl_grid_laea <- list.files("data/remote_sensing/ocean_colour",
 
 ```r
 # Save data
-save(seaice_grid_laea, file = "data/remote_sensing/seaice_grids.RData") 
-save(phy_grid_laea, file = "data/remote_sensing/physics_grids.RData")
-save(chl_grid_laea, file = "data/remote_sensing/chl_grid.RData")
+save(seaice_grid_laea,
+     file = paste0("data/remote_sensing/seaice_grids_", cell_res, "km.RData"))
+save(phy_grid_laea, 
+     file = paste0("data/remote_sensing/physics_grids_", cell_res, "km.RData"))
+save(chl_grid_laea, 
+     file = paste0("data/remote_sensing/chl_grids_", cell_res, "km.RData"))
 ```

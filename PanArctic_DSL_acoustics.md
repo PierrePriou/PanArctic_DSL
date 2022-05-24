@@ -1,7 +1,7 @@
 ---
 title: "PanArctic DSL - Acoustic gridding"
 author: "[Pierre Priou](mailto:pierre.priou@mi.mun.ca)"
-date: "2022/05/16 at 10:57"
+date: "2022/05/24 at 16:47"
 output: 
   html_document:
     keep_md: yes
@@ -51,7 +51,7 @@ arctic_latlon <- raster(extent(-155, 35, 66, 85), # Base projection for acoustic
                         res = c(2, 1)) # cells of 2 degree longitude per 1 degree latitude
 arctic_laea <- raster(extent(-2700, 2700, -2700, 2700), crs = "EPSG:6931") # Seaice projection
 projection(arctic_laea) <- gsub("units=m", "units=km", projection(arctic_laea)) # Convert proj unit from m to km
-cell_res <- 50 # Cell resolution in km
+cell_res <- 100 # Cell resolution in km
 res(arctic_laea) <- c(cell_res, cell_res) # Define the 100 km cell resolution
 
 # IHO areas
@@ -86,8 +86,8 @@ Acoustic data were collected continuously at 38 kHz. We selected data when the s
 
 ```r
 # Load and tidy files
-# MVBS_raw <- list.files("C:/Users/cfer/PhD/Chapt 2 - Arctic Mesopelagic DSL/data/acoustics/90dB threshold", 
-MVBS_raw <- list.files("D:/Travail/PhD/Chapt 2 - Arctic Mesopelagic DSL/data/acoustics/90dB threshold", 
+MVBS_raw <- list.files("C:/Users/cfer/PhD/Chapt 2 - Arctic Mesopelagic DSL/data/acoustics/90dB threshold",
+# MVBS_raw <- list.files("D:/Travail/PhD/Chapt 2 - Arctic Mesopelagic DSL/data/acoustics/90dB threshold", 
                        pattern = "*.csv", full.names = TRUE) %>% # list files in folder
   set_names() %>%
   map_dfr(.f = ~ read_csv(., show_col_types = FALSE), .id = "filename") %>% # reads file
@@ -326,6 +326,6 @@ Sv_grid_laea <- Sv_grid_laea %>%
 
 
 ```r
-save(SA_grid_laea, SA_raw_laea, file = "data/acoustics/SA_grids.RData") # Save data
-save(Sv_grid_laea, file = "data/acoustics/Sv_grids.RData") # Save data
+save(SA_grid_laea, SA_raw_laea, file = paste0("data/acoustics/SA_grids_", cell_res, "km.RData")) # Save data
+save(Sv_grid_laea, file = paste0("data/acoustics/Sv_grids_", cell_res, "km.RData")) # Save data
 ```
