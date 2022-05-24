@@ -474,11 +474,9 @@ I select data at 318 m depth because it fits well with the DSL diurnal centre of
 ```{r GAM-prep}
 SA_df <- stat_laea %>%
   filter(depth == 318) %>% 
-  dplyr::select(year, xc, yc, IHO_area, NASC_int, velocity, chl) %>%
+  dplyr::select(year, xc, yc, IHO_area, NASC_int, SA_int, velocity, chl) %>%
   group_by(IHO_area) %>%
-  mutate(
-    year = factor(year),
-    NASC_int_n = (NASC_int - min(NASC_int)) / (max(NASC_int) - min(NASC_int))) %>%
+  mutate(year = factor(year)) %>%
   ungroup() %>%
   rename(IHO = IHO_area, 
          v = velocity) 
@@ -507,7 +505,7 @@ Check spearman correlations.
 ```{r corr-area}
 # Compute Spearman correlation matrix
 corr <- SA_df %>% 
-  dplyr::select(-year, -xc, -yc, -IHO, -NASC_int_n) %>%
+  dplyr::select(-year, -xc, -yc, -IHO) %>%
   cor(., method = "spearman") %>%
   round(., 2)
 ggcorrplot(corr, type = "lower", lab = T, title = "corr")
@@ -892,7 +890,7 @@ plot_grid(GAM_S2_resid %>%
 
 I predict the model to get the smooths in the response scale (NASC). I need to create a specific data frame for this with the factors of interest `IHO` and `year`, and covariates `v` and `chl`.
 
-```{r summary-SA-df}
+```{r summary-NASC-df}
 val <- SA_df %>%
   dplyr::select(IHO, year, v, chl) %>%
   group_by(IHO) %>%
@@ -1099,4 +1097,437 @@ GAMI_chl <- pred_I %>%
         legend.position = "none")
 # Combine plots
 plot_grid(GAMI_velo, GAMI_chl, ncol = 1, rel_heights = c(1,0.8))
+```
+
+
+# HGAM - Gaussian SA
+
+## Model fitting
+
+In model S the random intercept is already included in the `s(bs = "fs")` term.
+
+```{r HGAMSA-fit}
+# Model G
+GAMSA_G <- gam(SA_int ~ 
+               # First order effects
+               s(v, k = 5, bs = "tp") + # Global smoothers
+               s(chl, k = 5, bs = "tp") + # Global smoothers
+               s(IHO, bs = "re") + # Random effect
+               s(year, bs = "re") + # Random effect
+               # Second order effects
+               s(IHO, year, bs = "re"), # Random slope
+            data = SA_df, family = "gaussian", method = "REML")
+# Model S
+GAMSA_S <- gam(SA_int ~ 
+                # First order effects
+                # s(chl, bs = "tp", k = 5) +
+                # s(v, bs = "tp", k = 5) +
+                s(year, bs = "re") +
+                s(IHO, bs = "re") +
+                # Second order random effects
+                s(year, IHO, bs = "re") +
+                # Second order functional effects
+                s(chl, IHO, bs = "fs", k = 5) +
+                s(v, IHO, bs = "fs", k = 5),
+             data = SA_df, family = "gaussian", method = "REML")
+# Model I
+GAMSA_I <- gam(SA_int ~
+                # First order effects
+                # s(chl, bs = "tp", k = 5) +
+                # s(v, bs = "tp", k = 5) +
+                s(year, bs = "re") +
+                s(IHO, bs = "re") +
+                # Second order random effects
+                s(year, IHO, bs = "re") +
+                # Second order functional effects
+                s(chl, by = IHO, k = 5, bs = "tp") + 
+                s(v, by = IHO, k = 5, bs = "tp"),
+             data = SA_df, family = "gaussian", method = "REML")
+```
+
+Check model metrics
+
+```{r summary-GAMSA}
+# Summary metrics
+GAMSA_AIC <- AIC(GAMSA_G, GAMSA_S, GAMSA_I) %>% 
+  rownames_to_column() %>%
+  rename(model = rowname)
+# Metrics data frame
+data.frame(model = c("GAMSA_G", "GAMSA_S", "GAMSA_I"),
+           reml = round(c(GAMSA_G$gcv.ubre,
+                          GAMSA_S$gcv.ubre, 
+                          GAMSA_I$gcv.ubre), 
+                        2), 
+           dev_expl = round(c(
+             (1 - (GAMSA_G$deviance / GAMSA_G$null.deviance)) * 100,
+             (1 - (GAMSA_S$deviance / GAMSA_S$null.deviance)) * 100,
+             (1 - (GAMSA_I$deviance / GAMSA_I$null.deviance)) * 100),
+             2),
+           r2 = round(c(summary(GAMSA_G)$r.sq,
+                        summary(GAMSA_S)$r.sq, 
+                        summary(GAMSA_I)$r.sq),
+                      2)) %>%
+  full_join(., GAMSA_AIC, by = "model") %>%
+  mutate(df = round(df, 3),
+         AIC = round(AIC, 3),
+         dAIC = round(AIC - min(AIC), 2),
+         w_AIC = round(Weights(AIC), 5)) %>%
+  dplyr::select(model, df, dev_expl, r2, reml, AIC, dAIC, w_AIC) %>%
+  arrange(dAIC) %>% 
+  datatable(class = "cell-border stribe", rownames = F)
+```
+
+Model G summary.
+
+```{r GAMSAG-summary}
+summary(GAMSA_G)
+```
+
+Model S summary.
+
+```{r GAMSAS-summary}
+summary(GAMSA_S)
+```
+
+Model I summary.
+
+```{r GAMSAI-summary}
+summary(GAMSA_I)
+```
+
+## Model checking
+
+### Basis size and residual distribution
+
+First I check the basis size k. `k-indexes` are \> 1 or close to 1 so the basis size is large enough. The residual plot look good too.
+
+```{r GAMSAS-basis-size-residuals}
+appraise(GAMSA_S, method = "simulate")
+k.check(GAMSA_S)
+```
+
+```{r GAMSAI-basis-size-residuals}
+appraise(GAMSA_I, method = "simulate")
+k.check(GAMSA_I)
+```
+
+### Resiudals against covariates
+
+```{r GAMSAS-residuals-covariates, message=FALSE}
+GAMSA_S_resid <- bind_cols(SA_df, residuals.gam(GAMSA_S)) %>%
+  rename(resid = "...9")
+plot_grid(GAMSA_S_resid %>%
+            ggplot(aes(x = v, y = resid)) + 
+            geom_hline(yintercept = 0, col = "red") +
+            labs(x = "velocity") +
+            geom_point(), 
+          GAMSA_S_resid %>%
+            ggplot(aes(x = chl, y = resid)) + 
+            geom_hline(yintercept = 0, col = "red") +
+            labs(x = "chlorophyll") +
+            geom_point(), 
+          GAMSA_S_resid %>%
+            ggplot(aes(x = IHO, y = resid)) + 
+            geom_hline(yintercept = 0, col = "red") +
+            labs(x = "area") +
+            geom_boxplot(fill = NA), 
+          GAMSA_S_resid %>%
+            ggplot(aes(x = year, y = resid)) + 
+            geom_hline(yintercept = 0, col = "red") +
+            labs(x = "year") +
+            geom_boxplot(fill = NA))
+```
+
+```{r GAMSAI-residuals-covariates, message=FALSE}
+GAMSA_I_resid <- bind_cols(SA_df, residuals.gam(GAMSA_I)) %>%
+  rename(resid = "...9")
+plot_grid(GAMSA_I_resid %>%
+            ggplot(aes(x = v, y = resid)) + 
+            geom_hline(yintercept = 0, col = "red") +
+            labs(x = "velocity") +
+            geom_point(), 
+          GAMSA_I_resid %>%
+            ggplot(aes(x = chl, y = resid)) + 
+            geom_hline(yintercept = 0, col = "red") +
+            labs(x = "chlorophyll") +
+            geom_point(), 
+          GAMSA_I_resid %>%
+            ggplot(aes(x = IHO, y = resid)) + 
+            geom_hline(yintercept = 0, col = "red") +
+            labs(x = "area") +
+            geom_boxplot(fill = NA), 
+          GAMSA_I_resid %>%
+            ggplot(aes(x = year, y = resid)) + 
+            geom_hline(yintercept = 0, col = "red") +
+            labs(x = "year") +
+            geom_boxplot(fill = NA))
+```
+
+### Autotcorrelation
+
+```{r GAMSAS-acf-pacf}
+par(mfrow = c(1, 2))
+acf(resid(GAMSA_S), lag.max = 36, main = "ACF")
+pacf(resid(GAMSA_S), lag.max = 36, main = "pACF")
+```
+
+```{r GAMSAI-acf-pacf}
+par(mfrow = c(1, 2))
+acf(resid(GAMSA_I), lag.max = 36, main = "ACF")
+pacf(resid(GAMSA_I), lag.max = 36, main = "pACF")
+```
+
+## Term selection
+
+I turn on the double penalty (`select = TRUE`) and check the covariates that has been shrunk.
+
+### Model S
+
+```{r shrink-GAMSAS-selection}
+# Model S
+GAMSA_S_p <- gam(SA_int ~ 
+                # First order effects
+                # s(chl, bs = "tp", k = 5) +
+                # s(v, bs = "tp", k = 5) +
+                s(year, bs = "re") +
+                s(IHO, bs = "re") +
+                # Second order random effects
+                s(year, IHO, bs = "re") +
+                # Second order functional effects
+                s(chl, IHO, bs = "fs", k = 5) +
+                s(v, IHO, bs = "fs", k = 5),
+             data = SA_df, family = "gaussian", method = "REML", 
+             select = T)
+summary(GAMSA_S_p)
+```
+
+The random effects `s(IHO)` and `s(year)` also have low edf but I decide to keep them in the model as their interaction `s(year,IHO)` is significant.
+
+### Model I
+
+```{r shrink-GAMSAI-selection}
+# Model I
+GAMSA_I_p <- gam(SA_int ~
+                  # First order effects
+                  # s(chl, bs = "tp", k = 5) +
+                  # s(v, bs = "tp", k = 5) +
+                  s(year, bs = "re") +
+                  s(IHO, bs = "re") +
+                  # Second order random effects
+                  s(year, IHO, bs = "re") +
+                  # Second order functional effects
+                  s(chl, by = IHO, k = 5, bs = "tp") + 
+                  s(v, by = IHO, k = 5, bs = "tp"),
+                data = SA_df, family = "gaussian", method = "REML",
+                select = T)
+summary(GAMSA_I_p)
+```
+
+The random effects `s(IHO)` and `s(year)` also have low edf but I decide to keep them in the model as their interaction `s(year,IHO)` is significant. I refit the model without the `s(v,year)` and `s(chl,year)` terms.
+
+## Model predictions
+
+I predict the model to get the smooths in the response scale (NASC). I need to create a specific data frame for this with the factors of interest `IHO` and `year`, and covariates `v` and `chl`.
+
+```{r summary-SA-df}
+val <- SA_df %>%
+  dplyr::select(IHO, year, v, chl) %>%
+  group_by(IHO) %>%
+  summarise(min_v = min(v),
+            max_v = max(v),
+            median_v = median(v),
+            min_chl = min(chl),
+            max_chl = max(chl),
+            median_chl = median(chl))
+val
+```
+
+```{r data-frame-predSA}
+# Resolution for predictions
+res = 20
+# IHO areas
+IHO_area <- levels(SA_df$IHO)
+# Empty data frame that we populate with new values
+SA_new <- data.frame()
+
+for (i in IHO_area) {
+  # Select data from which we build the 
+  val_tmp <- val %>% 
+    filter(IHO == i)
+  # Temporary data frame for each region
+  SA_tmp <- data.frame(
+    IHO = rep(rep(rep(i, res), 3), 2),
+    year = rep(c(rep(2015, res), rep(2016, res), rep(2017, res)), 2),
+    var = c(rep("v", res * 3), rep("chl", res * 3)),
+    # Velocity
+    v = c(rep(seq(subset(val, IHO == i)$min_v,
+                  subset(val, IHO == i)$max_v,
+                  length.out = res), 3),
+          rep(subset(val, IHO == "WAO")$median_v, res * 3)),
+    # Chlorophyll
+    chl = c(rep(subset(val, IHO == i)$median_chl, res * 3),
+            rep(seq(subset(val, IHO == i)$min_chl, 
+                    subset(val, IHO == i)$max_chl,
+                    length.out = res), 3)))
+  # Append data
+  SA_new <- bind_rows(SA_new, SA_tmp)
+}
+# Reorder factors
+SA_new <- SA_new %>%
+  mutate(IHO = factor(IHO, levels = c("WAO_BF","CAA", "BB", "DS", "EAO")))
+```
+
+Get GAM predictions (`GAM_S` and `GAM_I`) for the new data. I then calculate the average functional response for all years.
+
+```{r GAMSAS-pred}
+ilinkSA_S <- family(GAMSA_S)$linkinv # Get link function
+predSA_S <- predict(GAMSA_S, SA_new, type = "link", se.fit = TRUE) %>% # Predict data
+  bind_cols(., SA_new) %>%
+  transform(lwr_ci = ilinkSA_S(fit - (2 * se.fit)), # Calculate lower CI
+            upr_ci = ilinkSA_S(fit + (2 * se.fit)), # Calculate upper CI
+            fitted = ilinkSA_S(fit)) %>% # Calculate fit
+  group_by(IHO, var, v, chl) %>%
+  summarise(SA_fit = mean(fitted), # Calculate average functional response
+            SA_lwr_ci = mean(lwr_ci),
+            SA_upr_ci = mean(upr_ci)) 
+```
+
+```{r GAMSAI-pred}
+ilinkSA_I <- family(GAMSA_I)$linkinv # Get link function
+predSA_I <- predict(GAMSA_I, SA_new, type = "link", se.fit = TRUE) %>% # Predict data
+  bind_cols(., SA_new) %>%
+  transform(lwr_ci = ilinkSA_I(fit - (2 * se.fit)), # Calculate lower CI
+            upr_ci = ilinkSA_I(fit + (2 * se.fit)), # Calculate upper CI
+            fitted = ilinkSA_I(fit)) %>% # Calculate fit
+  group_by(IHO, var, v, chl) %>%
+  summarise(SA_fit = mean(fitted), # Calculate average functional response
+            SA_lwr_ci = mean(lwr_ci),
+            SA_upr_ci = mean(upr_ci)) 
+```
+
+```{r save-GAMSA}
+# Save data
+save(predSA_S, predSA_I, GAMSA_S, GAMSA_I, file = "data/statistics/GAMSA_results.RData")
+```
+
+## Model visualization
+
+Plot to see if predictions worked well.
+
+```{r veloSA-ggplot, fig.height=8, fig.width=8}
+plot_grid(
+  predSA_S %>%
+    filter(var == "v") %>%
+    ggplot() +
+    geom_line(aes(x = v, y = SA_fit)) +
+    geom_ribbon(aes(x = v, ymin = SA_lwr_ci, ymax = SA_upr_ci), alpha = 0.1) +
+    geom_point(data = SA_df, aes(x = v, y = SA_int, group = IHO)) + 
+    facet_wrap(~ IHO, scales = "free") +
+    ggtitle("Model SA S"),
+  predSA_I %>%
+    filter(var == "v") %>%
+    ggplot() +
+    geom_line(aes(x = v, y = SA_fit)) +
+    geom_ribbon(aes(x = v, ymin = SA_lwr_ci, ymax = SA_upr_ci), alpha = 0.1) +
+    geom_point(data = SA_df, aes(x = v, y = SA_int, group = IHO)) + 
+    facet_wrap(~ IHO, scales = "free") +
+    ggtitle("Model SA I"),
+  ncol = 1)
+```
+
+```{r chlSA-ggplot, fig.height=8, fig.width=8}
+plot_grid(
+  predSA_S %>%
+    filter(var == "chl") %>%
+    ggplot() +
+    geom_line(aes(x = chl, y = SA_fit)) +
+    geom_ribbon(aes(x = chl, ymin = SA_lwr_ci, ymax = SA_upr_ci), alpha = 0.1) +
+    geom_point(data = SA_df, aes(x = chl, y = SA_int, group = IHO)) + 
+    facet_wrap(~ IHO, scales = "free") +
+    ggtitle("Model SA S"),
+  predSA_I %>%
+    filter(var == "chl") %>%
+    ggplot() +
+    geom_line(aes(x = chl, y = SA_fit)) +
+    geom_ribbon(aes(x = chl, ymin = SA_lwr_ci, ymax = SA_upr_ci), alpha = 0.1) +
+    geom_point(data = SA_df, aes(x = chl, y = SA_int, group = IHO)) + 
+    facet_wrap(~ IHO, scales = "free") +
+    ggtitle("Model SA I"),
+  ncol = 1)
+```
+
+```{r GAMSAS-pretty-ggplot, fig.height=8, fig.width=7}
+GAMSAS_velo <- predSA_S %>%
+  filter(var == "v") %>%
+  ggplot() +
+  geom_line(aes(x = v, y = SA_fit, col = IHO), size = 0.8) +
+  geom_ribbon(aes(x = v, ymin = SA_lwr_ci, ymax = SA_upr_ci, fill = IHO),
+              alpha = 0.1) +
+  scale_colour_manual(values = met.brewer("Johnson", n = 6, direction = -1)) +
+  scale_fill_manual(values = met.brewer("Johnson", n = 6, direction = -1)) +
+  coord_cartesian(ylim = c(-2, 50), expand = T) +
+  scale_x_continuous(breaks = seq(0, 10, 1)) +
+  labs(title = "Model S",
+       x = expression("Current velocity at 318 m (cm s"^-1*")"),
+       y = expression("S"[A]*" (dB re 1 m"^2*" nmi"^-2*")")) +
+  theme(panel.border = element_blank(),
+        axis.line = element_line(),
+        legend.title = element_blank(), 
+        legend.position = "top")
+GAMSAS_chl <- predSA_S %>%
+  filter(var == "chl") %>%
+  ggplot() +
+  geom_line(aes(x = chl, y = SA_fit, col = IHO), size = 0.8) +
+  geom_ribbon(aes(x = chl, ymin = SA_lwr_ci, ymax = SA_upr_ci, fill = IHO), 
+              alpha = 0.1) +
+  scale_colour_manual(values = met.brewer("Johnson", n = 6, direction = -1)) +
+  scale_fill_manual(values = met.brewer("Johnson", n = 6, direction = -1)) +
+  coord_cartesian(ylim = c(-2, 50), expand = T) +
+  scale_x_continuous(breaks = seq(0, 10, 0.5)) +
+  labs(x = expression("Chlorophyll (mg m"^-3*")"),
+       y = expression("S"[A]*" (dB re 1 m"^2*" nmi"^-2*")")) +
+  theme(panel.border = element_blank(),
+        axis.line = element_line(),
+        legend.title = element_blank(), 
+        legend.position = "none")
+# Combine plots
+plot_grid(GAMSAS_velo, GAMSAS_chl, ncol = 1, rel_heights = c(1,0.8))
+```
+
+```{r GAMSAI-pretty-ggplot, fig.height=8, fig.width=7}
+GAMSAI_velo <- predSA_I %>%
+  filter(var == "v") %>%
+  ggplot() +
+  geom_line(aes(x = v, y = SA_fit, col = IHO), size = 0.8) +
+  geom_ribbon(aes(x = v, ymin = SA_lwr_ci, ymax = SA_upr_ci, fill = IHO), 
+              alpha = 0.1) +
+  scale_colour_manual(values = met.brewer("Johnson", n = 6, direction = -1)) +
+  scale_fill_manual(values = met.brewer("Johnson", n = 6, direction = -1)) +
+  coord_cartesian(ylim = c(-2, 50), expand = T) +
+  scale_x_continuous(breaks = seq(0, 10, 1)) +
+  labs(title = "Model I",
+       x = expression("Current velocity at 318 m (cm s"^-1*")"),
+       y = expression("S"[A]*" (dB re 1 m"^2*" nmi"^-2*")")) +
+  theme(panel.border = element_blank(),
+        axis.line = element_line(),
+        legend.title = element_blank(), 
+        legend.position = "top")
+GAMSAI_chl <- predSA_I %>%
+  filter(var == "chl") %>%
+  ggplot() +
+  geom_line(aes(x = chl, y = SA_fit, col = IHO), size = 0.8) +
+  geom_ribbon(aes(x = chl, ymin = SA_lwr_ci, ymax = SA_upr_ci, fill = IHO),
+              alpha = 0.1) +
+  scale_colour_manual(values = met.brewer("Johnson", n = 6, direction = -1)) +
+  scale_fill_manual(values = met.brewer("Johnson", n = 6, direction = -1)) +
+  coord_cartesian(ylim = c(-2, 50), expand = T) +
+  scale_x_continuous(breaks = seq(0, 10, 0.5)) +
+  labs(x = expression("Chlorophyll (mg m"^-3*")"),
+       y = expression("S"[A]*" (dB re 1 m"^2*" nmi"^-2*")")) +
+  theme(panel.border = element_blank(),
+        axis.line = element_line(),
+        legend.title = element_blank(), 
+        legend.position = "none")
+# Combine plots
+plot_grid(GAMSAI_velo, GAMSAI_chl, ncol = 1, rel_heights = c(1,0.8))
 ```

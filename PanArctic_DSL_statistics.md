@@ -1,7 +1,7 @@
 ---
 title: "PanArctic DSL - Statistics"
 author: "[Pierre Priou](mailto:pierre.priou@mi.mun.ca)"
-date: "2022/05/24 at 18:24"
+date: "2022/05/24 at 19:13"
 output: 
   html_document:
     keep_md: yes
@@ -583,11 +583,9 @@ I select data at 318 m depth because it fits well with the DSL diurnal centre of
 ```r
 SA_df <- stat_laea %>%
   filter(depth == 318) %>% 
-  dplyr::select(year, xc, yc, IHO_area, NASC_int, velocity, chl) %>%
+  dplyr::select(year, xc, yc, IHO_area, NASC_int, SA_int, velocity, chl) %>%
   group_by(IHO_area) %>%
-  mutate(
-    year = factor(year),
-    NASC_int_n = (NASC_int - min(NASC_int)) / (max(NASC_int) - min(NASC_int))) %>%
+  mutate(year = factor(year)) %>%
   ungroup() %>%
   rename(IHO = IHO_area, 
          v = velocity) 
@@ -624,15 +622,13 @@ Check spearman correlations.
 ```r
 # Compute Spearman correlation matrix
 corr <- SA_df %>% 
-  dplyr::select(-year, -xc, -yc, -IHO, -NASC_int_n) %>%
+  dplyr::select(-year, -xc, -yc, -IHO) %>%
   cor(., method = "spearman") %>%
   round(., 2)
 ggcorrplot(corr, type = "lower", lab = T, title = "corr")
 ```
 
 ![](PanArctic_DSL_statistics_files/figure-html/corr-area-1.png)<!-- -->
-
-# Velocity and chlorophyll
 
 I do not expect regional functional responses to derive from a global functional responses because I expect differences in species assemblages and environmental conditions from one region of the Arctic to the other. So I fit models S and I following the nomenclature proposed by Pedersen et al. 2019.
 
@@ -714,8 +710,8 @@ data.frame(model = c("GAM_G", "GAM_S", "GAM_I"),
 ```
 
 ```{=html}
-<div id="htmlwidget-109f9f9afca83339cb59" style="width:100%;height:auto;" class="datatables html-widget"></div>
-<script type="application/json" data-for="htmlwidget-109f9f9afca83339cb59">{"x":{"filter":"none","vertical":false,"data":[["GAM_I","GAM_S","GAM_G"],[27.173,30.313,18.42],[71.67,72.47,62.93],[0.42,0.47,0.28],[569.74,583.46,589.01],[1161.442,1164.578,1174.239],[0,3.14,12.8],[0.82636,0.17226,0.00138]],"container":"<table class=\"cell-border stribe\">\n  <thead>\n    <tr>\n      <th>model<\/th>\n      <th>df<\/th>\n      <th>dev_expl<\/th>\n      <th>r2<\/th>\n      <th>reml<\/th>\n      <th>AIC<\/th>\n      <th>dAIC<\/th>\n      <th>w_AIC<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[1,2,3,4,5,6,7]}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
+<div id="htmlwidget-3e399fe16efdabcd80a9" style="width:100%;height:auto;" class="datatables html-widget"></div>
+<script type="application/json" data-for="htmlwidget-3e399fe16efdabcd80a9">{"x":{"filter":"none","vertical":false,"data":[["GAM_I","GAM_S","GAM_G"],[27.173,30.313,18.42],[71.67,72.47,62.93],[0.42,0.47,0.28],[569.74,583.46,589.01],[1161.442,1164.578,1174.239],[0,3.14,12.8],[0.82636,0.17226,0.00138]],"container":"<table class=\"cell-border stribe\">\n  <thead>\n    <tr>\n      <th>model<\/th>\n      <th>df<\/th>\n      <th>dev_expl<\/th>\n      <th>r2<\/th>\n      <th>reml<\/th>\n      <th>AIC<\/th>\n      <th>dAIC<\/th>\n      <th>w_AIC<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[1,2,3,4,5,6,7]}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
 ```
 
 Model G summary.
@@ -858,8 +854,8 @@ k.check(GAM_S)
 ## s(year)      3 1.141853948        NA      NA
 ## s(IHO)       5 0.001956388        NA      NA
 ## s(year,IHO) 15 7.287029664        NA      NA
-## s(chl,IHO)  25 5.978132860 0.8048709  0.1525
-## s(v,IHO)    25 7.234359596 0.9153094  0.6650
+## s(chl,IHO)  25 5.978132860 0.8048709  0.2125
+## s(v,IHO)    25 7.234359596 0.9153094  0.6525
 ```
 
 
@@ -878,16 +874,16 @@ k.check(GAM_I)
 ## s(year)           3 1.211474e+00        NA      NA
 ## s(IHO)            5 2.081778e-05        NA      NA
 ## s(year,IHO)      15 5.469597e+00        NA      NA
-## s(chl):IHOWAO_BF  4 1.000293e+00 0.7655921  0.0800
-## s(chl):IHOCAA     4 1.000044e+00 0.7655921  0.0975
-## s(chl):IHOBB      4 2.240052e+00 0.7655921  0.1025
-## s(chl):IHODS      4 1.000036e+00 0.7655921  0.0800
-## s(chl):IHOEAO     4 1.000068e+00 0.7655921  0.0925
-## s(v):IHOWAO_BF    4 1.001700e+00 0.9262131  0.6825
-## s(v):IHOCAA       4 1.000064e+00 0.9262131  0.6350
-## s(v):IHOBB        4 2.572119e+00 0.9262131  0.6750
-## s(v):IHODS        4 1.000082e+00 0.9262131  0.6950
-## s(v):IHOEAO       4 2.540037e+00 0.9262131  0.7250
+## s(chl):IHOWAO_BF  4 1.000293e+00 0.7655921  0.0900
+## s(chl):IHOCAA     4 1.000044e+00 0.7655921  0.1025
+## s(chl):IHOBB      4 2.240052e+00 0.7655921  0.0850
+## s(chl):IHODS      4 1.000036e+00 0.7655921  0.0900
+## s(chl):IHOEAO     4 1.000068e+00 0.7655921  0.0775
+## s(v):IHOWAO_BF    4 1.001700e+00 0.9262131  0.6475
+## s(v):IHOCAA       4 1.000064e+00 0.9262131  0.7175
+## s(v):IHOBB        4 2.572119e+00 0.9262131  0.6600
+## s(v):IHODS        4 1.000082e+00 0.9262131  0.6775
+## s(v):IHOEAO       4 2.540037e+00 0.9262131  0.7100
 ```
 
 ### Resiudals against covariates
@@ -1101,8 +1097,8 @@ data.frame(model = c("GAM_S", "GAM_S2"),
 ```
 
 ```{=html}
-<div id="htmlwidget-bc88f8b79e68762e2cd0" style="width:100%;height:auto;" class="datatables html-widget"></div>
-<script type="application/json" data-for="htmlwidget-bc88f8b79e68762e2cd0">{"x":{"filter":"none","vertical":false,"data":[["GAM_S","GAM_S2"],[30.313,30.313],[72.47,72.47],[0.47,0.47],[583.46,583.46],[1164.578,1164.578],[0,0],[0.5,0.5]],"container":"<table class=\"cell-border stribe\">\n  <thead>\n    <tr>\n      <th>model<\/th>\n      <th>df<\/th>\n      <th>dev_expl<\/th>\n      <th>r2<\/th>\n      <th>reml<\/th>\n      <th>AIC<\/th>\n      <th>dAIC<\/th>\n      <th>w_AIC<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[1,2,3,4,5,6,7]}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
+<div id="htmlwidget-2e4e01734d173c1301ad" style="width:100%;height:auto;" class="datatables html-widget"></div>
+<script type="application/json" data-for="htmlwidget-2e4e01734d173c1301ad">{"x":{"filter":"none","vertical":false,"data":[["GAM_S","GAM_S2"],[30.313,30.313],[72.47,72.47],[0.47,0.47],[583.46,583.46],[1164.578,1164.578],[0,0],[0.5,0.5]],"container":"<table class=\"cell-border stribe\">\n  <thead>\n    <tr>\n      <th>model<\/th>\n      <th>df<\/th>\n      <th>dev_expl<\/th>\n      <th>r2<\/th>\n      <th>reml<\/th>\n      <th>AIC<\/th>\n      <th>dAIC<\/th>\n      <th>w_AIC<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[1,2,3,4,5,6,7]}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
 ```
 
 `GAM_S` has better metics. So I keep that model.
@@ -1286,8 +1282,8 @@ data.frame(model = c("GAM_I", "GAM_I2"),
 ```
 
 ```{=html}
-<div id="htmlwidget-627fac6f57a0809c87fd" style="width:100%;height:auto;" class="datatables html-widget"></div>
-<script type="application/json" data-for="htmlwidget-627fac6f57a0809c87fd">{"x":{"filter":"none","vertical":false,"data":[["GAM_I","GAM_I2"],[27.173,18.707],[71.67,65.4],[0.42,0.65],[569.74,571.55],[1161.442,1166.726],[0,5.28],[0.9335161995,0.0664838005]],"container":"<table class=\"cell-border stribe\">\n  <thead>\n    <tr>\n      <th>model<\/th>\n      <th>df<\/th>\n      <th>dev_expl<\/th>\n      <th>r2<\/th>\n      <th>reml<\/th>\n      <th>AIC<\/th>\n      <th>dAIC<\/th>\n      <th>w_AIC<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[1,2,3,4,5,6,7]}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
+<div id="htmlwidget-ad952f3a2b53cc250ddd" style="width:100%;height:auto;" class="datatables html-widget"></div>
+<script type="application/json" data-for="htmlwidget-ad952f3a2b53cc250ddd">{"x":{"filter":"none","vertical":false,"data":[["GAM_I","GAM_I2"],[27.173,18.707],[71.67,65.4],[0.42,0.65],[569.74,571.55],[1161.442,1166.726],[0,5.28],[0.9335161995,0.0664838005]],"container":"<table class=\"cell-border stribe\">\n  <thead>\n    <tr>\n      <th>model<\/th>\n      <th>df<\/th>\n      <th>dev_expl<\/th>\n      <th>r2<\/th>\n      <th>reml<\/th>\n      <th>AIC<\/th>\n      <th>dAIC<\/th>\n      <th>w_AIC<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[1,2,3,4,5,6,7]}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
 ```
 
 `GAM_I` has better metics. So I keep that model.
@@ -1568,3 +1564,689 @@ plot_grid(GAMI_velo, GAMI_chl, ncol = 1, rel_heights = c(1,0.8))
 ```
 
 ![](PanArctic_DSL_statistics_files/figure-html/GAMI-pretty-ggplot-1.png)<!-- -->
+
+
+# HGAM - Gaussian SA
+
+## Model fitting
+
+In model S the random intercept is already included in the `s(bs = "fs")` term.
+
+
+```r
+# Model G
+GAMSA_G <- gam(SA_int ~ 
+               # First order effects
+               s(v, k = 5, bs = "tp") + # Global smoothers
+               s(chl, k = 5, bs = "tp") + # Global smoothers
+               s(IHO, bs = "re") + # Random effect
+               s(year, bs = "re") + # Random effect
+               # Second order effects
+               s(IHO, year, bs = "re"), # Random slope
+            data = SA_df, family = "gaussian", method = "REML")
+# Model S
+GAMSA_S <- gam(SA_int ~ 
+                # First order effects
+                # s(chl, bs = "tp", k = 5) +
+                # s(v, bs = "tp", k = 5) +
+                s(year, bs = "re") +
+                s(IHO, bs = "re") +
+                # Second order random effects
+                s(year, IHO, bs = "re") +
+                # Second order functional effects
+                s(chl, IHO, bs = "fs", k = 5) +
+                s(v, IHO, bs = "fs", k = 5),
+             data = SA_df, family = "gaussian", method = "REML")
+# Model I
+GAMSA_I <- gam(SA_int ~
+                # First order effects
+                # s(chl, bs = "tp", k = 5) +
+                # s(v, bs = "tp", k = 5) +
+                s(year, bs = "re") +
+                s(IHO, bs = "re") +
+                # Second order random effects
+                s(year, IHO, bs = "re") +
+                # Second order functional effects
+                s(chl, by = IHO, k = 5, bs = "tp") + 
+                s(v, by = IHO, k = 5, bs = "tp"),
+             data = SA_df, family = "gaussian", method = "REML")
+```
+
+Check model metrics
+
+
+```r
+# Summary metrics
+GAMSA_AIC <- AIC(GAMSA_G, GAMSA_S, GAMSA_I) %>% 
+  rownames_to_column() %>%
+  rename(model = rowname)
+# Metrics data frame
+data.frame(model = c("GAMSA_G", "GAMSA_S", "GAMSA_I"),
+           reml = round(c(GAMSA_G$gcv.ubre,
+                          GAMSA_S$gcv.ubre, 
+                          GAMSA_I$gcv.ubre), 
+                        2), 
+           dev_expl = round(c(
+             (1 - (GAMSA_G$deviance / GAMSA_G$null.deviance)) * 100,
+             (1 - (GAMSA_S$deviance / GAMSA_S$null.deviance)) * 100,
+             (1 - (GAMSA_I$deviance / GAMSA_I$null.deviance)) * 100),
+             2),
+           r2 = round(c(summary(GAMSA_G)$r.sq,
+                        summary(GAMSA_S)$r.sq, 
+                        summary(GAMSA_I)$r.sq),
+                      2)) %>%
+  full_join(., GAMSA_AIC, by = "model") %>%
+  mutate(df = round(df, 3),
+         AIC = round(AIC, 3),
+         dAIC = round(AIC - min(AIC), 2),
+         w_AIC = round(Weights(AIC), 5)) %>%
+  dplyr::select(model, df, dev_expl, r2, reml, AIC, dAIC, w_AIC) %>%
+  arrange(dAIC) %>% 
+  datatable(class = "cell-border stribe", rownames = F)
+```
+
+```{=html}
+<div id="htmlwidget-db3958cb65cac0525503" style="width:100%;height:auto;" class="datatables html-widget"></div>
+<script type="application/json" data-for="htmlwidget-db3958cb65cac0525503">{"x":{"filter":"none","vertical":false,"data":[["GAMSA_I","GAMSA_S","GAMSA_G"],[25.064,23.479,18.886],[54.24,51.99,36.74],[0.43,0.43,0.27],[306.06,331.77,336.93],[666.285,667.732,685.024],[0,1.45,18.74],[0.67334,0.3266,6e-05]],"container":"<table class=\"cell-border stribe\">\n  <thead>\n    <tr>\n      <th>model<\/th>\n      <th>df<\/th>\n      <th>dev_expl<\/th>\n      <th>r2<\/th>\n      <th>reml<\/th>\n      <th>AIC<\/th>\n      <th>dAIC<\/th>\n      <th>w_AIC<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[1,2,3,4,5,6,7]}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
+```
+
+Model G summary.
+
+
+```r
+summary(GAMSA_G)
+```
+
+```
+## 
+## Family: gaussian 
+## Link function: identity 
+## 
+## Formula:
+## SA_int ~ s(v, k = 5, bs = "tp") + s(chl, k = 5, bs = "tp") + 
+##     s(IHO, bs = "re") + s(year, bs = "re") + s(IHO, year, bs = "re")
+## 
+## Parametric coefficients:
+##             Estimate Std. Error t value Pr(>|t|)    
+## (Intercept)   17.042      1.859   9.166 3.33e-14 ***
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## 
+## Approximate significance of smooth terms:
+##                edf Ref.df     F p-value
+## s(v)        2.2031  2.696 1.549   0.296
+## s(chl)      2.5769  3.066 1.085   0.307
+## s(IHO)      1.1639  4.000 0.660   0.437
+## s(year)     0.7162  2.000 1.279   0.343
+## s(IHO,year) 6.2709 14.000 1.136   0.120
+## 
+## R-sq.(adj) =  0.268   Deviance explained = 36.7%
+## -REML = 336.93  Scale est. = 58.039    n = 96
+```
+
+Model S summary.
+
+
+```r
+summary(GAMSA_S)
+```
+
+```
+## 
+## Family: gaussian 
+## Link function: identity 
+## 
+## Formula:
+## SA_int ~ s(year, bs = "re") + s(IHO, bs = "re") + s(year, IHO, 
+##     bs = "re") + s(chl, IHO, bs = "fs", k = 5) + s(v, IHO, bs = "fs", 
+##     k = 5)
+## 
+## Parametric coefficients:
+##             Estimate Std. Error t value Pr(>|t|)    
+## (Intercept)   16.563      2.405   6.886  1.2e-09 ***
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## 
+## Approximate significance of smooth terms:
+##                 edf Ref.df     F p-value   
+## s(year)     1.49144      2 6.315  0.0722 . 
+## s(IHO)      0.00077      4 0.000  0.0998 . 
+## s(year,IHO) 4.27786     14 0.531  0.1334   
+## s(chl,IHO)  7.46194     24 1.956  0.0018 **
+## s(v,IHO)    2.19864     24 0.139  0.1680   
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## 
+## R-sq.(adj) =  0.427   Deviance explained =   52%
+## -REML = 331.77  Scale est. = 45.433    n = 96
+```
+
+Model I summary.
+
+
+```r
+summary(GAMSA_I)
+```
+
+```
+## 
+## Family: gaussian 
+## Link function: identity 
+## 
+## Formula:
+## SA_int ~ s(year, bs = "re") + s(IHO, bs = "re") + s(year, IHO, 
+##     bs = "re") + s(chl, by = IHO, k = 5, bs = "tp") + s(v, by = IHO, 
+##     k = 5, bs = "tp")
+## 
+## Parametric coefficients:
+##             Estimate Std. Error t value Pr(>|t|)    
+## (Intercept)   16.693      2.215   7.537 8.58e-11 ***
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## 
+## Approximate significance of smooth terms:
+##                       edf Ref.df     F p-value   
+## s(year)          1.453625  2.000 5.030 0.10368   
+## s(IHO)           0.001634  4.000 0.000 0.38556   
+## s(year,IHO)      3.930004 14.000 0.564 0.13353   
+## s(chl):IHOWAO_BF 1.000024  1.000 5.794 0.01851 * 
+## s(chl):IHOCAA    1.000020  1.000 0.013 0.91079   
+## s(chl):IHOBB     1.879422  2.277 2.436 0.09292 . 
+## s(chl):IHODS     1.000031  1.000 0.315 0.57643   
+## s(chl):IHOEAO    2.555437  3.039 5.786 0.00128 **
+## s(v):IHOWAO_BF   1.000061  1.000 1.477 0.22806   
+## s(v):IHOCAA      1.000025  1.000 0.238 0.62702   
+## s(v):IHOBB       2.428626  2.901 2.949 0.03928 * 
+## s(v):IHODS       1.000043  1.000 0.312 0.57807   
+## s(v):IHOEAO      1.000054  1.000 0.944 0.33434   
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## 
+## R-sq.(adj) =  0.426   Deviance explained = 54.2%
+## -REML = 306.06  Scale est. = 45.483    n = 96
+```
+
+## Model checking
+
+### Basis size and residual distribution
+
+First I check the basis size k. `k-indexes` are \> 1 or close to 1 so the basis size is large enough. The residual plot look good too.
+
+
+```r
+appraise(GAMSA_S, method = "simulate")
+```
+
+![](PanArctic_DSL_statistics_files/figure-html/GAMSAS-basis-size-residuals-1.png)<!-- -->
+
+```r
+k.check(GAMSA_S)
+```
+
+```
+##             k'          edf   k-index p-value
+## s(year)      3 1.4914351710        NA      NA
+## s(IHO)       5 0.0007699674        NA      NA
+## s(year,IHO) 15 4.2778591432        NA      NA
+## s(chl,IHO)  25 7.4619396229 0.9794999  0.3750
+## s(v,IHO)    25 2.1986389681 1.0385734  0.6025
+```
+
+
+```r
+appraise(GAMSA_I, method = "simulate")
+```
+
+![](PanArctic_DSL_statistics_files/figure-html/GAMSAI-basis-size-residuals-1.png)<!-- -->
+
+```r
+k.check(GAMSA_I)
+```
+
+```
+##                  k'         edf   k-index p-value
+## s(year)           3 1.453625176        NA      NA
+## s(IHO)            5 0.001633903        NA      NA
+## s(year,IHO)      15 3.930004344        NA      NA
+## s(chl):IHOWAO_BF  4 1.000023655 0.9507955  0.2600
+## s(chl):IHOCAA     4 1.000019798 0.9507955  0.2600
+## s(chl):IHOBB      4 1.879421884 0.9507955  0.3200
+## s(chl):IHODS      4 1.000031144 0.9507955  0.2875
+## s(chl):IHOEAO     4 2.555436938 0.9507955  0.2575
+## s(v):IHOWAO_BF    4 1.000060612 1.0398818  0.6450
+## s(v):IHOCAA       4 1.000024510 1.0398818  0.5975
+## s(v):IHOBB        4 2.428625579 1.0398818  0.5875
+## s(v):IHODS        4 1.000042979 1.0398818  0.5925
+## s(v):IHOEAO       4 1.000053799 1.0398818  0.6475
+```
+
+### Resiudals against covariates
+
+
+```r
+GAMSA_S_resid <- bind_cols(SA_df, residuals.gam(GAMSA_S)) %>%
+  rename(resid = "...9")
+plot_grid(GAMSA_S_resid %>%
+            ggplot(aes(x = v, y = resid)) + 
+            geom_hline(yintercept = 0, col = "red") +
+            labs(x = "velocity") +
+            geom_point(), 
+          GAMSA_S_resid %>%
+            ggplot(aes(x = chl, y = resid)) + 
+            geom_hline(yintercept = 0, col = "red") +
+            labs(x = "chlorophyll") +
+            geom_point(), 
+          GAMSA_S_resid %>%
+            ggplot(aes(x = IHO, y = resid)) + 
+            geom_hline(yintercept = 0, col = "red") +
+            labs(x = "area") +
+            geom_boxplot(fill = NA), 
+          GAMSA_S_resid %>%
+            ggplot(aes(x = year, y = resid)) + 
+            geom_hline(yintercept = 0, col = "red") +
+            labs(x = "year") +
+            geom_boxplot(fill = NA))
+```
+
+![](PanArctic_DSL_statistics_files/figure-html/GAMSAS-residuals-covariates-1.png)<!-- -->
+
+
+```r
+GAMSA_I_resid <- bind_cols(SA_df, residuals.gam(GAMSA_I)) %>%
+  rename(resid = "...9")
+plot_grid(GAMSA_I_resid %>%
+            ggplot(aes(x = v, y = resid)) + 
+            geom_hline(yintercept = 0, col = "red") +
+            labs(x = "velocity") +
+            geom_point(), 
+          GAMSA_I_resid %>%
+            ggplot(aes(x = chl, y = resid)) + 
+            geom_hline(yintercept = 0, col = "red") +
+            labs(x = "chlorophyll") +
+            geom_point(), 
+          GAMSA_I_resid %>%
+            ggplot(aes(x = IHO, y = resid)) + 
+            geom_hline(yintercept = 0, col = "red") +
+            labs(x = "area") +
+            geom_boxplot(fill = NA), 
+          GAMSA_I_resid %>%
+            ggplot(aes(x = year, y = resid)) + 
+            geom_hline(yintercept = 0, col = "red") +
+            labs(x = "year") +
+            geom_boxplot(fill = NA))
+```
+
+![](PanArctic_DSL_statistics_files/figure-html/GAMSAI-residuals-covariates-1.png)<!-- -->
+
+### Autotcorrelation
+
+
+```r
+par(mfrow = c(1, 2))
+acf(resid(GAMSA_S), lag.max = 36, main = "ACF")
+pacf(resid(GAMSA_S), lag.max = 36, main = "pACF")
+```
+
+![](PanArctic_DSL_statistics_files/figure-html/GAMSAS-acf-pacf-1.png)<!-- -->
+
+
+```r
+par(mfrow = c(1, 2))
+acf(resid(GAMSA_I), lag.max = 36, main = "ACF")
+pacf(resid(GAMSA_I), lag.max = 36, main = "pACF")
+```
+
+![](PanArctic_DSL_statistics_files/figure-html/GAMSAI-acf-pacf-1.png)<!-- -->
+
+## Term selection
+
+I turn on the double penalty (`select = TRUE`) and check the covariates that has been shrunk.
+
+### Model S
+
+
+```r
+# Model S
+GAMSA_S_p <- gam(SA_int ~ 
+                # First order effects
+                # s(chl, bs = "tp", k = 5) +
+                # s(v, bs = "tp", k = 5) +
+                s(year, bs = "re") +
+                s(IHO, bs = "re") +
+                # Second order random effects
+                s(year, IHO, bs = "re") +
+                # Second order functional effects
+                s(chl, IHO, bs = "fs", k = 5) +
+                s(v, IHO, bs = "fs", k = 5),
+             data = SA_df, family = "gaussian", method = "REML", 
+             select = T)
+summary(GAMSA_S_p)
+```
+
+```
+## 
+## Family: gaussian 
+## Link function: identity 
+## 
+## Formula:
+## SA_int ~ s(year, bs = "re") + s(IHO, bs = "re") + s(year, IHO, 
+##     bs = "re") + s(chl, IHO, bs = "fs", k = 5) + s(v, IHO, bs = "fs", 
+##     k = 5)
+## 
+## Parametric coefficients:
+##             Estimate Std. Error t value Pr(>|t|)    
+## (Intercept)   16.563      2.405   6.886  1.2e-09 ***
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## 
+## Approximate significance of smooth terms:
+##                 edf Ref.df     F p-value   
+## s(year)     1.49144      2 6.315  0.0722 . 
+## s(IHO)      0.00077      4 0.000  0.0998 . 
+## s(year,IHO) 4.27786     14 0.531  0.1334   
+## s(chl,IHO)  7.46194     24 1.956  0.0018 **
+## s(v,IHO)    2.19864     24 0.139  0.1680   
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## 
+## R-sq.(adj) =  0.427   Deviance explained =   52%
+## -REML = 331.77  Scale est. = 45.433    n = 96
+```
+
+The random effects `s(IHO)` and `s(year)` also have low edf but I decide to keep them in the model as their interaction `s(year,IHO)` is significant.
+
+### Model I
+
+
+```r
+# Model I
+GAMSA_I_p <- gam(SA_int ~
+                  # First order effects
+                  # s(chl, bs = "tp", k = 5) +
+                  # s(v, bs = "tp", k = 5) +
+                  s(year, bs = "re") +
+                  s(IHO, bs = "re") +
+                  # Second order random effects
+                  s(year, IHO, bs = "re") +
+                  # Second order functional effects
+                  s(chl, by = IHO, k = 5, bs = "tp") + 
+                  s(v, by = IHO, k = 5, bs = "tp"),
+                data = SA_df, family = "gaussian", method = "REML",
+                select = T)
+summary(GAMSA_I_p)
+```
+
+```
+## 
+## Family: gaussian 
+## Link function: identity 
+## 
+## Formula:
+## SA_int ~ s(year, bs = "re") + s(IHO, bs = "re") + s(year, IHO, 
+##     bs = "re") + s(chl, by = IHO, k = 5, bs = "tp") + s(v, by = IHO, 
+##     k = 5, bs = "tp")
+## 
+## Parametric coefficients:
+##             Estimate Std. Error t value Pr(>|t|)    
+## (Intercept)   16.662      2.306   7.226 2.44e-10 ***
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## 
+## Approximate significance of smooth terms:
+##                        edf Ref.df     F  p-value    
+## s(year)          1.532e+00      2 9.234 0.065534 .  
+## s(IHO)           9.567e-01      4 0.436 0.403143    
+## s(year,IHO)      5.200e+00     14 0.958 0.135065    
+## s(chl):IHOWAO_BF 7.400e-01      4 2.050 0.053229 .  
+## s(chl):IHOCAA    2.519e-05      4 0.000 0.849089    
+## s(chl):IHOBB     1.524e+00      4 2.269 0.030548 *  
+## s(chl):IHODS     2.955e-05      4 0.000 0.763772    
+## s(chl):IHOEAO    1.962e+00      4 6.365 0.000592 ***
+## s(v):IHOWAO_BF   3.455e-04      4 0.000 0.336614    
+## s(v):IHOCAA      3.693e-05      4 0.000 0.635799    
+## s(v):IHOBB       1.859e+00      4 2.542 0.008396 ** 
+## s(v):IHODS       5.135e-05      4 0.000 0.507434    
+## s(v):IHOEAO      7.085e-02      4 0.019 0.299247    
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## 
+## R-sq.(adj) =  0.461   Deviance explained = 53.9%
+## -REML = 329.39  Scale est. = 42.731    n = 96
+```
+
+The random effects `s(IHO)` and `s(year)` also have low edf but I decide to keep them in the model as their interaction `s(year,IHO)` is significant. I refit the model without the `s(v,year)` and `s(chl,year)` terms.
+
+## Model predictions
+
+I predict the model to get the smooths in the response scale (NASC). I need to create a specific data frame for this with the factors of interest `IHO` and `year`, and covariates `v` and `chl`.
+
+
+```r
+val <- SA_df %>%
+  dplyr::select(IHO, year, v, chl) %>%
+  group_by(IHO) %>%
+  summarise(min_v = min(v),
+            max_v = max(v),
+            median_v = median(v),
+            min_chl = min(chl),
+            max_chl = max(chl),
+            median_chl = median(chl))
+val
+```
+
+```
+## # A tibble: 5 × 7
+##   IHO    min_v max_v median_v min_chl max_chl median_chl
+##   <fct>  <dbl> <dbl>    <dbl>   <dbl>   <dbl>      <dbl>
+## 1 WAO_BF 0.606  4.32     2.49  0.110    1.07       0.251
+## 2 CAA    0.633  2.64     1.02  0.309    1.07       0.423
+## 3 BB     0.297  3.97     1.75  0.309    1.82       0.855
+## 4 DS     0.598  2.94     1.60  0.318    0.748      0.432
+## 5 EAO    0.292  4.66     1.99  0.0892   2.20       1.04
+```
+
+
+```r
+# Resolution for predictions
+res = 20
+# IHO areas
+IHO_area <- levels(SA_df$IHO)
+# Empty data frame that we populate with new values
+SA_new <- data.frame()
+
+for (i in IHO_area) {
+  # Select data from which we build the 
+  val_tmp <- val %>% 
+    filter(IHO == i)
+  # Temporary data frame for each region
+  SA_tmp <- data.frame(
+    IHO = rep(rep(rep(i, res), 3), 2),
+    year = rep(c(rep(2015, res), rep(2016, res), rep(2017, res)), 2),
+    var = c(rep("v", res * 3), rep("chl", res * 3)),
+    # Velocity
+    v = c(rep(seq(subset(val, IHO == i)$min_v,
+                  subset(val, IHO == i)$max_v,
+                  length.out = res), 3),
+          rep(subset(val, IHO == "WAO")$median_v, res * 3)),
+    # Chlorophyll
+    chl = c(rep(subset(val, IHO == i)$median_chl, res * 3),
+            rep(seq(subset(val, IHO == i)$min_chl, 
+                    subset(val, IHO == i)$max_chl,
+                    length.out = res), 3)))
+  # Append data
+  SA_new <- bind_rows(SA_new, SA_tmp)
+}
+# Reorder factors
+SA_new <- SA_new %>%
+  mutate(IHO = factor(IHO, levels = c("WAO_BF","CAA", "BB", "DS", "EAO")))
+```
+
+Get GAM predictions (`GAM_S` and `GAM_I`) for the new data. I then calculate the average functional response for all years.
+
+
+```r
+ilinkSA_S <- family(GAMSA_S)$linkinv # Get link function
+predSA_S <- predict(GAMSA_S, SA_new, type = "link", se.fit = TRUE) %>% # Predict data
+  bind_cols(., SA_new) %>%
+  transform(lwr_ci = ilinkSA_S(fit - (2 * se.fit)), # Calculate lower CI
+            upr_ci = ilinkSA_S(fit + (2 * se.fit)), # Calculate upper CI
+            fitted = ilinkSA_S(fit)) %>% # Calculate fit
+  group_by(IHO, var, v, chl) %>%
+  summarise(SA_fit = mean(fitted), # Calculate average functional response
+            SA_lwr_ci = mean(lwr_ci),
+            SA_upr_ci = mean(upr_ci)) 
+```
+
+
+```r
+ilinkSA_I <- family(GAMSA_I)$linkinv # Get link function
+predSA_I <- predict(GAMSA_I, SA_new, type = "link", se.fit = TRUE) %>% # Predict data
+  bind_cols(., SA_new) %>%
+  transform(lwr_ci = ilinkSA_I(fit - (2 * se.fit)), # Calculate lower CI
+            upr_ci = ilinkSA_I(fit + (2 * se.fit)), # Calculate upper CI
+            fitted = ilinkSA_I(fit)) %>% # Calculate fit
+  group_by(IHO, var, v, chl) %>%
+  summarise(SA_fit = mean(fitted), # Calculate average functional response
+            SA_lwr_ci = mean(lwr_ci),
+            SA_upr_ci = mean(upr_ci)) 
+```
+
+
+```r
+# Save data
+save(predSA_S, predSA_I, GAMSA_S, GAMSA_I, file = "data/statistics/GAMSA_results.RData")
+```
+
+## Model visualization
+
+Plot to see if predictions worked well.
+
+
+```r
+plot_grid(
+  predSA_S %>%
+    filter(var == "v") %>%
+    ggplot() +
+    geom_line(aes(x = v, y = SA_fit)) +
+    geom_ribbon(aes(x = v, ymin = SA_lwr_ci, ymax = SA_upr_ci), alpha = 0.1) +
+    geom_point(data = SA_df, aes(x = v, y = SA_int, group = IHO)) + 
+    facet_wrap(~ IHO, scales = "free") +
+    ggtitle("Model SA S"),
+  predSA_I %>%
+    filter(var == "v") %>%
+    ggplot() +
+    geom_line(aes(x = v, y = SA_fit)) +
+    geom_ribbon(aes(x = v, ymin = SA_lwr_ci, ymax = SA_upr_ci), alpha = 0.1) +
+    geom_point(data = SA_df, aes(x = v, y = SA_int, group = IHO)) + 
+    facet_wrap(~ IHO, scales = "free") +
+    ggtitle("Model SA I"),
+  ncol = 1)
+```
+
+![](PanArctic_DSL_statistics_files/figure-html/veloSA-ggplot-1.png)<!-- -->
+
+
+```r
+plot_grid(
+  predSA_S %>%
+    filter(var == "chl") %>%
+    ggplot() +
+    geom_line(aes(x = chl, y = SA_fit)) +
+    geom_ribbon(aes(x = chl, ymin = SA_lwr_ci, ymax = SA_upr_ci), alpha = 0.1) +
+    geom_point(data = SA_df, aes(x = chl, y = SA_int, group = IHO)) + 
+    facet_wrap(~ IHO, scales = "free") +
+    ggtitle("Model SA S"),
+  predSA_I %>%
+    filter(var == "chl") %>%
+    ggplot() +
+    geom_line(aes(x = chl, y = SA_fit)) +
+    geom_ribbon(aes(x = chl, ymin = SA_lwr_ci, ymax = SA_upr_ci), alpha = 0.1) +
+    geom_point(data = SA_df, aes(x = chl, y = SA_int, group = IHO)) + 
+    facet_wrap(~ IHO, scales = "free") +
+    ggtitle("Model SA I"),
+  ncol = 1)
+```
+
+![](PanArctic_DSL_statistics_files/figure-html/chlSA-ggplot-1.png)<!-- -->
+
+
+```r
+GAMSAS_velo <- predSA_S %>%
+  filter(var == "v") %>%
+  ggplot() +
+  geom_line(aes(x = v, y = SA_fit, col = IHO), size = 0.8) +
+  geom_ribbon(aes(x = v, ymin = SA_lwr_ci, ymax = SA_upr_ci, fill = IHO),
+              alpha = 0.1) +
+  scale_colour_manual(values = met.brewer("Johnson", n = 6, direction = -1)) +
+  scale_fill_manual(values = met.brewer("Johnson", n = 6, direction = -1)) +
+  coord_cartesian(ylim = c(-2, 50), expand = T) +
+  scale_x_continuous(breaks = seq(0, 10, 1)) +
+  labs(title = "Model S",
+       x = expression("Current velocity at 318 m (cm s"^-1*")"),
+       y = expression("S"[A]*" (dB re 1 m"^2*" nmi"^-2*")")) +
+  theme(panel.border = element_blank(),
+        axis.line = element_line(),
+        legend.title = element_blank(), 
+        legend.position = "top")
+GAMSAS_chl <- predSA_S %>%
+  filter(var == "chl") %>%
+  ggplot() +
+  geom_line(aes(x = chl, y = SA_fit, col = IHO), size = 0.8) +
+  geom_ribbon(aes(x = chl, ymin = SA_lwr_ci, ymax = SA_upr_ci, fill = IHO), 
+              alpha = 0.1) +
+  scale_colour_manual(values = met.brewer("Johnson", n = 6, direction = -1)) +
+  scale_fill_manual(values = met.brewer("Johnson", n = 6, direction = -1)) +
+  coord_cartesian(ylim = c(-2, 50), expand = T) +
+  scale_x_continuous(breaks = seq(0, 10, 0.5)) +
+  labs(x = expression("Chlorophyll (mg m"^-3*")"),
+       y = expression("S"[A]*" (dB re 1 m"^2*" nmi"^-2*")")) +
+  theme(panel.border = element_blank(),
+        axis.line = element_line(),
+        legend.title = element_blank(), 
+        legend.position = "none")
+# Combine plots
+plot_grid(GAMSAS_velo, GAMSAS_chl, ncol = 1, rel_heights = c(1,0.8))
+```
+
+![](PanArctic_DSL_statistics_files/figure-html/GAMSAS-pretty-ggplot-1.png)<!-- -->
+
+
+```r
+GAMSAI_velo <- predSA_I %>%
+  filter(var == "v") %>%
+  ggplot() +
+  geom_line(aes(x = v, y = SA_fit, col = IHO), size = 0.8) +
+  geom_ribbon(aes(x = v, ymin = SA_lwr_ci, ymax = SA_upr_ci, fill = IHO), 
+              alpha = 0.1) +
+  scale_colour_manual(values = met.brewer("Johnson", n = 6, direction = -1)) +
+  scale_fill_manual(values = met.brewer("Johnson", n = 6, direction = -1)) +
+  coord_cartesian(ylim = c(-2, 50), expand = T) +
+  scale_x_continuous(breaks = seq(0, 10, 1)) +
+  labs(title = "Model I",
+       x = expression("Current velocity at 318 m (cm s"^-1*")"),
+       y = expression("S"[A]*" (dB re 1 m"^2*" nmi"^-2*")")) +
+  theme(panel.border = element_blank(),
+        axis.line = element_line(),
+        legend.title = element_blank(), 
+        legend.position = "top")
+GAMSAI_chl <- predSA_I %>%
+  filter(var == "chl") %>%
+  ggplot() +
+  geom_line(aes(x = chl, y = SA_fit, col = IHO), size = 0.8) +
+  geom_ribbon(aes(x = chl, ymin = SA_lwr_ci, ymax = SA_upr_ci, fill = IHO),
+              alpha = 0.1) +
+  scale_colour_manual(values = met.brewer("Johnson", n = 6, direction = -1)) +
+  scale_fill_manual(values = met.brewer("Johnson", n = 6, direction = -1)) +
+  coord_cartesian(ylim = c(-2, 50), expand = T) +
+  scale_x_continuous(breaks = seq(0, 10, 0.5)) +
+  labs(x = expression("Chlorophyll (mg m"^-3*")"),
+       y = expression("S"[A]*" (dB re 1 m"^2*" nmi"^-2*")")) +
+  theme(panel.border = element_blank(),
+        axis.line = element_line(),
+        legend.title = element_blank(), 
+        legend.position = "none")
+# Combine plots
+plot_grid(GAMSAI_velo, GAMSAI_chl, ncol = 1, rel_heights = c(1,0.8))
+```
+
+![](PanArctic_DSL_statistics_files/figure-html/GAMSAI-pretty-ggplot-1.png)<!-- -->
