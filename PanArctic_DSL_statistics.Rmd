@@ -39,6 +39,7 @@ library(MetBrewer)    # Pretty colour palettes
 library(MuMIn)        # AIC weights
 library(DT)           # Interactive table
 library(rstatix)      # Pipe-friendly stats
+library(broom)        # LM
 # Custom figure theme
 theme_set(theme_bw())
 theme_update(axis.text = element_text(size = 9),
@@ -321,6 +322,107 @@ SA_diff %>% # Kruskal wallis interannual difference SA within group
 ```
 
 There were some interannual differences in SA within some region (WAO_BF - H = 6.4670868, *p* = 0.0394; CAA - H = 11.8260406, *p* = 0.0027; BB - H = 5.0981791, *p* = 0.0782; DS - H = 0.3282051, *p* = 0.8490; EAO - H = 4.9779498, *p* = 0.0830).
+
+# LM - Latitude - S\~A\~ int
+
+A number of studies show decreasing mesopelagic backscatter with increasing latitude. To test this hypothesis, I use a linear regression. Because there are some high mesopelagic backscatter values in the East Arctic Ocean I transformed the nautical area scattering coefficient into nautical area scattering strength in dB.
+
+## Data preparation
+
+First I prepare the data.
+
+```{r lm-data-prep}
+SA_lm <- SA_grid_laea %>%
+  mutate(IHO = 
+           factor(
+             case_when(IHO_area == "East Arctic Ocean" ~ "EAO",
+                       IHO_area == "West Arctic Ocean" ~ "WAO",
+                       IHO_area == "Beaufort Sea" ~ "BF",
+                       IHO_area == "The Northwestern Passages" ~ "CAA",
+                       IHO_area == "Baffin Bay" ~ "BB",
+                       IHO_area == "Davis Strait" ~ "DS"),
+             levels = c("WAO", "BF", "CAA", "BB", "DS", "EAO")))
+```
+
+Plot the relationship I want to test.
+
+```{r lm-plot}
+SA_lm %>%
+  ggplot(aes(x = lat, y = SA_int)) +
+  geom_point() + 
+  geom_smooth(aes(x = lat, y = SA_int, group = IHO, col = IHO), method = "lm") +
+  geom_smooth(aes(x = lat, y = SA_int), method = "lm", col = "red") 
+```
+
+## All areas
+
+Fit linear regression.
+
+```{r lm-SA}
+LM_all <- lm(SA_int ~ lat, data = SA_grid_laea)
+summary(LM_all)
+```
+
+Check residuals.
+
+```{r residuals-lm}
+par(mfrow = c(2, 2))
+plot(LM_all)
+```
+
+## LM per area
+
+Fit linear regression for each Arctic region.
+
+```{r lm-lat-sa-area}
+# Fit models
+LM_area <- SA_lm %>%
+  nest_by(IHO) %>%
+  # Fit linear model for each arctic region
+  mutate(mod = list(lm(SA_int ~ lat, data = data))) %>%
+  # Find coefficients, summary (AIC, r2, etc) and fit
+  summarise(coefs = list(tidy(mod)),
+            summary_mod = list(glance(mod)),
+            fit = list(augment(mod, interval = "confidence"))) %>%
+  ungroup()
+
+# Extract coefficients
+LM_area_coefs <- LM_area %>%
+  dplyr::select(IHO, coefs) %>% 
+  unnest(cols = c(coefs)) %>%
+  mutate(term = if_else(term == "(Intercept)", "itcpt", "lat")) %>%
+  rename(est = estimate, 
+         sd = std.error,
+         p_val = p.value) %>%
+  pivot_wider(names_from = term, values_from = c(est, sd, statistic, p_val))
+
+# Extract fit
+LM_area_fit <- LM_area %>%
+  dplyr::select(IHO, fit) %>% 
+  unnest(cols = c(fit))
+
+# Combine data
+LM_area_res <- left_join(LM_area_coefs, LM_area_fit)
+```
+
+Plot regressions. We can see that mesopelagic backscatter decreases with increasing latitude in all regions.
+
+```{r lm-plot-area}
+LM_area_res %>%
+  ggplot() + 
+  geom_point(aes(x = lat, y = SA_int)) +
+  # geom_abline(aes(slope = est_lat, intercept = est_itcpt, col = IHO)) + 
+  geom_line(aes(x = lat, y = .fitted, col = IHO)) + 
+  geom_ribbon(aes(x = lat, ymin = .lower, ymax = .upper, group = IHO), alpha = 0.1)
+```
+
+Save data
+
+```{r save-lm}
+# Save data
+save(LM_area_coefs, LM_area_fit, LM_area_res, 
+     file = "data/statistics/LM_results.RData")
+```
 
 # HGAM - Gamma NASC
 
