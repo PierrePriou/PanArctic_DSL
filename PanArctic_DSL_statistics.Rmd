@@ -5,6 +5,7 @@ date: "`r format(Sys.time(), '%Y/%m/%d at %H:%M')`"
 output: 
   html_document:
     keep_md: yes
+    code_folding: hide
   github_document:
     always_allow_html: true
 ---
@@ -58,7 +59,7 @@ options(dplyr.summarise.inform = F)
 
 ```{r data-loading, message=FALSE}
 # Laea projection
-cell_res <- 25
+cell_res <- 150
 arctic_laea <- raster(extent(-2700, 2700, -2700, 2700), crs = "EPSG:6931")
 projection(arctic_laea) <- gsub("units=m", "units=km", projection(arctic_laea)) 
 res(arctic_laea) <- c(cell_res, cell_res) 
@@ -141,8 +142,8 @@ stat_laea <- stat_laea %>%
     velocity = if_else(
       is.na(velocity) == T,
       mean(pull(subset(phy_grid_laea, 
-                       xc >= xc_v - 2 * cell_res & xc <= xc_v + 2 * cell_res & 
-                         yc >= yc_v - 2 * cell_res & yc <= yc_v + 2 * cell_res & 
+                       xc >= xc_v - 1 * cell_res & xc <= xc_v + 1 * cell_res & 
+                         yc >= yc_v - 1 * cell_res & yc <= yc_v + 1 * cell_res & 
                          year == year_v,
                        select = velocity),
                 velocity),
@@ -155,8 +156,8 @@ stat_laea <- stat_laea %>%
     chl = if_else(
       is.na(chl) == T,
       mean(pull(subset(chl_grid_laea, 
-                       xc >= xc_chl - 2 * cell_res & xc <= xc_chl + 2 * cell_res & 
-                         yc >= yc_chl - 2 * cell_res & yc <= yc_chl + 2 * cell_res & 
+                       xc >= xc_chl - 1 * cell_res & xc <= xc_chl + 1 * cell_res & 
+                         yc >= yc_chl - 1 * cell_res & yc <= yc_chl + 1 * cell_res & 
                          year == year_chl,
                        select = chl),
                 chl),
@@ -322,7 +323,7 @@ phy_grid_laea %>%
         axis.title = element_blank())
 ```
 
-# Spatial and interannual variability
+# Spatial and interannual variability {.tabset .tabset-pills}
 
 ```{r prep-diff}
 SA_diff <- SA_grid_laea %>%
@@ -386,7 +387,7 @@ SA_diff %>% # Kruskal wallis interannual difference SA within group
 
 There were some interannual differences in SA within some region (WAO_BF - H = 6.4670868, *p* = 0.0394; CAA - H = 11.8260406, *p* = 0.0027; BB - H = 5.0981791, *p* = 0.0782; DS - H = 0.3282051, *p* = 0.8490; EAO - H = 4.9779498, *p* = 0.0830).
 
-# LM - Latitude - S\~A\~ int
+# LM - Latitude - S\~A\~ int {.tabset .tabset-pills}
 
 A number of studies show decreasing mesopelagic backscatter with increasing latitude. To test this hypothesis, I use a linear regression. Because there are some high mesopelagic backscatter values in the East Arctic Ocean I transformed the nautical area scattering coefficient into nautical area scattering strength in dB.
 
@@ -487,7 +488,7 @@ save(LM_area_coefs, LM_area_fit, LM_area_res,
      file = "data/statistics/LM_results.RData")
 ```
 
-# HGAM - Gamma NASC
+# HGAM - Gamma NASC {.tabset .tabset-pills}
 
 ## Data preparation
 
@@ -547,7 +548,7 @@ GAM_G <- gam(NASC_int ~
                s(chl, k = 5, bs = "tp") + # Global smoothers
                s(IHO, bs = "re") + # Random effect
                s(year, bs = "re") + # Random effect
-               te(xc, yc, by = year, k = 5) +
+               # te(xc, yc, by = year, k = 5) +
                # Second order effects
                s(IHO, year, bs = "re"), # Random slope
             data = SA_df, family = Gamma(link = "log"), method = "ML")
@@ -558,7 +559,7 @@ GAM_S <- gam(NASC_int ~
                 # s(v, bs = "tp", k = 5) +
                 s(year, bs = "re") +
                 s(IHO, bs = "re") +
-                te(xc, yc, by = year, k = 5) +
+                # te(xc, yc, by = year, k = 5) +
                 # Second order random effects
                 s(year, IHO, bs = "re") +
                 # Second order functional effects
@@ -572,7 +573,7 @@ GAM_I <- gam(NASC_int ~
                 # s(v, bs = "tp", k = 5) +
                 s(year, bs = "re") +
                 s(IHO, bs = "re") +
-                te(xc, yc, by = year, k = 5) +
+                # te(xc, yc, by = year, k = 5) +
                 # Second order random effects
                 s(year, IHO, bs = "re") +
                 # Second order functional effects
@@ -747,7 +748,7 @@ GAM_S_p <- gam(NASC_int ~
                 # s(v, bs = "tp", k = 5) +
                 s(year, bs = "re") +
                 s(IHO, bs = "re") +
-                te(xc, yc, by = year, k = 5) +
+                # te(xc, yc, by = year, k = 5) +
                 # Second order random effects
                 s(year, IHO, bs = "re") +
                 # Second order functional effects
@@ -768,9 +769,9 @@ GAM_S2 <- gam(NASC_int ~
                 # s(v, bs = "tp", k = 5) +
                 s(year, bs = "re") +
                 # s(IHO, bs = "re") +
-                te(xc, yc, by = year, k = 5) +
+                # te(xc, yc, by = year, k = 5) +
                 # Second order random effects
-                # s(year, IHO, bs = "re") +
+                s(year, IHO, bs = "re") +
                 # Second order functional effects
                 s(chl, IHO, bs = "fs", k = 5) +
                 s(v, IHO, bs = "fs", k = 5),
@@ -816,9 +817,9 @@ GAM_S3 <- gam(NASC_int ~
                 # s(v, bs = "tp", k = 5) +
                 s(year, bs = "re") +
                 # s(IHO, bs = "re") +
-                te(xc, yc, by = year, k = 5) +
+                # te(xc, yc, by = year, k = 5) +
                 # Second order random effects
-                # s(year, IHO, bs = "re") +
+                s(year, IHO, bs = "re") +
                 # Second order functional effects
                 s(chl, IHO, bs = "fs", k = 5) +
                 s(v, IHO, bs = "fs", k = 5),
@@ -874,7 +875,7 @@ GAM_I_p <- gam(NASC_int ~
                  # s(v, bs = "tp", k = 5) +
                  s(year, bs = "re") +
                  s(IHO, bs = "re") +
-                 te(xc, yc, by = year, k = 5) +
+                 # te(xc, yc, by = year, k = 5) +
                  # Second order random effects
                  s(year, IHO, bs = "re") +
                  # Second order functional effects
@@ -895,9 +896,9 @@ GAM_I2 <- gam(NASC_int ~
                  # s(v, bs = "tp", k = 5) +
                  # s(year, bs = "re") +
                  # s(IHO, bs = "re") +
-                 te(xc, yc, by = year, k = 5) +
+                 # te(xc, yc, by = year, k = 5) +
                  # Second order random effects
-                 # s(year, IHO, bs = "re") +
+                 s(year, IHO, bs = "re") +
                  # Second order functional effects
                  s(chl, by = IHO, k = 5, bs = "tp") +
                  s(v, by = IHO, k = 5, bs = "tp"),
@@ -942,9 +943,9 @@ GAM_I3 <- gam(NASC_int ~
                  # s(v, bs = "tp", k = 5) +
                  # s(year, bs = "re") +
                  # s(IHO, bs = "re") +
-                 te(xc, yc, by = year, k = 5) +
+                 # te(xc, yc, by = year, k = 5) +
                  # Second order random effects
-                 # s(year, IHO, bs = "re") +
+                 s(year, IHO, bs = "re") +
                  # Second order functional effects
                  s(chl, by = IHO, k = 5, bs = "tp") +
                  s(v, by = IHO, k = 5, bs = "tp"),
@@ -1118,7 +1119,7 @@ plot_grid(
     geom_ribbon(aes(x = chl, ymin = NASC_lwr_ci, ymax = NASC_upr_ci), alpha = 0.1) +
     geom_point(data = SA_df, aes(x = chl, y = NASC_int, group = IHO)) + 
     facet_wrap(~ IHO, scales = "free") +
-    ggtitle("Model S"),
+    ggtitle("NASC Model S"),
   pred_I %>%
     filter(var == "chl") %>%
     ggplot() +
@@ -1126,7 +1127,7 @@ plot_grid(
     geom_ribbon(aes(x = chl, ymin = NASC_lwr_ci, ymax = NASC_upr_ci), alpha = 0.1) +
     geom_point(data = SA_df, aes(x = chl, y = NASC_int, group = IHO)) + 
     facet_wrap(~ IHO, scales = "free") +
-    ggtitle("Model I"),
+    ggtitle("NASC Model I"),
   ncol = 1)
 ```
 
@@ -1141,7 +1142,7 @@ GAMS_velo <- pred_S %>%
   scale_fill_manual(values = met.brewer("Johnson", n = 6, direction = -1)) +
   coord_cartesian(ylim = c(-2, 50), expand = T) +
   scale_x_continuous(breaks = seq(0, 10, 1)) +
-  labs(title = "Model S",
+  labs(title = "NASC Model S",
        x = expression("Current velocity at 318 m (cm s"^-1*")"),
        y = expression("S"[A]*" (dB re 1 m"^2*" nmi"^-2*")")) +
   theme(panel.border = element_blank(),
@@ -1181,7 +1182,7 @@ GAMI_velo <- pred_I %>%
   scale_fill_manual(values = met.brewer("Johnson", n = 6, direction = -1)) +
   coord_cartesian(ylim = c(-2, 50), expand = T) +
   scale_x_continuous(breaks = seq(0, 10, 1)) +
-  labs(title = "Model I",
+  labs(title = "NASC Model I",
        x = expression("Current velocity at 318 m (cm s"^-1*")"),
        y = expression("S"[A]*" (dB re 1 m"^2*" nmi"^-2*")")) +
   theme(panel.border = element_blank(),
@@ -1211,7 +1212,7 @@ rm(GAMI_velo, GAMI_chl)
 ```
 
 
-# HGAM - Gaussian SA
+# HGAM - Gaussian SA {.tabset .tabset-pills}
 
 ## Model fitting
 
@@ -1225,7 +1226,7 @@ GAMSA_G <- gam(SA_int ~
                  s(chl, k = 5, bs = "tp") + # Global smoothers
                  s(IHO, bs = "re") + # Random effect
                  s(year, bs = "re") + # Random effect
-                 te(xc, yc, by = year, k = 5) +
+                 # te(xc, yc, by = year, k = 5) +
                  # Second order effects
                  s(IHO, year, bs = "re"), # Random slope
                data = SA_df, family = "gaussian", method = "ML")
@@ -1236,7 +1237,7 @@ GAMSA_S <- gam(SA_int ~
                 # s(v, bs = "tp", k = 5) +
                 s(year, bs = "re") +
                 s(IHO, bs = "re") +
-                te(xc, yc, by = year, k = 5) +
+                # te(xc, yc, by = year, k = 5) +
                 # Second order random effects
                 s(year, IHO, bs = "re") +
                 # Second order functional effects
@@ -1250,7 +1251,7 @@ GAMSA_I <- gam(SA_int ~
                 # s(v, bs = "tp", k = 5) +
                 s(year, bs = "re") +
                 s(IHO, bs = "re") +
-                te(xc, yc, by = year, k = 5) +
+                # te(xc, yc, by = year, k = 5) +
                 # Second order random effects
                 s(year, IHO, bs = "re") +
                 # Second order functional effects
@@ -1425,7 +1426,7 @@ GAMSA_S_p <- gam(SA_int ~
                 # s(v, bs = "tp", k = 5) +
                 s(year, bs = "re") +
                 s(IHO, bs = "re") +
-                te(xc, yc, by = year, k = 5) +
+                # te(xc, yc, by = year, k = 5) +
                 # Second order random effects
                 s(year, IHO, bs = "re") +
                 # Second order functional effects
@@ -1446,9 +1447,9 @@ GAMSA_S2 <- gam(SA_int ~
                   # s(v, bs = "tp", k = 5) +
                   s(year, bs = "re") +
                   # s(IHO, bs = "re") +
-                  te(xc, yc, by = year, k = 5) +
+                  # te(xc, yc, by = year, k = 5) +
                   # Second order random effects
-                  # s(year, IHO, bs = "re") +
+                  s(year, IHO, bs = "re") +
                   # Second order functional effects
                   s(chl, IHO, bs = "fs", k = 5) +
                   s(v, IHO, bs = "fs", k = 5),
@@ -1494,9 +1495,9 @@ GAMSA_S3 <- gam(SA_int ~
                   # s(v, bs = "tp", k = 5) +
                   s(year, bs = "re") +
                   # s(IHO, bs = "re") +
-                  te(xc, yc, by = year, k = 5) +
+                  # te(xc, yc, by = year, k = 5) +
                   # Second order random effects
-                  # s(year, IHO, bs = "re") +
+                  s(year, IHO, bs = "re") +
                   # Second order functional effects
                   s(chl, IHO, bs = "fs", k = 5) +
                   s(v, IHO, bs = "fs", k = 5),
@@ -1552,7 +1553,7 @@ GAMSA_I_p <- gam(SA_int ~
                    # s(v, bs = "tp", k = 5) +
                    s(year, bs = "re") +
                    s(IHO, bs = "re") +
-                   te(xc, yc, by = year, k = 5) +
+                   # te(xc, yc, by = year, k = 5) +
                    # Second order random effects
                    s(year, IHO, bs = "re") +
                    # Second order functional effects
@@ -1571,11 +1572,11 @@ GAMSA_I2 <- gam(SA_int ~
                   # First order effects
                   # s(chl, bs = "tp", k = 5) +
                   # s(v, bs = "tp", k = 5) +
-                  s(year, bs = "re") +
+                  # s(year, bs = "re") +
                   # s(IHO, bs = "re") +
-                  te(xc, yc, by = year, k = 5) +
+                  # te(xc, yc, by = year, k = 5) +
                   # Second order random effects
-                  # s(year, IHO, bs = "re") +
+                  s(year, IHO, bs = "re") +
                   # Second order functional effects
                   s(chl, by = IHO, k = 5, bs = "tp") +
                   s(v, by = IHO, k = 5, bs = "tp"),
@@ -1619,11 +1620,11 @@ GAMSA_I3 <- gam(SA_int ~
                   # First order effects
                   # s(chl, bs = "tp", k = 5) +
                   # s(v, bs = "tp", k = 5) +
-                  s(year, bs = "re") +
+                  # s(year, bs = "re") +
                   # s(IHO, bs = "re") +
-                  te(xc, yc, by = year, k = 5) +
+                  # te(xc, yc, by = year, k = 5) +
                   # Second order random effects
-                  # s(year, IHO, bs = "re") +
+                  s(year, IHO, bs = "re") +
                   # Second order functional effects
                   s(chl, by = IHO, k = 5, bs = "tp") +
                   s(v, by = IHO, k = 5, bs = "tp"),
@@ -1768,7 +1769,7 @@ plot_grid(
     geom_ribbon(aes(x = v, ymin = SA_lwr_ci, ymax = SA_upr_ci), alpha = 0.1) +
     geom_point(data = SA_df, aes(x = v, y = SA_int, group = IHO)) + 
     facet_wrap(~ IHO, scales = "free") +
-    ggtitle("Model SA S"),
+    ggtitle("SA Model S"),
   predSA_I %>%
     filter(var == "v") %>%
     ggplot() +
@@ -1776,7 +1777,7 @@ plot_grid(
     geom_ribbon(aes(x = v, ymin = SA_lwr_ci, ymax = SA_upr_ci), alpha = 0.1) +
     geom_point(data = SA_df, aes(x = v, y = SA_int, group = IHO)) + 
     facet_wrap(~ IHO, scales = "free") +
-    ggtitle("Model SA I"),
+    ggtitle("SA Model I"),
   ncol = 1)
 ```
 
@@ -1789,7 +1790,7 @@ plot_grid(
     geom_ribbon(aes(x = chl, ymin = SA_lwr_ci, ymax = SA_upr_ci), alpha = 0.1) +
     geom_point(data = SA_df, aes(x = chl, y = SA_int, group = IHO)) + 
     facet_wrap(~ IHO, scales = "free") +
-    ggtitle("Model SA S"),
+    ggtitle("SA Model S"),
   predSA_I %>%
     filter(var == "chl") %>%
     ggplot() +
@@ -1797,7 +1798,7 @@ plot_grid(
     geom_ribbon(aes(x = chl, ymin = SA_lwr_ci, ymax = SA_upr_ci), alpha = 0.1) +
     geom_point(data = SA_df, aes(x = chl, y = SA_int, group = IHO)) + 
     facet_wrap(~ IHO, scales = "free") +
-    ggtitle("Model SA I"),
+    ggtitle("SA Model I"),
   ncol = 1)
 ```
 
@@ -1812,7 +1813,7 @@ GAMSAS_velo <- predSA_S %>%
   scale_fill_manual(values = met.brewer("Johnson", n = 6, direction = -1)) +
   coord_cartesian(ylim = c(-2, 50), expand = T) +
   scale_x_continuous(breaks = seq(0, 10, 1)) +
-  labs(title = "Model S",
+  labs(title = "SA Model S",
        x = expression("Current velocity at 318 m (cm s"^-1*")"),
        y = expression("S"[A]*" (dB re 1 m"^2*" nmi"^-2*")")) +
   theme(panel.border = element_blank(),
@@ -1850,7 +1851,7 @@ GAMSAI_velo <- predSA_I %>%
   scale_fill_manual(values = met.brewer("Johnson", n = 6, direction = -1)) +
   coord_cartesian(ylim = c(-2, 50), expand = T) +
   scale_x_continuous(breaks = seq(0, 10, 1)) +
-  labs(title = "Model I",
+  labs(title = "SA Model I",
        x = expression("Current velocity at 318 m (cm s"^-1*")"),
        y = expression("S"[A]*" (dB re 1 m"^2*" nmi"^-2*")")) +
   theme(panel.border = element_blank(),
