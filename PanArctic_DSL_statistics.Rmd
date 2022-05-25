@@ -58,7 +58,7 @@ options(dplyr.summarise.inform = F)
 
 ```{r data-loading, message=FALSE}
 # Laea projection
-cell_res <- 100
+cell_res <- 25
 arctic_laea <- raster(extent(-2700, 2700, -2700, 2700), crs = "EPSG:6931")
 projection(arctic_laea) <- gsub("units=m", "units=km", projection(arctic_laea)) 
 res(arctic_laea) <- c(cell_res, cell_res) 
@@ -87,7 +87,11 @@ SA_laea <- SA_grid_laea %>%
   dplyr::select(-lat, -lon) 
 # Remote sensing: physics reanalysis
 phy_laea <- phy_grid_laea %>% 
-  dplyr::select(year, area, xc, yc, cell_res, depth, velocity)
+  dplyr::select(year, area, xc, yc, cell_res, depth, velocity) %>%
+  # Find missing depth values
+  complete(depth, nesting(year, area, xc, yc, cell_res), fill = list(velocity = NA)) %>%
+  arrange(year, area, xc, yc, cell_res, depth) %>%
+  mutate(depth = factor(depth))
 
 stat_laea <- SA_laea %>%
   left_join(., phy_laea, by = c("year", "xc", "yc", "area", "cell_res")) %>%
@@ -110,7 +114,7 @@ plot_grid(
           axis.ticks = element_blank(), 
           axis.title = element_blank()),
   stat_laea %>% 
-    filter(depth == 318) %>%
+    filter(depth == 380) %>%
     ggplot(aes(x = xc,  y = yc)) +
     geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group),
                  fill = "grey80") +
@@ -124,7 +128,7 @@ plot_grid(
   ncol = 1, align = "hv", axis = "tblr")
 ```
 
-This is because the coverage of acoustic data and remote sensing products slightly differ close to the coasts. For sea ice concentration (and open water duration) the NAs are close to land while for ocean colour they are in ice covered areas. I use the average value of neighbouring cells (8 cells around the pixel of interest) to fill missing values.
+This is because the coverage of acoustic data and remote sensing products slightly differ close to the coasts. For sea ice concentration (and open water duration) the NAs are close to land while for ocean colour they are in ice covered areas. I use the average value of neighbouring cells (24 cells around the pixel of interest) to fill missing values.
 
 ```{r fill-NAs}
 stat_laea <- stat_laea %>%
@@ -137,8 +141,8 @@ stat_laea <- stat_laea %>%
     velocity = if_else(
       is.na(velocity) == T,
       mean(pull(subset(phy_grid_laea, 
-                       xc >= xc_v - cell_res & xc <= xc_v + cell_res & 
-                         yc >= yc_v - cell_res & yc <= yc_v + cell_res & 
+                       xc >= xc_v - 2 * cell_res & xc <= xc_v + 2 * cell_res & 
+                         yc >= yc_v - 2 * cell_res & yc <= yc_v + 2 * cell_res & 
                          year == year_v,
                        select = velocity),
                 velocity),
@@ -151,8 +155,8 @@ stat_laea <- stat_laea %>%
     chl = if_else(
       is.na(chl) == T,
       mean(pull(subset(chl_grid_laea, 
-                       xc >= xc_chl - cell_res & xc <= xc_chl + cell_res & 
-                         yc >= yc_chl - cell_res & yc <= yc_chl + cell_res & 
+                       xc >= xc_chl - 2 * cell_res & xc <= xc_chl + 2 * cell_res & 
+                         yc >= yc_chl - 2 * cell_res & yc <= yc_chl + 2 * cell_res & 
                          year == year_chl,
                        select = chl),
                 chl),
@@ -187,7 +191,7 @@ plot_grid(
           axis.ticks = element_blank(), 
           axis.title = element_blank()),
   stat_laea %>%
-    filter(depth == 318) %>%
+    filter(depth == 380) %>%
     ggplot(aes(x = xc,  y = yc)) +
     geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group),
                  fill = "grey80") +
@@ -222,7 +226,7 @@ plot_grid(
           axis.ticks = element_blank(), 
           axis.title = element_blank()),
   stat_laea %>%
-    filter(depth == 318) %>%
+    filter(depth == 380) %>%
     ggplot(aes(x = xc,  y = yc)) +
     geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group),
                  fill = "grey80") +
@@ -282,7 +286,7 @@ chl_grid_laea %>%
         axis.title = element_blank())
 ```
 
-```{r map-velocity, fig.height=3.5, fig.width=6}
+```{r map-velocity318, fig.height=3.5, fig.width=6}
 # Velocity
 phy_grid_laea %>% 
   filter(depth == 318) %>%
@@ -293,6 +297,24 @@ phy_grid_laea %>%
   scale_fill_cmocean("velo (cm/s)", name = "speed", limits = c(0, 10)) +
   facet_wrap(~ year, ncol = 3) +
   ggtitle("Velocity at 318 m depth") +
+  coord_fixed(xlim = c(-2600, 1100), ylim = c(-1800, 1900), expand = F) + 
+  theme(legend.position = "top",
+        axis.text = element_blank(),
+        axis.ticks = element_blank(), 
+        axis.title = element_blank())
+```
+
+```{r map-velocity380, fig.height=3.5, fig.width=6}
+# Velocity
+phy_grid_laea %>% 
+  filter(depth == 380) %>%
+  ggplot(aes(x = xc,  y = yc)) +
+  geom_tile(aes(fill = velocity * 100)) +
+  geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group),
+               fill = "grey80") +
+  scale_fill_cmocean("velo (cm/s)", name = "speed", limits = c(0, 10)) +
+  facet_wrap(~ year, ncol = 3) +
+  ggtitle("Velocity at 380 m depth") +
   coord_fixed(xlim = c(-2600, 1100), ylim = c(-1800, 1900), expand = F) + 
   theme(legend.position = "top",
         axis.text = element_blank(),
@@ -485,19 +507,19 @@ SA_df <- stat_laea %>%
 Plot data.
 
 ```{r plot-data-area, message=FALSE}
-SA_df %>%
-  ggplot(aes(x = v, y = NASC_int, col = IHO)) +
-  geom_point() +
-  geom_smooth(method = "gam", se = F, col = "grey20") +
-  facet_wrap(~ IHO, scales = "free") +
-  theme(legend.position = "none")
-
-SA_df %>%
-  ggplot(aes(x = chl, y = NASC_int, col = IHO)) +
-  geom_point() +
-  geom_smooth(method = "gam", se = F, col = "grey20") +
-  facet_wrap(~ IHO, scales = "free") +
-  theme(legend.position = "none")
+plot_grid(SA_df %>%
+            ggplot(aes(x = v, y = NASC_int, col = IHO)) +
+            geom_point() +
+            geom_smooth(method = "gam", se = F, col = "grey20") +
+            facet_wrap(~ IHO, scales = "free") +
+            theme(legend.position = "none"),
+          SA_df %>%
+            ggplot(aes(x = chl, y = NASC_int, col = IHO)) +
+            geom_point() +
+            geom_smooth(method = "gam", se = F, col = "grey20") +
+            facet_wrap(~ IHO, scales = "free") +
+            theme(legend.position = "none"),
+          ncol = 1)
 ```
 
 Check spearman correlations.
@@ -525,9 +547,10 @@ GAM_G <- gam(NASC_int ~
                s(chl, k = 5, bs = "tp") + # Global smoothers
                s(IHO, bs = "re") + # Random effect
                s(year, bs = "re") + # Random effect
+               te(xc, yc, by = year, k = 5) +
                # Second order effects
                s(IHO, year, bs = "re"), # Random slope
-            data = SA_df, family = Gamma(link = "log"), method = "REML")
+            data = SA_df, family = Gamma(link = "log"), method = "ML")
 # Model S
 GAM_S <- gam(NASC_int ~ 
                 # First order effects
@@ -535,12 +558,13 @@ GAM_S <- gam(NASC_int ~
                 # s(v, bs = "tp", k = 5) +
                 s(year, bs = "re") +
                 s(IHO, bs = "re") +
+                te(xc, yc, by = year, k = 5) +
                 # Second order random effects
                 s(year, IHO, bs = "re") +
                 # Second order functional effects
                 s(chl, IHO, bs = "fs", k = 5) +
                 s(v, IHO, bs = "fs", k = 5),
-             data = SA_df, family = Gamma(link = "log"), method = "REML")
+             data = SA_df, family = Gamma(link = "log"), method = "ML")
 # Model I
 GAM_I <- gam(NASC_int ~
                 # First order effects
@@ -548,12 +572,13 @@ GAM_I <- gam(NASC_int ~
                 # s(v, bs = "tp", k = 5) +
                 s(year, bs = "re") +
                 s(IHO, bs = "re") +
+                te(xc, yc, by = year, k = 5) +
                 # Second order random effects
                 s(year, IHO, bs = "re") +
                 # Second order functional effects
-                s(chl, by = IHO, k = 5, bs = "tp") + 
+                s(chl, by = IHO, k = 5, bs = "tp") +
                 s(v, by = IHO, k = 5, bs = "tp"),
-             data = SA_df, family = Gamma(link = "log"), method = "REML")
+             data = SA_df, family = Gamma(link = "log"), method = "ML")
 ```
 
 Check model metrics
@@ -584,7 +609,7 @@ data.frame(model = c("GAM_G", "GAM_S", "GAM_I"),
          dAIC = round(AIC - min(AIC), 2),
          w_AIC = round(Weights(AIC), 5)) %>%
   dplyr::select(model, df, dev_expl, r2, reml, AIC, dAIC, w_AIC) %>%
-  arrange(dAIC) %>% 
+  arrange(AIC) %>% 
   datatable(class = "cell-border stribe", rownames = F)
 ```
 
@@ -638,6 +663,16 @@ plot_grid(GAM_S_resid %>%
             labs(x = "chlorophyll") +
             geom_point(), 
           GAM_S_resid %>%
+            ggplot(aes(x = xc, y = resid)) + 
+            geom_hline(yintercept = 0, col = "red") +
+            labs(x = "xc") +
+            geom_point(), 
+          GAM_S_resid %>%
+            ggplot(aes(x = yc, y = resid)) + 
+            geom_hline(yintercept = 0, col = "red") +
+            labs(x = "yc") +
+            geom_point(), 
+          GAM_S_resid %>%
             ggplot(aes(x = IHO, y = resid)) + 
             geom_hline(yintercept = 0, col = "red") +
             labs(x = "area") +
@@ -663,6 +698,16 @@ plot_grid(GAM_I_resid %>%
             labs(x = "chlorophyll") +
             geom_point(), 
           GAM_I_resid %>%
+            ggplot(aes(x = xc, y = resid)) + 
+            geom_hline(yintercept = 0, col = "red") +
+            labs(x = "xc") +
+            geom_point(), 
+          GAM_I_resid %>%
+            ggplot(aes(x = yc, y = resid)) + 
+            geom_hline(yintercept = 0, col = "red") +
+            labs(x = "yc") +
+            geom_point(), 
+          GAM_I_resid %>%
             ggplot(aes(x = IHO, y = resid)) + 
             geom_hline(yintercept = 0, col = "red") +
             labs(x = "area") +
@@ -678,14 +723,14 @@ plot_grid(GAM_I_resid %>%
 
 ```{r GAMS-acf-pacf}
 par(mfrow = c(1, 2))
-acf(resid(GAM_S), lag.max = 36, main = "ACF")
-pacf(resid(GAM_S), lag.max = 36, main = "pACF")
+acf(resid(GAM_S), lag.max = 20, main = "ACF")
+pacf(resid(GAM_S), lag.max = 20, main = "pACF")
 ```
 
 ```{r GAMI-acf-pacf}
 par(mfrow = c(1, 2))
-acf(resid(GAM_I), lag.max = 36, main = "ACF")
-pacf(resid(GAM_I), lag.max = 36, main = "pACF")
+acf(resid(GAM_I), lag.max = 20, main = "ACF")
+pacf(resid(GAM_I), lag.max = 20, main = "pACF")
 ```
 
 ## Term selection
@@ -702,6 +747,7 @@ GAM_S_p <- gam(NASC_int ~
                 # s(v, bs = "tp", k = 5) +
                 s(year, bs = "re") +
                 s(IHO, bs = "re") +
+                te(xc, yc, by = year, k = 5) +
                 # Second order random effects
                 s(year, IHO, bs = "re") +
                 # Second order functional effects
@@ -712,7 +758,7 @@ GAM_S_p <- gam(NASC_int ~
 summary(GAM_S_p)
 ```
 
-The random effects `s(IHO)` and `s(year)` also have low edf but I decide to keep them in the model as their interaction `s(year,IHO)` is significant.
+`s(IHO)` and `s(year,IHO)` can be dropped. Refit model without those terms.
 
 ```{r refit-GAMS}
 # Model S
@@ -722,19 +768,21 @@ GAM_S2 <- gam(NASC_int ~
                 # s(v, bs = "tp", k = 5) +
                 s(year, bs = "re") +
                 # s(IHO, bs = "re") +
+                te(xc, yc, by = year, k = 5) +
                 # Second order random effects
-                s(year, IHO, bs = "re") +
+                # s(year, IHO, bs = "re") +
                 # Second order functional effects
                 s(chl, IHO, bs = "fs", k = 5) +
                 s(v, IHO, bs = "fs", k = 5),
-             data = SA_df, family = Gamma(link = "log"), method = "REML")
+             data = SA_df, family = Gamma(link = "log"), method = "ML")
 summary(GAM_S2)
 ```
 
 Compare models.
 
-```{r compare-GAMS}
-GAM_S_AIC <- AIC(GAM_S, GAM_S2) %>% 
+```{r summary-GAMS}
+# Summary metrics
+GAMS_AIC <- AIC(GAM_S, GAM_S2) %>% 
   rownames_to_column() %>%
   rename(model = rowname)
 # Metrics data frame
@@ -749,40 +797,67 @@ data.frame(model = c("GAM_S", "GAM_S2"),
            r2 = round(c(summary(GAM_S)$r.sq,
                         summary(GAM_S2)$r.sq),
                       2)) %>%
-  full_join(., GAM_S_AIC, by = "model") %>%
+  full_join(., GAMS_AIC, by = "model") %>%
   mutate(df = round(df, 3),
          AIC = round(AIC, 3),
          dAIC = round(AIC - min(AIC), 2),
-         w_AIC = round(Weights(AIC), 10)) %>%
+         w_AIC = round(Weights(AIC), 5)) %>%
   dplyr::select(model, df, dev_expl, r2, reml, AIC, dAIC, w_AIC) %>%
-  arrange(dAIC) %>% 
+  arrange(AIC) %>% 
   datatable(class = "cell-border stribe", rownames = F)
 ```
 
-`GAM_S` has better metics. So I keep that model.
+Refit model with REML
+
+```{r fit-GAMS3-reml}
+GAM_S3 <- gam(NASC_int ~ 
+                # First order effects
+                # s(chl, bs = "tp", k = 5) +
+                # s(v, bs = "tp", k = 5) +
+                s(year, bs = "re") +
+                # s(IHO, bs = "re") +
+                te(xc, yc, by = year, k = 5) +
+                # Second order random effects
+                # s(year, IHO, bs = "re") +
+                # Second order functional effects
+                s(chl, IHO, bs = "fs", k = 5) +
+                s(v, IHO, bs = "fs", k = 5),
+              data = SA_df, family = Gamma(link = "log"), method = "REML")
+summary(GAM_S3)
+```
 
 Check residuals.
 
-```{r GAMS2-residuals-covariates, message=FALSE}
-appraise(GAM_S2)
-GAM_S2_resid <- bind_cols(SA_df, residuals.gam(GAM_S2)) %>%
+```{r GAMS3-residuals-covariates, message=FALSE}
+appraise(GAM_S3)
+GAM_S3_resid <- bind_cols(SA_df, residuals.gam(GAM_S3)) %>%
   rename(resid = "...9")
-plot_grid(GAM_S2_resid %>%
+plot_grid(GAM_S3_resid %>%
             ggplot(aes(x = v, y = resid)) + 
             geom_hline(yintercept = 0, col = "red") +
             labs(x = "velocity") +
             geom_point(), 
-          GAM_S2_resid %>%
+          GAM_S3_resid %>%
             ggplot(aes(x = chl, y = resid)) + 
             geom_hline(yintercept = 0, col = "red") +
             labs(x = "chlorophyll") +
             geom_point(), 
-          GAM_S2_resid %>%
+          GAM_S3_resid %>%
+            ggplot(aes(x = xc, y = resid)) + 
+            geom_hline(yintercept = 0, col = "red") +
+            labs(x = "xc") +
+            geom_point(), 
+          GAM_S3_resid %>%
+            ggplot(aes(x = yc, y = resid)) + 
+            geom_hline(yintercept = 0, col = "red") +
+            labs(x = "yc") +
+            geom_point(), 
+          GAM_S3_resid %>%
             ggplot(aes(x = IHO, y = resid)) + 
             geom_hline(yintercept = 0, col = "red") +
             labs(x = "area") +
             geom_boxplot(fill = NA), 
-          GAM_S2_resid %>%
+          GAM_S3_resid %>%
             ggplot(aes(x = year, y = resid)) + 
             geom_hline(yintercept = 0, col = "red") +
             labs(x = "year") +
@@ -794,22 +869,23 @@ plot_grid(GAM_S2_resid %>%
 ```{r shrink-GAMI-selection}
 # Model I
 GAM_I_p <- gam(NASC_int ~
-                  # First order effects
-                  # s(chl, bs = "tp", k = 5) +
-                  # s(v, bs = "tp", k = 5) +
-                  s(year, bs = "re") +
-                  s(IHO, bs = "re") +
-                  # Second order random effects
-                  s(year, IHO, bs = "re") +
-                  # Second order functional effects
-                  s(chl, by = IHO, k = 5, bs = "tp") + 
-                  s(v, by = IHO, k = 5, bs = "tp"),
-                data = SA_df, family = Gamma(link = "log"), method = "REML",
-                select = T)
+                 # First order effects
+                 # s(chl, bs = "tp", k = 5) +
+                 # s(v, bs = "tp", k = 5) +
+                 s(year, bs = "re") +
+                 s(IHO, bs = "re") +
+                 te(xc, yc, by = year, k = 5) +
+                 # Second order random effects
+                 s(year, IHO, bs = "re") +
+                 # Second order functional effects
+                 s(chl, by = IHO, k = 5, bs = "tp") +
+                 s(v, by = IHO, k = 5, bs = "tp"),
+               data = SA_df, family = Gamma(link = "log"), method = "REML",
+               select = T)
 summary(GAM_I_p)
 ```
 
-The random effects `s(IHO)` and `s(year)` also have low edf but I decide to keep them in the model as their interaction `s(year,IHO)` is significant. I refit the model without the `s(v,year)` and `s(chl,year)` terms.
+`s(year)`, `s(IHO)`, and `s(year,IHO)` can be dropped. Refit model without those terms.
 
 ```{r refit-GAMI}
 # Model I
@@ -819,19 +895,20 @@ GAM_I2 <- gam(NASC_int ~
                  # s(v, bs = "tp", k = 5) +
                  # s(year, bs = "re") +
                  # s(IHO, bs = "re") +
+                 te(xc, yc, by = year, k = 5) +
                  # Second order random effects
                  # s(year, IHO, bs = "re") +
                  # Second order functional effects
-                 s(chl, by = IHO, k = 5, bs = "tp") + 
+                 s(chl, by = IHO, k = 5, bs = "tp") +
                  s(v, by = IHO, k = 5, bs = "tp"),
-               data = SA_df, family = Gamma(link = "log"), method = "REML")
+               data = SA_df, family = Gamma(link = "log"), method = "ML")
 summary(GAM_I2)
 ```
+Compare models
 
-Compare models.
-
-```{r compare-GAMI}
-GAM_I_AIC <- AIC(GAM_I, GAM_I2) %>% 
+```{r summary-GAMI}
+# Summary metrics
+GAMI_AIC <- AIC(GAM_I, GAM_I2) %>% 
   rownames_to_column() %>%
   rename(model = rowname)
 # Metrics data frame
@@ -846,40 +923,67 @@ data.frame(model = c("GAM_I", "GAM_I2"),
            r2 = round(c(summary(GAM_I)$r.sq,
                         summary(GAM_I2)$r.sq),
                       2)) %>%
-  full_join(., GAM_I_AIC, by = "model") %>%
+  full_join(., GAMI_AIC, by = "model") %>%
   mutate(df = round(df, 3),
          AIC = round(AIC, 3),
          dAIC = round(AIC - min(AIC), 2),
-         w_AIC = round(Weights(AIC), 10)) %>%
+         w_AIC = round(Weights(AIC), 5)) %>%
   dplyr::select(model, df, dev_expl, r2, reml, AIC, dAIC, w_AIC) %>%
-  arrange(dAIC) %>% 
+  arrange(AIC) %>% 
   datatable(class = "cell-border stribe", rownames = F)
 ```
 
-`GAM_I` has better metics. So I keep that model.
+Refit model with REML
+
+```{r fit-GAMI3-reml}
+GAM_I3 <- gam(NASC_int ~ 
+                 # First order effects
+                 # s(chl, bs = "tp", k = 5) +
+                 # s(v, bs = "tp", k = 5) +
+                 # s(year, bs = "re") +
+                 # s(IHO, bs = "re") +
+                 te(xc, yc, by = year, k = 5) +
+                 # Second order random effects
+                 # s(year, IHO, bs = "re") +
+                 # Second order functional effects
+                 s(chl, by = IHO, k = 5, bs = "tp") +
+                 s(v, by = IHO, k = 5, bs = "tp"),
+              data = SA_df, family = Gamma(link = "log"), method = "REML")
+summary(GAM_I3)
+```
 
 Check residuals.
 
-```{r GAMI2-residuals-covariates, message=FALSE}
-appraise(GAM_I2)
-GAM_I2_resid <- bind_cols(SA_df, residuals.gam(GAM_I2)) %>%
+```{r GAMI3-residuals-covariates, message=FALSE}
+appraise(GAM_I3)
+GAM_I3_resid <- bind_cols(SA_df, residuals.gam(GAM_I3)) %>%
   rename(resid = "...9")
-plot_grid(GAM_S2_resid %>%
+plot_grid(GAM_I3_resid %>%
             ggplot(aes(x = v, y = resid)) + 
             geom_hline(yintercept = 0, col = "red") +
             labs(x = "velocity") +
             geom_point(), 
-          GAM_S2_resid %>%
+          GAM_I3_resid %>%
             ggplot(aes(x = chl, y = resid)) + 
             geom_hline(yintercept = 0, col = "red") +
             labs(x = "chlorophyll") +
             geom_point(), 
-          GAM_S2_resid %>%
+          GAM_I3_resid %>%
+            ggplot(aes(x = xc, y = resid)) + 
+            geom_hline(yintercept = 0, col = "red") +
+            labs(x = "xc") +
+            geom_point(), 
+          GAM_I3_resid %>%
+            ggplot(aes(x = yc, y = resid)) + 
+            geom_hline(yintercept = 0, col = "red") +
+            labs(x = "yc") +
+            geom_point(), 
+          GAM_I3_resid %>%
             ggplot(aes(x = IHO, y = resid)) + 
             geom_hline(yintercept = 0, col = "red") +
             labs(x = "area") +
             geom_boxplot(fill = NA), 
-          GAM_S2_resid %>%
+          GAM_I3_resid %>%
             ggplot(aes(x = year, y = resid)) + 
             geom_hline(yintercept = 0, col = "red") +
             labs(x = "year") +
@@ -890,22 +994,21 @@ plot_grid(GAM_S2_resid %>%
 
 I predict the model to get the smooths in the response scale (NASC). I need to create a specific data frame for this with the factors of interest `IHO` and `year`, and covariates `v` and `chl`.
 
-```{r summary-NASC-df}
+```{r data-frame-pred}
+# Find median, min, and max of SA_df
 val <- SA_df %>%
-  dplyr::select(IHO, year, v, chl) %>%
+  dplyr::select(IHO, year, xc, yc, v, chl) %>%
   group_by(IHO) %>%
-  summarise(min_v = min(v),
+  summarise(median_xc = median(xc),
+            median_yc = median(yc),
+            min_v = min(v),
             max_v = max(v),
             median_v = median(v),
             min_chl = min(chl),
             max_chl = max(chl),
             median_chl = median(chl))
-val
-```
-
-```{r data-frame-pred}
 # Resolution for predictions
-res = 20
+res = 50
 # IHO areas
 IHO_area <- levels(SA_df$IHO)
 # Empty data frame that we populate with new values
@@ -921,6 +1024,8 @@ for (i in IHO_area) {
     year = rep(c(rep(2015, res), rep(2016, res), rep(2017, res)), 2),
     var = c(rep("v", res * 3), rep("chl", res * 3)),
     # Velocity
+    xc = rep(rep(rep(subset(val, IHO == i)$median_xc, res), 3), 2),
+    yc = rep(rep(rep(subset(val, IHO == i)$median_yc, res), 3), 2),
     v = c(rep(seq(subset(val, IHO == i)$min_v,
                   subset(val, IHO == i)$max_v,
                   length.out = res), 3),
@@ -935,14 +1040,16 @@ for (i in IHO_area) {
 }
 # Reorder factors
 SA_new <- SA_new %>%
-  mutate(IHO = factor(IHO, levels = c("WAO_BF","CAA", "BB", "DS", "EAO")))
+  mutate(IHO = factor(IHO, levels = c("WAO_BF", "CAA", "BB", "DS", "EAO")))
+# Remove unused variables
+rm(val_tmp, SA_tmp, IHO_area, res)
 ```
 
 Get GAM predictions (`GAM_S` and `GAM_I`) for the new data. I then calculate the average functional response for all years.
 
 ```{r GAMS-pred}
-ilink_S <- family(GAM_S)$linkinv # Get link function
-pred_S <- predict(GAM_S, SA_new, type = "link", se.fit = TRUE) %>% # Predict data
+ilink_S <- family(GAM_S3)$linkinv # Get link function
+pred_S <- predict(GAM_S3, SA_new, type = "link", se.fit = TRUE) %>% # Predict data
   bind_cols(., SA_new) %>%
   transform(lwr_ci = ilink_S(fit - (2 * se.fit)), # Calculate lower CI
             upr_ci = ilink_S(fit + (2 * se.fit)), # Calculate upper CI
@@ -957,8 +1064,8 @@ pred_S <- predict(GAM_S, SA_new, type = "link", se.fit = TRUE) %>% # Predict dat
 ```
 
 ```{r GAMI-pred}
-ilink_I <- family(GAM_I)$linkinv # Get link function
-pred_I <- predict(GAM_I, SA_new, type = "link", se.fit = TRUE) %>% # Predict data
+ilink_I <- family(GAM_I3)$linkinv # Get link function
+pred_I <- predict(GAM_I3, SA_new, type = "link", se.fit = TRUE) %>% # Predict data
   bind_cols(., SA_new) %>%
   transform(lwr_ci = ilink_I(fit - (2 * se.fit)), # Calculate lower CI
             upr_ci = ilink_I(fit + (2 * se.fit)), # Calculate upper CI
@@ -974,7 +1081,7 @@ pred_I <- predict(GAM_I, SA_new, type = "link", se.fit = TRUE) %>% # Predict dat
 
 ```{r save-GAM}
 # Save data
-save(pred_S, pred_I, GAM_S, GAM_I, file = "data/statistics/GAM_results.RData")
+save(pred_S, pred_I, GAM_S3, GAM_I3, file = "data/statistics/GAM_results.RData")
 ```
 
 ## Model visualization
@@ -1059,6 +1166,8 @@ GAMS_chl <- pred_S %>%
         legend.position = "none")
 # Combine plots
 plot_grid(GAMS_velo, GAMS_chl, ncol = 1, rel_heights = c(1,0.8))
+# Remove unused variables
+rm(GAMS_velo, GAMS_chl)
 ```
 
 ```{r GAMI-pretty-ggplot, fig.height=8, fig.width=7}
@@ -1097,6 +1206,8 @@ GAMI_chl <- pred_I %>%
         legend.position = "none")
 # Combine plots
 plot_grid(GAMI_velo, GAMI_chl, ncol = 1, rel_heights = c(1,0.8))
+# Remove unused variables
+rm(GAMI_velo, GAMI_chl)
 ```
 
 
@@ -1109,14 +1220,15 @@ In model S the random intercept is already included in the `s(bs = "fs")` term.
 ```{r HGAMSA-fit}
 # Model G
 GAMSA_G <- gam(SA_int ~ 
-               # First order effects
-               s(v, k = 5, bs = "tp") + # Global smoothers
-               s(chl, k = 5, bs = "tp") + # Global smoothers
-               s(IHO, bs = "re") + # Random effect
-               s(year, bs = "re") + # Random effect
-               # Second order effects
-               s(IHO, year, bs = "re"), # Random slope
-            data = SA_df, family = "gaussian", method = "REML")
+                 # First order effects
+                 s(v, k = 5, bs = "tp") + # Global smoothers
+                 s(chl, k = 5, bs = "tp") + # Global smoothers
+                 s(IHO, bs = "re") + # Random effect
+                 s(year, bs = "re") + # Random effect
+                 te(xc, yc, by = year, k = 5) +
+                 # Second order effects
+                 s(IHO, year, bs = "re"), # Random slope
+               data = SA_df, family = "gaussian", method = "ML")
 # Model S
 GAMSA_S <- gam(SA_int ~ 
                 # First order effects
@@ -1124,12 +1236,13 @@ GAMSA_S <- gam(SA_int ~
                 # s(v, bs = "tp", k = 5) +
                 s(year, bs = "re") +
                 s(IHO, bs = "re") +
+                te(xc, yc, by = year, k = 5) +
                 # Second order random effects
                 s(year, IHO, bs = "re") +
                 # Second order functional effects
                 s(chl, IHO, bs = "fs", k = 5) +
                 s(v, IHO, bs = "fs", k = 5),
-             data = SA_df, family = "gaussian", method = "REML")
+               data = SA_df, family = "gaussian", method = "ML")
 # Model I
 GAMSA_I <- gam(SA_int ~
                 # First order effects
@@ -1137,12 +1250,13 @@ GAMSA_I <- gam(SA_int ~
                 # s(v, bs = "tp", k = 5) +
                 s(year, bs = "re") +
                 s(IHO, bs = "re") +
+                te(xc, yc, by = year, k = 5) +
                 # Second order random effects
                 s(year, IHO, bs = "re") +
                 # Second order functional effects
-                s(chl, by = IHO, k = 5, bs = "tp") + 
+                s(chl, by = IHO, k = 5, bs = "tp") +
                 s(v, by = IHO, k = 5, bs = "tp"),
-             data = SA_df, family = "gaussian", method = "REML")
+             data = SA_df, family = "gaussian", method = "ML")
 ```
 
 Check model metrics
@@ -1173,7 +1287,7 @@ data.frame(model = c("GAMSA_G", "GAMSA_S", "GAMSA_I"),
          dAIC = round(AIC - min(AIC), 2),
          w_AIC = round(Weights(AIC), 5)) %>%
   dplyr::select(model, df, dev_expl, r2, reml, AIC, dAIC, w_AIC) %>%
-  arrange(dAIC) %>% 
+  arrange(AIC) %>% 
   datatable(class = "cell-border stribe", rownames = F)
 ```
 
@@ -1227,6 +1341,16 @@ plot_grid(GAMSA_S_resid %>%
             labs(x = "chlorophyll") +
             geom_point(), 
           GAMSA_S_resid %>%
+            ggplot(aes(x = xc, y = resid)) + 
+            geom_hline(yintercept = 0, col = "red") +
+            labs(x = "xc") +
+            geom_point(), 
+          GAMSA_S_resid %>%
+            ggplot(aes(x = yc, y = resid)) + 
+            geom_hline(yintercept = 0, col = "red") +
+            labs(x = "yc") +
+            geom_point(), 
+          GAMSA_S_resid %>%
             ggplot(aes(x = IHO, y = resid)) + 
             geom_hline(yintercept = 0, col = "red") +
             labs(x = "area") +
@@ -1252,6 +1376,16 @@ plot_grid(GAMSA_I_resid %>%
             labs(x = "chlorophyll") +
             geom_point(), 
           GAMSA_I_resid %>%
+            ggplot(aes(x = xc, y = resid)) + 
+            geom_hline(yintercept = 0, col = "red") +
+            labs(x = "xc") +
+            geom_point(), 
+          GAMSA_I_resid %>%
+            ggplot(aes(x = yc, y = resid)) + 
+            geom_hline(yintercept = 0, col = "red") +
+            labs(x = "yc") +
+            geom_point(), 
+          GAMSA_I_resid %>%
             ggplot(aes(x = IHO, y = resid)) + 
             geom_hline(yintercept = 0, col = "red") +
             labs(x = "area") +
@@ -1267,14 +1401,14 @@ plot_grid(GAMSA_I_resid %>%
 
 ```{r GAMSAS-acf-pacf}
 par(mfrow = c(1, 2))
-acf(resid(GAMSA_S), lag.max = 36, main = "ACF")
-pacf(resid(GAMSA_S), lag.max = 36, main = "pACF")
+acf(resid(GAMSA_S), lag.max = 20, main = "ACF")
+pacf(resid(GAMSA_S), lag.max = 20, main = "pACF")
 ```
 
 ```{r GAMSAI-acf-pacf}
 par(mfrow = c(1, 2))
-acf(resid(GAMSA_I), lag.max = 36, main = "ACF")
-pacf(resid(GAMSA_I), lag.max = 36, main = "pACF")
+acf(resid(GAMSA_I), lag.max = 20, main = "ACF")
+pacf(resid(GAMSA_I), lag.max = 20, main = "pACF")
 ```
 
 ## Term selection
@@ -1291,6 +1425,7 @@ GAMSA_S_p <- gam(SA_int ~
                 # s(v, bs = "tp", k = 5) +
                 s(year, bs = "re") +
                 s(IHO, bs = "re") +
+                te(xc, yc, by = year, k = 5) +
                 # Second order random effects
                 s(year, IHO, bs = "re") +
                 # Second order functional effects
@@ -1301,50 +1436,258 @@ GAMSA_S_p <- gam(SA_int ~
 summary(GAMSA_S_p)
 ```
 
-The random effects `s(IHO)` and `s(year)` also have low edf but I decide to keep them in the model as their interaction `s(year,IHO)` is significant.
+`s(IHO)` and `s(year,IHO)` can be dropped. Refit the model without those terms.
+
+```{r refit-GAMSAS}
+# Model S
+GAMSA_S2 <- gam(SA_int ~ 
+                  # First order effects
+                  # s(chl, bs = "tp", k = 5) +
+                  # s(v, bs = "tp", k = 5) +
+                  s(year, bs = "re") +
+                  # s(IHO, bs = "re") +
+                  te(xc, yc, by = year, k = 5) +
+                  # Second order random effects
+                  # s(year, IHO, bs = "re") +
+                  # Second order functional effects
+                  s(chl, IHO, bs = "fs", k = 5) +
+                  s(v, IHO, bs = "fs", k = 5),
+                data = SA_df, family = "gaussian", method = "ML")
+summary(GAMSA_S2)
+```
+
+Compare models.
+
+```{r summary-GAMSAS}
+# Summary metrics
+GAMSAS_AIC <- AIC(GAMSA_S, GAMSA_S2) %>% 
+  rownames_to_column() %>%
+  rename(model = rowname)
+# Metrics data frame
+data.frame(model = c("GAMSA_S", "GAMSA_S2"),
+           reml = round(c(GAMSA_S$gcv.ubre,
+                          GAMSA_S2$gcv.ubre), 
+                        2), 
+           dev_expl = round(c(
+             (1 - (GAMSA_S$deviance / GAMSA_S$null.deviance)) * 100,
+             (1 - (GAMSA_S2$deviance / GAMSA_S2$null.deviance)) * 100),
+             2),
+           r2 = round(c(summary(GAMSA_S)$r.sq,
+                        summary(GAMSA_S2)$r.sq),
+                      2)) %>%
+  full_join(., GAMSAS_AIC, by = "model") %>%
+  mutate(df = round(df, 3),
+         AIC = round(AIC, 3),
+         dAIC = round(AIC - min(AIC), 2),
+         w_AIC = round(Weights(AIC), 5)) %>%
+  dplyr::select(model, df, dev_expl, r2, reml, AIC, dAIC, w_AIC) %>%
+  arrange(AIC) %>% 
+  datatable(class = "cell-border stribe", rownames = F)
+```
+
+Refit model with REML
+
+```{r fit-GAMSAS3-reml}
+GAMSA_S3 <- gam(SA_int ~ 
+                  # First order effects
+                  # s(chl, bs = "tp", k = 5) +
+                  # s(v, bs = "tp", k = 5) +
+                  s(year, bs = "re") +
+                  # s(IHO, bs = "re") +
+                  te(xc, yc, by = year, k = 5) +
+                  # Second order random effects
+                  # s(year, IHO, bs = "re") +
+                  # Second order functional effects
+                  s(chl, IHO, bs = "fs", k = 5) +
+                  s(v, IHO, bs = "fs", k = 5),
+                data = SA_df, family = "gaussian", method = "REML")
+summary(GAMSA_S3)
+```
+
+Check residuals.
+
+```{r GAMSAS3-residuals-covariates, message=FALSE}
+appraise(GAMSA_S3)
+GAMSA_S3_resid <- bind_cols(SA_df, residuals.gam(GAMSA_S3)) %>%
+  rename(resid = "...9")
+plot_grid(GAMSA_S3_resid %>%
+            ggplot(aes(x = v, y = resid)) + 
+            geom_hline(yintercept = 0, col = "red") +
+            labs(x = "velocity") +
+            geom_point(), 
+          GAMSA_S3_resid %>%
+            ggplot(aes(x = chl, y = resid)) + 
+            geom_hline(yintercept = 0, col = "red") +
+            labs(x = "chlorophyll") +
+            geom_point(), 
+          GAMSA_S3_resid %>%
+            ggplot(aes(x = xc, y = resid)) + 
+            geom_hline(yintercept = 0, col = "red") +
+            labs(x = "xc") +
+            geom_point(), 
+          GAMSA_S3_resid %>%
+            ggplot(aes(x = yc, y = resid)) + 
+            geom_hline(yintercept = 0, col = "red") +
+            labs(x = "yc") +
+            geom_point(), 
+          GAMSA_S3_resid %>%
+            ggplot(aes(x = IHO, y = resid)) + 
+            geom_hline(yintercept = 0, col = "red") +
+            labs(x = "area") +
+            geom_boxplot(fill = NA), 
+          GAMSA_S3_resid %>%
+            ggplot(aes(x = year, y = resid)) + 
+            geom_hline(yintercept = 0, col = "red") +
+            labs(x = "year") +
+            geom_boxplot(fill = NA))
+```
 
 ### Model I
 
 ```{r shrink-GAMSAI-selection}
 # Model I
 GAMSA_I_p <- gam(SA_int ~
-                  # First order effects
-                  # s(chl, bs = "tp", k = 5) +
-                  # s(v, bs = "tp", k = 5) +
-                  s(year, bs = "re") +
-                  s(IHO, bs = "re") +
-                  # Second order random effects
-                  s(year, IHO, bs = "re") +
-                  # Second order functional effects
-                  s(chl, by = IHO, k = 5, bs = "tp") + 
-                  s(v, by = IHO, k = 5, bs = "tp"),
+                   # First order effects
+                   # s(chl, bs = "tp", k = 5) +
+                   # s(v, bs = "tp", k = 5) +
+                   s(year, bs = "re") +
+                   s(IHO, bs = "re") +
+                   te(xc, yc, by = year, k = 5) +
+                   # Second order random effects
+                   s(year, IHO, bs = "re") +
+                   # Second order functional effects
+                   s(chl, by = IHO, k = 5, bs = "tp") +
+                   s(v, by = IHO, k = 5, bs = "tp"),
                 data = SA_df, family = "gaussian", method = "REML",
                 select = T)
 summary(GAMSA_I_p)
 ```
 
-The random effects `s(IHO)` and `s(year)` also have low edf but I decide to keep them in the model as their interaction `s(year,IHO)` is significant. I refit the model without the `s(v,year)` and `s(chl,year)` terms.
+`s(IHO)`, and `s(year,IHO)` can be dropped. Refit model without those terms.
+
+```{r refit-GAMSAI}
+# Model I
+GAMSA_I2 <- gam(SA_int ~
+                  # First order effects
+                  # s(chl, bs = "tp", k = 5) +
+                  # s(v, bs = "tp", k = 5) +
+                  s(year, bs = "re") +
+                  # s(IHO, bs = "re") +
+                  te(xc, yc, by = year, k = 5) +
+                  # Second order random effects
+                  # s(year, IHO, bs = "re") +
+                  # Second order functional effects
+                  s(chl, by = IHO, k = 5, bs = "tp") +
+                  s(v, by = IHO, k = 5, bs = "tp"),
+                data = SA_df, family = "gaussian", method = "ML")
+summary(GAMSA_I2)
+```
+
+Compare models
+
+```{r summary-GAMSAI}
+# Summary metrics
+GAMSAI_AIC <- AIC(GAMSA_I, GAMSA_I2) %>% 
+  rownames_to_column() %>%
+  rename(model = rowname)
+# Metrics data frame
+data.frame(model = c("GAMSA_I", "GAMSA_I2"),
+           reml = round(c(GAMSA_I$gcv.ubre,
+                          GAMSA_I2$gcv.ubre), 
+                        2), 
+           dev_expl = round(c(
+             (1 - (GAMSA_I$deviance / GAMSA_I$null.deviance)) * 100,
+             (1 - (GAMSA_I2$deviance / GAMSA_I2$null.deviance)) * 100),
+             2),
+           r2 = round(c(summary(GAMSA_I)$r.sq,
+                        summary(GAMSA_I2)$r.sq),
+                      2)) %>%
+  full_join(., GAMSAI_AIC, by = "model") %>%
+  mutate(df = round(df, 3),
+         AIC = round(AIC, 3),
+         dAIC = round(AIC - min(AIC), 2),
+         w_AIC = round(Weights(AIC), 5)) %>%
+  dplyr::select(model, df, dev_expl, r2, reml, AIC, dAIC, w_AIC) %>%
+  arrange(AIC) %>% 
+  datatable(class = "cell-border stribe", rownames = F)
+```
+
+Refit model with REML
+
+```{r fit-GAMSAI3-reml}
+GAMSA_I3 <- gam(SA_int ~
+                  # First order effects
+                  # s(chl, bs = "tp", k = 5) +
+                  # s(v, bs = "tp", k = 5) +
+                  s(year, bs = "re") +
+                  # s(IHO, bs = "re") +
+                  te(xc, yc, by = year, k = 5) +
+                  # Second order random effects
+                  # s(year, IHO, bs = "re") +
+                  # Second order functional effects
+                  s(chl, by = IHO, k = 5, bs = "tp") +
+                  s(v, by = IHO, k = 5, bs = "tp"),
+                data = SA_df, family = "gaussian", method = "REML")
+summary(GAMSA_I3)
+```
+
+Check residuals.
+
+```{r GAMSAI3-residuals-covariates, message=FALSE}
+appraise(GAMSA_I3)
+GAMSA_I3_resid <- bind_cols(SA_df, residuals.gam(GAMSA_I3)) %>%
+  rename(resid = "...9")
+plot_grid(GAMSA_I3_resid %>%
+            ggplot(aes(x = v, y = resid)) + 
+            geom_hline(yintercept = 0, col = "red") +
+            labs(x = "velocity") +
+            geom_point(), 
+          GAMSA_I3_resid %>%
+            ggplot(aes(x = chl, y = resid)) + 
+            geom_hline(yintercept = 0, col = "red") +
+            labs(x = "chlorophyll") +
+            geom_point(), 
+          GAMSA_I3_resid %>%
+            ggplot(aes(x = xc, y = resid)) + 
+            geom_hline(yintercept = 0, col = "red") +
+            labs(x = "xc") +
+            geom_point(), 
+          GAMSA_I3_resid %>%
+            ggplot(aes(x = yc, y = resid)) + 
+            geom_hline(yintercept = 0, col = "red") +
+            labs(x = "yc") +
+            geom_point(), 
+          GAMSA_I3_resid %>%
+            ggplot(aes(x = IHO, y = resid)) + 
+            geom_hline(yintercept = 0, col = "red") +
+            labs(x = "area") +
+            geom_boxplot(fill = NA), 
+          GAMSA_I3_resid %>%
+            ggplot(aes(x = year, y = resid)) + 
+            geom_hline(yintercept = 0, col = "red") +
+            labs(x = "year") +
+            geom_boxplot(fill = NA))
+```
 
 ## Model predictions
 
 I predict the model to get the smooths in the response scale (NASC). I need to create a specific data frame for this with the factors of interest `IHO` and `year`, and covariates `v` and `chl`.
 
-```{r summary-SA-df}
+```{r data-frame-predSA}
+# Find median, min and max values of SA_df
 val <- SA_df %>%
-  dplyr::select(IHO, year, v, chl) %>%
+  dplyr::select(IHO, year, xc, yc, v, chl) %>%
   group_by(IHO) %>%
-  summarise(min_v = min(v),
+  summarise(median_xc = median(xc),
+            median_yc = median(yc),
+            min_v = min(v),
             max_v = max(v),
             median_v = median(v),
             min_chl = min(chl),
             max_chl = max(chl),
             median_chl = median(chl))
-val
-```
-
-```{r data-frame-predSA}
 # Resolution for predictions
-res = 20
+res = 50
 # IHO areas
 IHO_area <- levels(SA_df$IHO)
 # Empty data frame that we populate with new values
@@ -1360,6 +1703,8 @@ for (i in IHO_area) {
     year = rep(c(rep(2015, res), rep(2016, res), rep(2017, res)), 2),
     var = c(rep("v", res * 3), rep("chl", res * 3)),
     # Velocity
+    xc = rep(rep(rep(subset(val, IHO == i)$median_xc, res), 3), 2),
+    yc = rep(rep(rep(subset(val, IHO == i)$median_yc, res), 3), 2),
     v = c(rep(seq(subset(val, IHO == i)$min_v,
                   subset(val, IHO == i)$max_v,
                   length.out = res), 3),
@@ -1374,14 +1719,14 @@ for (i in IHO_area) {
 }
 # Reorder factors
 SA_new <- SA_new %>%
-  mutate(IHO = factor(IHO, levels = c("WAO_BF","CAA", "BB", "DS", "EAO")))
+  mutate(IHO = factor(IHO, levels = c("WAO_BF", "CAA", "BB", "DS", "EAO")))
 ```
 
 Get GAM predictions (`GAM_S` and `GAM_I`) for the new data. I then calculate the average functional response for all years.
 
 ```{r GAMSAS-pred}
-ilinkSA_S <- family(GAMSA_S)$linkinv # Get link function
-predSA_S <- predict(GAMSA_S, SA_new, type = "link", se.fit = TRUE) %>% # Predict data
+ilinkSA_S <- family(GAMSA_S3)$linkinv # Get link function
+predSA_S <- predict(GAMSA_S3, SA_new, type = "link", se.fit = TRUE) %>% # Predict data
   bind_cols(., SA_new) %>%
   transform(lwr_ci = ilinkSA_S(fit - (2 * se.fit)), # Calculate lower CI
             upr_ci = ilinkSA_S(fit + (2 * se.fit)), # Calculate upper CI
@@ -1393,8 +1738,8 @@ predSA_S <- predict(GAMSA_S, SA_new, type = "link", se.fit = TRUE) %>% # Predict
 ```
 
 ```{r GAMSAI-pred}
-ilinkSA_I <- family(GAMSA_I)$linkinv # Get link function
-predSA_I <- predict(GAMSA_I, SA_new, type = "link", se.fit = TRUE) %>% # Predict data
+ilinkSA_I <- family(GAMSA_I3)$linkinv # Get link function
+predSA_I <- predict(GAMSA_I3, SA_new, type = "link", se.fit = TRUE) %>% # Predict data
   bind_cols(., SA_new) %>%
   transform(lwr_ci = ilinkSA_I(fit - (2 * se.fit)), # Calculate lower CI
             upr_ci = ilinkSA_I(fit + (2 * se.fit)), # Calculate upper CI
@@ -1407,7 +1752,7 @@ predSA_I <- predict(GAMSA_I, SA_new, type = "link", se.fit = TRUE) %>% # Predict
 
 ```{r save-GAMSA}
 # Save data
-save(predSA_S, predSA_I, GAMSA_S, GAMSA_I, file = "data/statistics/GAMSA_results.RData")
+save(predSA_S, predSA_I, GAMSA_S2, GAMSA_I2, file = "data/statistics/GAMSA_results.RData")
 ```
 
 ## Model visualization
