@@ -654,34 +654,42 @@ p_Sv_prof_boxplot
 
 ## Figure 3. Boxplot mesopelagic NASC & Map detections
 
-### Boxplot
+### Map and Boxplot
 
 ```{r fig3-boxplot-NASC, fig.width=6, fig.height=5}
 # Map NASC
 map_DSL <- SA_grid_laea %>% 
   mutate(NASC_int_d = cut(NASC_int, c(0, 1, 10, 100, 1000, 10000, Inf))) %>%
   ggplot(aes(x = xc,  y = yc)) +
-  geom_raster(data = bathy_laea, aes(x = xc, y = yc, fill = depth_d)) + # bathy
-  scale_fill_grey("Depth (m)", start = 0.85, end = 0.3) +
+  geom_raster(data = bathy_laea, aes(x = xc, y = yc, fill = depth_d), alpha = 0.8) + # bathy
+  scale_fill_grey("Depth (m)", start = 0.9, end = 0.3) +
+  guides(fill = "none") + 
+  new_scale_fill() + 
   geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), 
                fill = "grey20") + # Coast
-  geom_point(aes(col = NASC_int_d), size = 0.6) +
-  scale_color_viridis_d(option = "plasma", 
-                        labels = c("< 1", "1-10", "11-100", "101-1000", 
-                                   "1001-10000", "> 10000")) +
+  # geom_point(aes(col = NASC_int_d), size = 0.6) +
+  # scale_color_viridis_d(option = "plasma", 
+  #                       labels = c("< 1", "1-10", "11-100", "101-1000", 
+  #                                  "1001-10000", "> 10000")) +
+  geom_tile(aes(fill = NASC_int_d), size = 0.2, alpha = 0.8, col = "white") +
+  scale_fill_viridis_d(option = "viridis", 
+                       labels = c("< 1", "1-10", "11-100", "101-1000", 
+                                  "1001-10000", "> 10000")) +
   facet_wrap(~ year) +
   coord_fixed(xlim = c(-2450, 600), ylim = c(-1500, 1800), expand = F) +
   # coord_fixed(xlim = c(-2600, 1100), ylim = c(-1600, 1900), expand = F) +
-  guides(fill = "none",
-         colour = guide_legend(override.aes = list(size = 2), 
-                               nrow = 1)) + # Increase symbol size in legend
+  guides(fill = guide_legend(override.aes = list(size = 2), 
+                               nrow = 1)) + 
+  # guides(fill = "none",
+  #        colour = guide_legend(override.aes = list(size = 2), 
+  #                              nrow = 1)) + # Increase symbol size in legend
   theme(legend.position = "top",
         legend.title = element_blank(),
         axis.text = element_blank(),
         axis.ticks = element_blank(),
         axis.title = element_blank())
 # Bxplot SA
-# p_boxplot_SA <- 
+p_boxplot_SA <-
   SA_grid_laea %>% # Boxplot of SA per region
   mutate(IHO_area = factor(
     case_when(IHO_area == "East Arctic Ocean" ~ "East Arctic\nOcean",
@@ -703,41 +711,99 @@ map_DSL <- SA_grid_laea %>%
         plot.margin = unit(c(0.1, 0.1, 0, 0), "in"))
 # Combine plots
 p_map_SA_DSL <- plot_grid(map_DSL, p_boxplot_SA, 
-                          ncol = 1, align = "v", axis = "lr") 
+                          ncol = 1, align = "v", axis = "lr",
+                          labels = "auto", label_size = 9) 
 # Save and display plots
 ggsave("plots/Fig3_map_boxplot_SA.png", p_map_SA_DSL,
        height = 5, width = 6, dpi = 600, units = "in")
 p_map_SA_DSL
 ```
 
-### Points
+### Map and Points
 
 ```{r fig3-map-points}
-map_DSL <- SA_grid_laea %>%  # Map of DSL detections
+map_DSL <- SA_grid_laea %>% 
   mutate(NASC_int_d = cut(NASC_int, c(0, 1, 10, 100, 1000, 10000, Inf))) %>%
   ggplot(aes(x = xc,  y = yc)) +
-  geom_raster(data = bathy_laea, 
-              aes(x = xc, y = yc, fill = depth_d)) + # bathy
-  scale_fill_grey("Depth (m)", start = 0.8, end = 0.3) +
-  # new_scale_fill() +
+  geom_raster(data = bathy_laea, aes(x = xc, y = yc, fill = depth_d), alpha = 0.8) + # bathy
+  scale_fill_grey("Depth (m)", start = 0.9, end = 0.3) +
+  guides(fill = "none") + 
+  new_scale_fill() + 
   geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), 
                fill = "grey20") + # Coast
-  geom_point(aes(col = NASC_int_d), size = 0.6) +
-  scale_color_viridis_d(option = "turbo", 
-                        labels = c("< 1", "1-10", "11-100", "101-1000", 
-                                   "1001-10000", "> 10000")) +
+  # geom_point(aes(col = NASC_int_d), size = 0.6) +
+  # scale_color_viridis_d(option = "plasma", 
+  #                       labels = c("< 1", "1-10", "11-100", "101-1000", 
+  #                                  "1001-10000", "> 10000")) +
+  geom_tile(aes(fill = NASC_int_d), size = 0.2, alpha = 0.8, col = "white") +
+  scale_fill_viridis_d(option = "viridis", 
+                       labels = c("< 1", "1-10", "11-100", "101-1000", 
+                                  "1001-10000", "> 10000")) +
   facet_wrap(~ year) +
   coord_fixed(xlim = c(-2450, 600), ylim = c(-1500, 1800), expand = F) +
   # coord_fixed(xlim = c(-2600, 1100), ylim = c(-1600, 1900), expand = F) +
-  # Increase symbol size in legend
-  guides(fill = "none",
-         colour = guide_legend(override.aes = list(size = 2), nrow = 1)) + 
+  guides(fill = guide_legend(override.aes = list(size = 2), 
+                               nrow = 1)) + 
+  # guides(fill = "none",
+  #        colour = guide_legend(override.aes = list(size = 2), 
+  #                              nrow = 1)) + # Increase symbol size in legend
   theme(legend.position = "top",
         legend.title = element_blank(),
         axis.text = element_blank(),
         axis.ticks = element_blank(),
         axis.title = element_blank())
 
+pointrange_NASC <- SA_grid_laea %>% # Pointrange of SA per region
+  mutate(IHO_area = factor(
+    case_when(
+    IHO_area == "East Arctic Ocean" ~ "East Arctic\nOcean",
+    IHO_area == "West Arctic Ocean" ~ "West Arctic\nOcean",
+    IHO_area == "Beaufort Sea" ~ "Beaufort Sea",
+    IHO_area == "The Northwestern Passages" ~ "Can. Arctic\nArchipelago",
+    IHO_area == "Baffin Bay" ~ "Baffin Bay",
+    IHO_area == "Davis Strait" ~ "Davis Strait"),
+    levels = c("West Arctic\nOcean", "Beaufort Sea", "Can. Arctic\nArchipelago",
+               "Baffin Bay", "Davis Strait", "East Arctic\nOcean"))) %>%
+  group_by(IHO_area, year) %>%  # median per year
+  summarise(NASC_median = median(NASC_int, na.rm = T),
+            NASC_mean = mean(NASC_int, na.rm = T),
+            NASC_q025 = quantile(NASC_int, 0.025),
+            NASC_q975 = quantile(NASC_int, 0.975)) %>%
+  ungroup() %>%
+  group_by(IHO_area) %>% # Mean per area
+  summarise(NASC_median = mean(NASC_median, na.rm = T),
+            NASC_mean = mean(NASC_mean, na.rm = T),
+            NASC_q025 = min(NASC_q025, na.rm = T),
+            NASC_q975 = max(NASC_q975, na.rm = T)) %>%
+  ungroup() %>%
+  ggplot(aes(x = IHO_area)) +
+  geom_point(aes(y = 10*log10(NASC_mean)), shape = 18, size = 4.5, col = "black") +
+  geom_pointrange(aes(y = 10*log10(NASC_median), ymin = 10*log10(NASC_q025), ymax = 10*log10(NASC_q975)),
+                  col = "black", fill = "white", shape = 21) +
+  scale_y_continuous(
+    expression("S"[A]*" (dB re 1 m"^2*" nmi"^-2*")"),
+    sec.axis = sec_axis(trans = ~10^(./10), 
+                        name = expression("s"[A]*" ( m"^2*" nmi"^-2*")"),
+                        breaks = c(1, 5, 10, 50, 100, 500, 1000, 5000, 10000, 50000))) +
+    # trans = "log10") +
+  theme(#panel.border = element_blank(),
+        # panel.grid.major.y = element_line(colour = "grey90"),
+        axis.title.x = element_blank(),
+        # axis.line = element_line(),
+        plot.margin = unit(c(0.1, 0.1, 0, 0), "in"))
+# Combine plots
+p_map_pointrange_NASC <- plot_grid(map_DSL, pointrange_NASC, 
+                                   ncol = 1, align = "v", axis = "lr",
+                                   labels = "auto", label_size = 9) 
+# Save and display plot
+ggsave("plots/Fig3_map_pointrange_NASC.png", p_map_pointrange_NASC, 
+       height = 5, width = 6, dpi = 600, units = "in")
+p_map_pointrange_NASC
+```
+
+### Just points
+
+```{r fig3-points}
 pointrange_NASC <- SA_grid_laea %>% # Pointrange of SA per region
   mutate(IHO_area = factor(
     case_when(
@@ -782,6 +848,7 @@ ggsave("plots/Fig3_map_pointrange_NASC.png", p_map_pointrange_NASC,
        height = 5, width = 6, dpi = 600, units = "in")
 p_map_pointrange_NASC
 ```
+
 
 ## Map/table 1. Abundance mesopelagic fish and map
 
@@ -955,7 +1022,7 @@ heatmap_RA <- trawl_area_df %>%
                               "Polar cod"),
                    expand = c(0, 0)) +
   scale_colour_identity() +
-  scale_fill_viridis_c("Relative\nabundance (%)  ", option = "magma",
+  scale_fill_viridis_c("Relative\nabundance (%)  ", option = "viridis",
                        breaks = seq(0, 100, 20), limits = c(0, 100),
                        direction = -1) +
   guides(fill = guide_colorbar(label.position = "top")) +
@@ -969,11 +1036,12 @@ heatmap_RA <- trawl_area_df %>%
         plot.margin = unit(c(0, 0.1, 0.01, 0), "in"))
 
 # Map relative abundance
-map_RA <- trawl_station_df %>%
+map_RA <-
+  trawl_station_df %>%
   ggplot() +
   # Bathymetry
   geom_raster(data = bathy_laea,
-              aes(x = xc, y = yc, fill = depth_d)) + 
+              aes(x = xc, y = yc, fill = depth_d), alpha = 0.8) + 
   scale_fill_grey("Depth (m)", start = 0.9, end = 0.3) +
   guides(fill = "none") +
   new_scale_fill() +
@@ -987,7 +1055,8 @@ map_RA <- trawl_station_df %>%
                            "Lanternfish",
                            "Redfish",
                            "Other"),
-                  alpha = 0.9, pie_scale = 1.5, legend_name = "Species", colour = NA) +
+                  alpha = 0.9, pie_scale = 1.5, legend_name = "Species", 
+                  colour = "white", size = 0.2) +
   # geom_text(aes(x = xc_jit, y = yc_jit, label = row), size = 8, col = "green") +
   scale_fill_manual(values = met.brewer("Johnson", n = 5, direction = -1)) +
   coord_fixed(xlim = c(-2450, 600), ylim = c(-1500, 1800), expand = F) +
