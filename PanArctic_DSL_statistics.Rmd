@@ -1753,7 +1753,7 @@ predSA_I <- predict(GAMSA_I3, SA_new, type = "link", se.fit = TRUE) %>% # Predic
 
 ```{r save-GAMSA}
 # Save data
-save(predSA_S, predSA_I, GAMSA_S3, GAMSA_I3, file = "data/statistics/GAMSA_results.RData")
+save(predSA_S, predSA_I, GAMSA_S3, GAMSA_I3, SA_df, file = "data/statistics/GAMSA_results.RData")
 ```
 
 ## Model visualization

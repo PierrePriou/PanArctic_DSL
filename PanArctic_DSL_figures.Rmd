@@ -111,6 +111,10 @@ trawl_latlon <- trawl_station %>% # Location of trawls
 # Remote sensing data
 load(paste0("data/remote_sensing/physics_grids_", cell_res, "km.RData"))
 load(paste0("data/remote_sensing/chl_grids_", cell_res, "km.RData"))
+
+# Statistics
+load("data/statistics/LM_results.RData")
+load("data/statistics/GAMSA_results.RData")
 ```
 
 I re-project data from the WGS84 projection to the EASE-Grid 2.0 North projection.
@@ -1006,6 +1010,32 @@ ggsave("plots/Table1_RA_map.png", table1_RA,
 table1_RA
 ```
 
+
+## Figure 4. Linear regression latitude
+
+```{r LM-SA-latitude}
+lm_SA_lat <- LM_area_res %>%
+  ggplot() + 
+  geom_point(aes(x = lat, y = SA_int, col = IHO), alpha = 0.5, size = 1) +
+  geom_line(aes(x = lat, y = .fitted, col = IHO), size = 0.6) + 
+  geom_ribbon(aes(x = lat, ymin = .lower, ymax = .upper, group = IHO, fill = IHO), alpha = 0.1) +
+  scale_x_continuous("Latitude (°N)", breaks = seq(0, 90, 2)) + 
+  scale_y_continuous(expression("S"[A]*" (dB re 1 m"^2*" nmi"^-2*")")) + 
+  scale_colour_manual("Region", values = met.brewer("Johnson", n = 6, direction = -1)) +
+  scale_fill_manual("Region", values = met.brewer("Johnson", n = 6, direction = -1)) +
+  coord_cartesian(ylim = c(-5, 45)) +
+  guides(colour = guide_legend(nrow = 1, byrow = T)) +
+  theme(legend.position = "top", 
+        legend.title = element_blank(),
+        legend.key.height = unit(0.15, "in"), 
+        legend.key.width = unit(0.15, "in"), 
+        panel.border = element_blank(),
+        axis.line = element_line())
+# Save and display plot
+ggsave("plots/Figure_LM_SA_lat.png", lm_SA_lat, 
+       height = 2.25, width = 3.55, dpi = 600, units = "in")
+lm_SA_lat
+```
 
 # Supplementary data
 
