@@ -860,7 +860,6 @@ ggsave("plots/Fig3_pointrange_NASC.png", pointrange_NASC,
 pointrange_NASC
 ```
 
-
 ## Map/table 1. Abundance mesopelagic fish and map
 
 ### Data preparation
@@ -1007,7 +1006,7 @@ trawl_station_df <- trawl %>%
 
 ### Plot
 
-Plot the the heatmap and map together. 
+Plot the the heatmap and map together.
 
 ```{r heatmap-map-trawl}
 # Heatmap
@@ -1183,9 +1182,11 @@ p_map_NASC_LM
 ```{r HGAM-plot}
 # GAM velocity
 GAMSAI_velo <- predSA_I %>%
+  mutate(lty = factor(case_when(IHO %in% c("WAO_BF", "BB", "EAO") ~ 1,
+                                !IHO %in% c("WAO_BF", "BB", "EAO") ~ 2))) %>%
   filter(var == "v") %>%
   ggplot() +
-  geom_line(aes(x = v, y = SA_fit, col = IHO), size = 0.6) +
+  geom_line(aes(x = v, y = SA_fit, col = IHO, linetype = lty), size = 0.6) +
   geom_ribbon(aes(x = v, ymin = SA_lwr_ci, ymax = SA_upr_ci, fill = IHO), 
               alpha = 0.05) +
   scale_colour_manual(values = met.brewer("Johnson", n = 6, direction = -1)) +
@@ -1201,12 +1202,21 @@ GAMSAI_velo <- predSA_I %>%
 
 # GAM chlorophyll
 GAMSAI_chl <- predSA_I %>%
-  mutate(IHO = as.character(IHO),
-         IHO = factor(if_else(IHO == "WAO_BF", "WAO & BF", IHO),
-                      levels = c("WAO & BF", "CAA", "BB", "DS", "EAO"))) %>%
+  mutate(lty = factor(case_when(IHO %in% c("WAO_BF", "EAO") ~ 1,
+                                !IHO %in% c("WAO_BF", "EAO") ~ 2)),
+         IHO = as.character(IHO),
+         IHO = factor(
+           case_when(IHO == "WAO_BF" ~ "West Arctic Ocean\n& Beaufort Sea", 
+                     IHO == "CAA" ~ "Can. Arctic Archipelago", 
+                     IHO == "BB" ~ "Baffin Bay",
+                     IHO == "DS" ~ "Davis Strait", 
+                     IHO == "EAO" ~ "East Arctic Ocean"),
+           levels = c("West Arctic Ocean\n& Beaufort Sea",
+                      "Can. Arctic Archipelago", "Baffin Bay", "Davis Strait",
+                      "East Arctic Ocean"))) %>%
   filter(var == "chl") %>%
   ggplot() +
-  geom_line(aes(x = chl, y = SA_fit, col = IHO), size = 0.6) +
+  geom_line(aes(x = chl, y = SA_fit, col = IHO, linetype = lty), size = 0.6) +
   geom_ribbon(aes(x = chl, ymin = SA_lwr_ci, ymax = SA_upr_ci, fill = IHO),
               alpha = 0.05) +
   scale_colour_manual(values = met.brewer("Johnson", n = 6, direction = -1)) +
@@ -1215,12 +1225,14 @@ GAMSAI_chl <- predSA_I %>%
   scale_x_continuous(breaks = seq(0, 10, 0.5)) +
   labs(x = expression("Mean chlorophyll (mg m"^-3*")"),
        y = expression("S"[A]*" (dB re 1 m"^2*" nmi"^-2*")")) +
+  guides(linetype = "none") +
   theme(panel.border = element_blank(),
         legend.key.height = unit(0.15, "in"), 
         legend.key.width = unit(0.15, "in"), 
         axis.line = element_line(),
         legend.title = element_blank(), 
-        legend.position = "none")
+        legend.position = "none",
+        legend.box.margin = margin(0, 0, , 0))
 
 # Legend for plots
 legend <- get_legend(GAMSAI_chl + 
@@ -1229,14 +1241,13 @@ legend <- get_legend(GAMSAI_chl +
 
 # Combine plots
 HGAM <- plot_grid(legend, 
-                  plot_grid(GAMSAI_velo, GAMSAI_chl, ncol = 2, labels = "auto", label_size = 9),
+                  plot_grid(GAMSAI_chl, GAMSAI_velo, ncol = 2, labels = "auto", label_size = 9),
                   ncol = 1, rel_heights = c(0.2, 1))
 # Save and display plot
 ggsave("plots/Figure_HGAM_SAI3.png", HGAM, 
        height = 2.5, width = 6.5, dpi = 600, units = "in")
 HGAM
 ```
-
 
 # Supplementary data
 
