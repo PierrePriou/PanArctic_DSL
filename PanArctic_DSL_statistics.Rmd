@@ -88,9 +88,10 @@ SA_laea <- SA_grid_laea %>%
   dplyr::select(-lat, -lon) 
 # Remote sensing: physics reanalysis
 phy_laea <- phy_grid_laea %>% 
-  dplyr::select(year, area, xc, yc, cell_res, depth, velocity) %>%
+  dplyr::select(year, area, xc, yc, cell_res, depth, v_mean) %>%
   # Find missing depth values
-  complete(depth, nesting(year, area, xc, yc, cell_res), fill = list(velocity = NA)) %>%
+  complete(depth, nesting(year, area, xc, yc, cell_res), 
+           fill = list(v_mean = NA)) %>%
   arrange(year, area, xc, yc, cell_res, depth) %>%
   mutate(depth = factor(depth))
 
@@ -107,7 +108,7 @@ plot_grid(
     ggplot(aes(x = xc,  y = yc)) +
     geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group),
                  fill = "grey80") +
-    geom_point(aes(col = chl)) +
+    geom_point(aes(col = chl_mean)) +
     scale_colour_cmocean(name = "algae", na.value = "red") + 
     facet_wrap(~ year) +
     coord_fixed(xlim = c(-2450, 600), ylim = c(-1500, 1800), expand = F) +
@@ -115,11 +116,22 @@ plot_grid(
           axis.ticks = element_blank(), 
           axis.title = element_blank()),
   stat_laea %>% 
-    filter(depth == 380) %>%
     ggplot(aes(x = xc,  y = yc)) +
     geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group),
                  fill = "grey80") +
-    geom_point(aes(col = velocity)) +
+    geom_point(aes(col = chl_median)) +
+    scale_colour_cmocean(name = "algae", na.value = "red") + 
+    facet_wrap(~ year) +
+    coord_fixed(xlim = c(-2450, 600), ylim = c(-1500, 1800), expand = F) +
+    theme(axis.text = element_blank(), 
+          axis.ticks = element_blank(), 
+          axis.title = element_blank()),
+  stat_laea %>% 
+    filter(depth == 318) %>%
+    ggplot(aes(x = xc,  y = yc)) +
+    geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group),
+                 fill = "grey80") +
+    geom_point(aes(col = v_mean)) +
     scale_colour_cmocean(name = "speed", na.value = "red") + 
     facet_wrap(~ year) +
     coord_fixed(xlim = c(-2450, 600), ylim = c(-1500, 1800), expand = F) +
@@ -136,35 +148,35 @@ stat_laea <- stat_laea %>%
   rowwise() %>%
   mutate( 
     # Ocean colour
-    xc_v = if_else(is.na(velocity) == T, xc, NaN),
-    yc_v = if_else(is.na(velocity) == T, yc, NaN),
-    year_v = if_else(is.na(velocity) == T, year, NaN), 
-    velocity = if_else(
-      is.na(velocity) == T,
+    xc_v = if_else(is.na(v_mean) == T, xc, NaN),
+    yc_v = if_else(is.na(v_mean) == T, yc, NaN),
+    year_v = if_else(is.na(v_mean) == T, year, NaN), 
+    v = if_else(
+      is.na(v_mean) == T,
       mean(pull(subset(phy_grid_laea, 
                        xc >= xc_v - 1 * cell_res & xc <= xc_v + 1 * cell_res & 
                          yc >= yc_v - 1 * cell_res & yc <= yc_v + 1 * cell_res & 
                          year == year_v,
-                       select = velocity),
-                velocity),
+                       select = v_mean),
+                v_mean),
            na.rm = T),
-      velocity),
+      v_mean),
     # Ocean colour
-    xc_chl = if_else(is.na(chl) == T, xc, NaN),
-    yc_chl = if_else(is.na(chl) == T, yc, NaN),
-    year_chl = if_else(is.na(chl) == T, year, NaN), 
+    xc_chl = if_else(is.na(chl_median) == T, xc, NaN),
+    yc_chl = if_else(is.na(chl_median) == T, yc, NaN),
+    year_chl = if_else(is.na(chl_median) == T, year, NaN), 
     chl = if_else(
-      is.na(chl) == T,
+      is.na(chl_mean) == T,
       mean(pull(subset(chl_grid_laea, 
                        xc >= xc_chl - 1 * cell_res & xc <= xc_chl + 1 * cell_res & 
                          yc >= yc_chl - 1 * cell_res & yc <= yc_chl + 1 * cell_res & 
                          year == year_chl,
-                       select = chl),
-                chl),
+                       select = chl_mean),
+                chl_mean),
            na.rm = T),
-      chl),
+      chl_mean),
     # Convert veloctity to cm/s
-    velocity = velocity * 100, 
+    v = v * 100, 
     IHO_area = factor(case_when(IHO_area == "East Arctic Ocean" ~ "EAO",
                                 IHO_area == "West Arctic Ocean" ~ "WAO_BF",
                                 IHO_area == "Beaufort Sea" ~ "WAO_BF",
@@ -192,12 +204,12 @@ plot_grid(
           axis.ticks = element_blank(), 
           axis.title = element_blank()),
   stat_laea %>%
-    filter(depth == 380) %>%
+    filter(depth == 318) %>%
     ggplot(aes(x = xc,  y = yc)) +
     geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group),
                  fill = "grey80") +
-    geom_point(aes(col = velocity)) +
-    scale_colour_cmocean(name = "speed", na.value = "red", limits = c(0, 6)) + 
+    geom_point(aes(col = v)) +
+    scale_colour_cmocean(name = "speed", na.value = "red", limits = c(0, 5)) + 
     facet_wrap(~ year) +
     coord_fixed(xlim = c(-2450, 600), ylim = c(-1500, 1800), expand = F) +
     theme(axis.text = element_blank(),
@@ -210,7 +222,7 @@ There are still one missing chl values, so this cell is excluded from further an
 
 ```{r exclude-NA-chl}
 stat_laea <- stat_laea %>%
-  filter(is.na(chl) == F & is.na(velocity) == F)
+  filter(is.na(chl) == F & is.na(v) == F)
 ```
 
 ```{r map-chl-NA, fig.width=8, fig.height=6}
@@ -231,7 +243,7 @@ plot_grid(
     ggplot(aes(x = xc,  y = yc)) +
     geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group),
                  fill = "grey80") +
-    geom_point(aes(col = velocity)) +
+    geom_point(aes(col = v)) +
     scale_colour_cmocean(name = "speed", na.value = "red", limits = c(0, 6)) + 
     facet_wrap(~ year) +
     coord_fixed(xlim = c(-2450, 600), ylim = c(-1500, 1800), expand = F) +
@@ -274,10 +286,10 @@ stat_laea %>%
 # Temperature
 chl_grid_laea %>% 
   ggplot(aes(x = xc,  y = yc)) +
-  geom_tile(aes(fill = chl)) +
+  geom_tile(aes(fill = chl_mean)) +
   geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group),
                fill = "grey80") +
-  scale_fill_cmocean("chl (mg m-3)", name = "algae", limits = c(0,5)) +
+  scale_fill_cmocean("chl (mg m-3)", name = "algae", limits = c(0,3)) +
   facet_wrap(~ year, ncol = 3) +
   ggtitle("chlorophyll") +
   coord_fixed(xlim = c(-2600, 1100), ylim = c(-1800, 1900), expand = F) + 
@@ -292,7 +304,7 @@ chl_grid_laea %>%
 phy_grid_laea %>% 
   filter(depth == 318) %>%
   ggplot(aes(x = xc,  y = yc)) +
-  geom_tile(aes(fill = velocity * 100)) +
+  geom_tile(aes(fill = v_mean * 100)) +
   geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group),
                fill = "grey80") +
   scale_fill_cmocean("velo (cm/s)", name = "speed", limits = c(0, 10)) +
@@ -310,7 +322,7 @@ phy_grid_laea %>%
 phy_grid_laea %>% 
   filter(depth == 380) %>%
   ggplot(aes(x = xc,  y = yc)) +
-  geom_tile(aes(fill = velocity * 100)) +
+  geom_tile(aes(fill = v_mean * 100)) +
   geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group),
                fill = "grey80") +
   scale_fill_cmocean("velo (cm/s)", name = "speed", limits = c(0, 10)) +
@@ -327,7 +339,7 @@ phy_grid_laea %>%
 
 ```{r prep-diff}
 SA_diff <- SA_grid_laea %>%
-  dplyr::select(year, IHO_area, NASC_int, SA_int, NASC_int, CM) %>%
+  dplyr::select(year, IHO_area, NASC_int, SA_int, CM) %>%
   mutate(IHO_area = 
            factor(
              case_when(IHO_area == "East Arctic Ocean" ~ "EAO",
@@ -497,12 +509,11 @@ I select data at 318 m depth because it fits well with the DSL diurnal centre of
 ```{r GAM-prep}
 SA_df <- stat_laea %>%
   filter(depth == 318) %>% 
-  dplyr::select(year, xc, yc, IHO_area, NASC_int, SA_int, velocity, chl) %>%
+  dplyr::select(year, xc, yc, IHO_area, NASC_int, SA_int, v, chl) %>%
   group_by(IHO_area) %>%
   mutate(year = factor(year)) %>%
   ungroup() %>%
-  rename(IHO = IHO_area, 
-         v = velocity) 
+  rename(IHO = IHO_area) 
 ```
 
 Plot data.
@@ -511,16 +522,16 @@ Plot data.
 plot_grid(SA_df %>%
             ggplot(aes(x = v, y = NASC_int, col = IHO)) +
             geom_point() +
-            geom_smooth(method = "gam", se = F, col = "grey20") +
+            # geom_smooth(method = "gam", se = F, col = "grey20") +
             facet_wrap(~ IHO, scales = "free") +
             theme(legend.position = "none"),
           SA_df %>%
             ggplot(aes(x = chl, y = NASC_int, col = IHO)) +
             geom_point() +
-            geom_smooth(method = "gam", se = F, col = "grey20") +
+            # geom_smooth(method = "gam", se = F, col = "grey20") +
             facet_wrap(~ IHO, scales = "free") +
             theme(legend.position = "none"),
-          ncol = 1)
+          ncol = 2)
 ```
 
 Check spearman correlations.
@@ -759,7 +770,7 @@ GAM_S_p <- gam(NASC_int ~
 summary(GAM_S_p)
 ```
 
-`s(IHO)` and `s(year,IHO)` can be dropped. Refit model without those terms.
+`s(IHO)` and `s(year)` can be dropped. Refit model without those terms.
 
 ```{r refit-GAMS}
 # Model S
@@ -767,7 +778,7 @@ GAM_S2 <- gam(NASC_int ~
                 # First order effects
                 # s(chl, bs = "tp", k = 5) +
                 # s(v, bs = "tp", k = 5) +
-                s(year, bs = "re") +
+                # s(year, bs = "re") +
                 # s(IHO, bs = "re") +
                 # te(xc, yc, by = year, k = 5) +
                 # Second order random effects
@@ -815,7 +826,7 @@ GAM_S3 <- gam(NASC_int ~
                 # First order effects
                 # s(chl, bs = "tp", k = 5) +
                 # s(v, bs = "tp", k = 5) +
-                s(year, bs = "re") +
+                # s(year, bs = "re") +
                 # s(IHO, bs = "re") +
                 # te(xc, yc, by = year, k = 5) +
                 # Second order random effects
@@ -886,7 +897,7 @@ GAM_I_p <- gam(NASC_int ~
 summary(GAM_I_p)
 ```
 
-`s(year)`, `s(IHO)`, and `s(year,IHO)` can be dropped. Refit model without those terms.
+`s(year)` can be dropped. Refit model without those terms.
 
 ```{r refit-GAMI}
 # Model I
@@ -895,7 +906,7 @@ GAM_I2 <- gam(NASC_int ~
                  # s(chl, bs = "tp", k = 5) +
                  # s(v, bs = "tp", k = 5) +
                  # s(year, bs = "re") +
-                 # s(IHO, bs = "re") +
+                 s(IHO, bs = "re") +
                  # te(xc, yc, by = year, k = 5) +
                  # Second order random effects
                  s(year, IHO, bs = "re") +
@@ -942,7 +953,7 @@ GAM_I3 <- gam(NASC_int ~
                  # s(chl, bs = "tp", k = 5) +
                  # s(v, bs = "tp", k = 5) +
                  # s(year, bs = "re") +
-                 # s(IHO, bs = "re") +
+                 s(IHO, bs = "re") +
                  # te(xc, yc, by = year, k = 5) +
                  # Second order random effects
                  s(year, IHO, bs = "re") +
@@ -1564,7 +1575,7 @@ GAMSA_I_p <- gam(SA_int ~
 summary(GAMSA_I_p)
 ```
 
-`s(IHO)`, and `s(year,IHO)` can be dropped. Refit model without those terms.
+I remove `s(year)` from the model.
 
 ```{r refit-GAMSAI}
 # Model I
@@ -1573,7 +1584,7 @@ GAMSA_I2 <- gam(SA_int ~
                   # s(chl, bs = "tp", k = 5) +
                   # s(v, bs = "tp", k = 5) +
                   # s(year, bs = "re") +
-                  # s(IHO, bs = "re") +
+                  s(IHO, bs = "re") +
                   # te(xc, yc, by = year, k = 5) +
                   # Second order random effects
                   s(year, IHO, bs = "re") +
@@ -1587,15 +1598,15 @@ summary(GAMSA_I2)
 Compare models
 
 ```{r summary-GAMSAI}
-# Summary metrics
-GAMSAI_AIC <- AIC(GAMSA_I, GAMSA_I2) %>% 
+# # Summary metrics
+GAMSAI_AIC <- AIC(GAMSA_I, GAMSA_I2) %>%
   rownames_to_column() %>%
   rename(model = rowname)
 # Metrics data frame
 data.frame(model = c("GAMSA_I", "GAMSA_I2"),
            reml = round(c(GAMSA_I$gcv.ubre,
-                          GAMSA_I2$gcv.ubre), 
-                        2), 
+                          GAMSA_I2$gcv.ubre),
+                        2),
            dev_expl = round(c(
              (1 - (GAMSA_I$deviance / GAMSA_I$null.deviance)) * 100,
              (1 - (GAMSA_I2$deviance / GAMSA_I2$null.deviance)) * 100),
@@ -1609,7 +1620,7 @@ data.frame(model = c("GAMSA_I", "GAMSA_I2"),
          dAIC = round(AIC - min(AIC), 2),
          w_AIC = round(Weights(AIC), 5)) %>%
   dplyr::select(model, df, dev_expl, r2, reml, AIC, dAIC, w_AIC) %>%
-  arrange(AIC) %>% 
+  arrange(AIC) %>%
   datatable(class = "cell-border stribe", rownames = F)
 ```
 
@@ -1621,7 +1632,7 @@ GAMSA_I3 <- gam(SA_int ~
                   # s(chl, bs = "tp", k = 5) +
                   # s(v, bs = "tp", k = 5) +
                   # s(year, bs = "re") +
-                  # s(IHO, bs = "re") +
+                  s(IHO, bs = "re") +
                   # te(xc, yc, by = year, k = 5) +
                   # Second order random effects
                   s(year, IHO, bs = "re") +

@@ -1,7 +1,7 @@
 ---
 title: "PanArctic DSL - Statistics"
 author: "[Pierre Priou](mailto:pierre.priou@mi.mun.ca)"
-date: "2022/05/26 at 17:39"
+date: "2022/05/30 at 14:41"
 output: 
   html_document:
     keep_md: yes
@@ -91,9 +91,10 @@ SA_laea <- SA_grid_laea %>%
   dplyr::select(-lat, -lon) 
 # Remote sensing: physics reanalysis
 phy_laea <- phy_grid_laea %>% 
-  dplyr::select(year, area, xc, yc, cell_res, depth, velocity) %>%
+  dplyr::select(year, area, xc, yc, cell_res, depth, v_mean) %>%
   # Find missing depth values
-  complete(depth, nesting(year, area, xc, yc, cell_res), fill = list(velocity = NA)) %>%
+  complete(depth, nesting(year, area, xc, yc, cell_res), 
+           fill = list(v_mean = NA)) %>%
   arrange(year, area, xc, yc, cell_res, depth) %>%
   mutate(depth = factor(depth))
 
@@ -111,7 +112,7 @@ plot_grid(
     ggplot(aes(x = xc,  y = yc)) +
     geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group),
                  fill = "grey80") +
-    geom_point(aes(col = chl)) +
+    geom_point(aes(col = chl_mean)) +
     scale_colour_cmocean(name = "algae", na.value = "red") + 
     facet_wrap(~ year) +
     coord_fixed(xlim = c(-2450, 600), ylim = c(-1500, 1800), expand = F) +
@@ -119,11 +120,22 @@ plot_grid(
           axis.ticks = element_blank(), 
           axis.title = element_blank()),
   stat_laea %>% 
-    filter(depth == 380) %>%
     ggplot(aes(x = xc,  y = yc)) +
     geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group),
                  fill = "grey80") +
-    geom_point(aes(col = velocity)) +
+    geom_point(aes(col = chl_median)) +
+    scale_colour_cmocean(name = "algae", na.value = "red") + 
+    facet_wrap(~ year) +
+    coord_fixed(xlim = c(-2450, 600), ylim = c(-1500, 1800), expand = F) +
+    theme(axis.text = element_blank(), 
+          axis.ticks = element_blank(), 
+          axis.title = element_blank()),
+  stat_laea %>% 
+    filter(depth == 318) %>%
+    ggplot(aes(x = xc,  y = yc)) +
+    geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group),
+                 fill = "grey80") +
+    geom_point(aes(col = v_mean)) +
     scale_colour_cmocean(name = "speed", na.value = "red") + 
     facet_wrap(~ year) +
     coord_fixed(xlim = c(-2450, 600), ylim = c(-1500, 1800), expand = F) +
@@ -143,35 +155,35 @@ stat_laea <- stat_laea %>%
   rowwise() %>%
   mutate( 
     # Ocean colour
-    xc_v = if_else(is.na(velocity) == T, xc, NaN),
-    yc_v = if_else(is.na(velocity) == T, yc, NaN),
-    year_v = if_else(is.na(velocity) == T, year, NaN), 
-    velocity = if_else(
-      is.na(velocity) == T,
+    xc_v = if_else(is.na(v_mean) == T, xc, NaN),
+    yc_v = if_else(is.na(v_mean) == T, yc, NaN),
+    year_v = if_else(is.na(v_mean) == T, year, NaN), 
+    v = if_else(
+      is.na(v_mean) == T,
       mean(pull(subset(phy_grid_laea, 
                        xc >= xc_v - 1 * cell_res & xc <= xc_v + 1 * cell_res & 
                          yc >= yc_v - 1 * cell_res & yc <= yc_v + 1 * cell_res & 
                          year == year_v,
-                       select = velocity),
-                velocity),
+                       select = v_mean),
+                v_mean),
            na.rm = T),
-      velocity),
+      v_mean),
     # Ocean colour
-    xc_chl = if_else(is.na(chl) == T, xc, NaN),
-    yc_chl = if_else(is.na(chl) == T, yc, NaN),
-    year_chl = if_else(is.na(chl) == T, year, NaN), 
+    xc_chl = if_else(is.na(chl_median) == T, xc, NaN),
+    yc_chl = if_else(is.na(chl_median) == T, yc, NaN),
+    year_chl = if_else(is.na(chl_median) == T, year, NaN), 
     chl = if_else(
-      is.na(chl) == T,
+      is.na(chl_mean) == T,
       mean(pull(subset(chl_grid_laea, 
                        xc >= xc_chl - 1 * cell_res & xc <= xc_chl + 1 * cell_res & 
                          yc >= yc_chl - 1 * cell_res & yc <= yc_chl + 1 * cell_res & 
                          year == year_chl,
-                       select = chl),
-                chl),
+                       select = chl_mean),
+                chl_mean),
            na.rm = T),
-      chl),
+      chl_mean),
     # Convert veloctity to cm/s
-    velocity = velocity * 100, 
+    v = v * 100, 
     IHO_area = factor(case_when(IHO_area == "East Arctic Ocean" ~ "EAO",
                                 IHO_area == "West Arctic Ocean" ~ "WAO_BF",
                                 IHO_area == "Beaufort Sea" ~ "WAO_BF",
@@ -200,12 +212,12 @@ plot_grid(
           axis.ticks = element_blank(), 
           axis.title = element_blank()),
   stat_laea %>%
-    filter(depth == 380) %>%
+    filter(depth == 318) %>%
     ggplot(aes(x = xc,  y = yc)) +
     geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group),
                  fill = "grey80") +
-    geom_point(aes(col = velocity)) +
-    scale_colour_cmocean(name = "speed", na.value = "red", limits = c(0, 6)) + 
+    geom_point(aes(col = v)) +
+    scale_colour_cmocean(name = "speed", na.value = "red", limits = c(0, 5)) + 
     facet_wrap(~ year) +
     coord_fixed(xlim = c(-2450, 600), ylim = c(-1500, 1800), expand = F) +
     theme(axis.text = element_blank(),
@@ -221,7 +233,7 @@ There are still one missing chl values, so this cell is excluded from further an
 
 ```r
 stat_laea <- stat_laea %>%
-  filter(is.na(chl) == F & is.na(velocity) == F)
+  filter(is.na(chl) == F & is.na(v) == F)
 ```
 
 
@@ -243,7 +255,7 @@ plot_grid(
     ggplot(aes(x = xc,  y = yc)) +
     geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group),
                  fill = "grey80") +
-    geom_point(aes(col = velocity)) +
+    geom_point(aes(col = v)) +
     scale_colour_cmocean(name = "speed", na.value = "red", limits = c(0, 6)) + 
     facet_wrap(~ year) +
     coord_fixed(xlim = c(-2450, 600), ylim = c(-1500, 1800), expand = F) +
@@ -270,7 +282,7 @@ stat_laea %>%
 ##   IHO_area     n
 ##   <fct>    <int>
 ## 1 WAO_BF      12
-## 2 CAA         13
+## 2 CAA         14
 ## 3 BB          26
 ## 4 DS           9
 ## 5 EAO         14
@@ -304,10 +316,10 @@ stat_laea %>%
 # Temperature
 chl_grid_laea %>% 
   ggplot(aes(x = xc,  y = yc)) +
-  geom_tile(aes(fill = chl)) +
+  geom_tile(aes(fill = chl_mean)) +
   geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group),
                fill = "grey80") +
-  scale_fill_cmocean("chl (mg m-3)", name = "algae", limits = c(0,5)) +
+  scale_fill_cmocean("chl (mg m-3)", name = "algae", limits = c(0,3)) +
   facet_wrap(~ year, ncol = 3) +
   ggtitle("chlorophyll") +
   coord_fixed(xlim = c(-2600, 1100), ylim = c(-1800, 1900), expand = F) + 
@@ -325,7 +337,7 @@ chl_grid_laea %>%
 phy_grid_laea %>% 
   filter(depth == 318) %>%
   ggplot(aes(x = xc,  y = yc)) +
-  geom_tile(aes(fill = velocity * 100)) +
+  geom_tile(aes(fill = v_mean * 100)) +
   geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group),
                fill = "grey80") +
   scale_fill_cmocean("velo (cm/s)", name = "speed", limits = c(0, 10)) +
@@ -346,7 +358,7 @@ phy_grid_laea %>%
 phy_grid_laea %>% 
   filter(depth == 380) %>%
   ggplot(aes(x = xc,  y = yc)) +
-  geom_tile(aes(fill = velocity * 100)) +
+  geom_tile(aes(fill = v_mean * 100)) +
   geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group),
                fill = "grey80") +
   scale_fill_cmocean("velo (cm/s)", name = "speed", limits = c(0, 10)) +
@@ -366,7 +378,7 @@ phy_grid_laea %>%
 
 ```r
 SA_diff <- SA_grid_laea %>%
-  dplyr::select(year, IHO_area, NASC_int, SA_int, NASC_int, CM) %>%
+  dplyr::select(year, IHO_area, NASC_int, SA_int, CM) %>%
   mutate(IHO_area = 
            factor(
              case_when(IHO_area == "East Arctic Ocean" ~ "EAO",
@@ -609,12 +621,11 @@ I select data at 318 m depth because it fits well with the DSL diurnal centre of
 ```r
 SA_df <- stat_laea %>%
   filter(depth == 318) %>% 
-  dplyr::select(year, xc, yc, IHO_area, NASC_int, SA_int, velocity, chl) %>%
+  dplyr::select(year, xc, yc, IHO_area, NASC_int, SA_int, v, chl) %>%
   group_by(IHO_area) %>%
   mutate(year = factor(year)) %>%
   ungroup() %>%
-  rename(IHO = IHO_area, 
-         v = velocity) 
+  rename(IHO = IHO_area) 
 ```
 
 Plot data.
@@ -624,23 +635,16 @@ Plot data.
 plot_grid(SA_df %>%
             ggplot(aes(x = v, y = NASC_int, col = IHO)) +
             geom_point() +
-            geom_smooth(method = "gam", se = F, col = "grey20") +
+            # geom_smooth(method = "gam", se = F, col = "grey20") +
             facet_wrap(~ IHO, scales = "free") +
             theme(legend.position = "none"),
           SA_df %>%
             ggplot(aes(x = chl, y = NASC_int, col = IHO)) +
             geom_point() +
-            geom_smooth(method = "gam", se = F, col = "grey20") +
+            # geom_smooth(method = "gam", se = F, col = "grey20") +
             facet_wrap(~ IHO, scales = "free") +
             theme(legend.position = "none"),
-          ncol = 1)
-```
-
-```
-## Warning: Computation failed in `stat_smooth()`:
-## x has insufficient unique values to support 10 knots: reduce k.
-## Computation failed in `stat_smooth()`:
-## x has insufficient unique values to support 10 knots: reduce k.
+          ncol = 2)
 ```
 
 ![](PanArctic_DSL_statistics_files/figure-html/plot-data-area-1.png)<!-- -->
@@ -742,8 +746,8 @@ data.frame(model = c("GAM_G", "GAM_S", "GAM_I"),
 ```
 
 ```{=html}
-<div id="htmlwidget-42ceaf506f4a4ae30ca6" style="width:100%;height:auto;" class="datatables html-widget"></div>
-<script type="application/json" data-for="htmlwidget-42ceaf506f4a4ae30ca6">{"x":{"filter":"none","vertical":false,"data":[["GAM_I","GAM_S","GAM_G"],[27.828,28.585,20.883],[86.62,82.25,75.57],[0.36,0.15,0.1],[435.59,450.47,454.63],[862.691,888.703,898.806],[0,26.01,36.12],[1,0,0]],"container":"<table class=\"cell-border stribe\">\n  <thead>\n    <tr>\n      <th>model<\/th>\n      <th>df<\/th>\n      <th>dev_expl<\/th>\n      <th>r2<\/th>\n      <th>reml<\/th>\n      <th>AIC<\/th>\n      <th>dAIC<\/th>\n      <th>w_AIC<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[1,2,3,4,5,6,7]}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
+<div id="htmlwidget-636f2f798240cdca55a0" style="width:100%;height:auto;" class="datatables html-widget"></div>
+<script type="application/json" data-for="htmlwidget-636f2f798240cdca55a0">{"x":{"filter":"none","vertical":false,"data":[["GAM_S","GAM_I","GAM_G"],[31.615,27.353,20.42],[85.49,81.37,76.68],[0.33,0.27,0.13],[454.78,448.44,458.9],[891.273,901.007,906.478],[0,9.73,15.2],[0.99187,0.00763,0.0005]],"container":"<table class=\"cell-border stribe\">\n  <thead>\n    <tr>\n      <th>model<\/th>\n      <th>df<\/th>\n      <th>dev_expl<\/th>\n      <th>r2<\/th>\n      <th>reml<\/th>\n      <th>AIC<\/th>\n      <th>dAIC<\/th>\n      <th>w_AIC<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[1,2,3,4,5,6,7]}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
 ```
 
 Model G summary.
@@ -764,22 +768,22 @@ summary(GAM_G)
 ## 
 ## Parametric coefficients:
 ##             Estimate Std. Error t value Pr(>|t|)    
-## (Intercept)   4.5692     0.6206   7.362 7.65e-10 ***
+## (Intercept)   4.5408     0.6788   6.689 9.14e-09 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
 ## Approximate significance of smooth terms:
-##               edf Ref.df      F p-value   
-## s(v)        2.561  3.054  4.667 0.00529 **
-## s(chl)      2.661  3.170  5.011 0.00335 **
-## s(IHO)      3.040  4.000 20.458 0.01200 * 
-## s(year)     1.161  2.000 12.029 0.05956 . 
-## s(IHO,year) 6.198 14.000  3.105 0.02789 * 
+##               edf Ref.df      F  p-value    
+## s(v)        2.729  3.218  7.314 0.000240 ***
+## s(chl)      2.862  3.336  6.481 0.000530 ***
+## s(IHO)      3.403  4.000 22.293 0.000511 ***
+## s(year)     1.358  2.000  9.789 0.046074 *  
+## s(IHO,year) 4.764 14.000  1.426 0.048061 *  
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
-## R-sq.(adj) =  0.0976   Deviance explained = 75.6%
-## -ML = 454.63  Scale est. = 1.294     n = 74
+## R-sq.(adj) =  0.127   Deviance explained = 76.7%
+## -ML =  458.9  Scale est. = 1.2771    n = 75
 ```
 
 Model S summary.
@@ -801,22 +805,22 @@ summary(GAM_S)
 ## 
 ## Parametric coefficients:
 ##             Estimate Std. Error t value Pr(>|t|)    
-## (Intercept)   4.7222     0.6536   7.225 2.22e-09 ***
+## (Intercept)   5.0505     0.4463   11.31 1.96e-15 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
 ## Approximate significance of smooth terms:
 ##                   edf Ref.df     F  p-value    
-## s(year)     0.8650253      2 2.039 0.214590    
-## s(IHO)      0.0001781      4 0.000 0.001476 ** 
-## s(year,IHO) 4.8599174     14 0.915 0.044463 *  
-## s(chl,IHO)  6.6981943     23 3.998 0.000502 ***
-## s(v,IHO)    8.8150918     24 2.496 4.11e-06 ***
+## s(year)     1.862e-04      2 0.000  0.46077    
+## s(IHO)      5.793e-05      4 0.000  0.03839 *  
+## s(year,IHO) 4.933e+00     14 0.955  0.00552 ** 
+## s(chl,IHO)  1.120e+01     24 4.695  < 2e-16 ***
+## s(v,IHO)    7.561e+00     24 1.846 1.03e-05 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
-## R-sq.(adj) =   0.15   Deviance explained = 82.3%
-## -ML = 450.47  Scale est. = 1.1501    n = 74
+## R-sq.(adj) =  0.326   Deviance explained = 85.5%
+## -ML = 454.78  Scale est. = 0.82125   n = 75
 ```
 
 Model I summary.
@@ -838,30 +842,30 @@ summary(GAM_I)
 ## 
 ## Parametric coefficients:
 ##             Estimate Std. Error t value Pr(>|t|)    
-## (Intercept)   4.4581     0.3281   13.59   <2e-16 ***
+## (Intercept)   5.0453     0.5859   8.611 1.33e-11 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
 ## Approximate significance of smooth terms:
-##                        edf Ref.df      F  p-value    
-## s(year)          0.0001149  2.000  0.000 0.308035    
-## s(IHO)           0.0004805  4.000  0.000 0.385848    
-## s(year,IHO)      9.3964312 14.000  3.609  8.7e-06 ***
-## s(chl):IHOWAO_BF 1.0000020  1.000  7.517 0.008510 ** 
-## s(chl):IHOCAA    1.0000013  1.000  0.056 0.813953    
-## s(chl):IHOBB     1.0000076  1.000  2.294 0.136337    
-## s(chl):IHODS     1.0000025  1.000  0.270 0.605635    
-## s(chl):IHOEAO    1.0000037  1.000 11.384 0.001455 ** 
-## s(v):IHOWAO_BF   1.0000167  1.000  8.873 0.004490 ** 
-## s(v):IHOCAA      1.0000042  1.000  0.097 0.756626    
-## s(v):IHOBB       3.0305884  3.529  7.094 0.000326 ***
-## s(v):IHODS       1.0000016  1.000  0.822 0.369105    
-## s(v):IHOEAO      3.9141677  3.989 16.082  < 2e-16 ***
+##                     edf Ref.df      F  p-value    
+## s(year)          0.5521  2.000  0.826  0.30182    
+## s(IHO)           2.7883  4.000 14.191  0.00030 ***
+## s(year,IHO)      4.9114 14.000  1.014  0.03372 *  
+## s(chl):IHOWAO_BF 1.0000  1.000  5.290  0.02549 *  
+## s(chl):IHOCAA    1.0000  1.000  0.123  0.72762    
+## s(chl):IHOBB     1.0000  1.000  3.554  0.06498 .  
+## s(chl):IHODS     1.0000  1.000  0.000  0.99263    
+## s(chl):IHOEAO    1.0000  1.000 23.691 1.14e-05 ***
+## s(v):IHOWAO_BF   1.0000  1.000  7.314  0.00923 ** 
+## s(v):IHOCAA      1.0000  1.000  0.049  0.82492    
+## s(v):IHOBB       2.5877  3.083  5.366  0.00259 ** 
+## s(v):IHODS       1.0000  1.000  1.195  0.27936    
+## s(v):IHOEAO      2.8479  3.266 12.922 1.81e-06 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
-## R-sq.(adj) =  0.356   Deviance explained = 86.6%
-## -ML = 435.59  Scale est. = 0.92555   n = 74
+## R-sq.(adj) =  0.273   Deviance explained = 81.4%
+## -ML = 448.44  Scale est. = 1.095     n = 75
 ```
 
 ## Model checking
@@ -882,12 +886,12 @@ k.check(GAM_S)
 ```
 
 ```
-##             k'         edf   k-index p-value
-## s(year)      3 0.865025282        NA      NA
-## s(IHO)       5 0.000178073        NA      NA
-## s(year,IHO) 15 4.859917370        NA      NA
-## s(chl,IHO)  25 6.698194300 0.8041713  0.1125
-## s(v,IHO)    25 8.815091815 1.3053354  1.0000
+##             k'          edf   k-index p-value
+## s(year)      3 1.862448e-04        NA      NA
+## s(IHO)       5 5.792909e-05        NA      NA
+## s(year,IHO) 15 4.933321e+00        NA      NA
+## s(chl,IHO)  25 1.120141e+01 0.8800380  0.2825
+## s(v,IHO)    25 7.561252e+00 0.7491447  0.0325
 ```
 
 
@@ -902,20 +906,20 @@ k.check(GAM_I)
 ```
 
 ```
-##                  k'          edf   k-index p-value
-## s(year)           3 0.0001149474        NA      NA
-## s(IHO)            5 0.0004805104        NA      NA
-## s(year,IHO)      15 9.3964312239        NA      NA
-## s(chl):IHOWAO_BF  4 1.0000019877 0.9224096  0.4125
-## s(chl):IHOCAA     4 1.0000013102 0.9224096  0.4250
-## s(chl):IHOBB      4 1.0000075961 0.9224096  0.4950
-## s(chl):IHODS      4 1.0000025093 0.9224096  0.4225
-## s(chl):IHOEAO     4 1.0000036584 0.9224096  0.4325
-## s(v):IHOWAO_BF    4 1.0000166580 1.2091902  0.9950
-## s(v):IHOCAA       4 1.0000041928 1.2091902  0.9850
-## s(v):IHOBB        4 3.0305884357 1.2091902  0.9950
-## s(v):IHODS        4 1.0000016072 1.2091902  0.9950
-## s(v):IHOEAO       4 3.9141677148 1.2091902  0.9825
+##                  k'       edf   k-index p-value
+## s(year)           3 0.5520565        NA      NA
+## s(IHO)            5 2.7882951        NA      NA
+## s(year,IHO)      15 4.9113733        NA      NA
+## s(chl):IHOWAO_BF  4 1.0000002 0.8992914  0.4250
+## s(chl):IHOCAA     4 1.0000076 0.8992914  0.3675
+## s(chl):IHOBB      4 1.0000316 0.8992914  0.3875
+## s(chl):IHODS      4 1.0000113 0.8992914  0.3725
+## s(chl):IHOEAO     4 1.0000015 0.8992914  0.3550
+## s(v):IHOWAO_BF    4 1.0000320 0.7773980  0.0700
+## s(v):IHOCAA       4 1.0000098 0.7773980  0.0925
+## s(v):IHOBB        4 2.5876860 0.7773980  0.0650
+## s(v):IHODS        4 1.0000037 0.7773980  0.0775
+## s(v):IHOEAO       4 2.8479169 0.7773980  0.1000
 ```
 
 ### Resiudals against covariates
@@ -1054,25 +1058,25 @@ summary(GAM_S_p)
 ## 
 ## Parametric coefficients:
 ##             Estimate Std. Error t value Pr(>|t|)    
-## (Intercept)   4.6900     0.7186   6.526 2.87e-08 ***
+## (Intercept)   4.9974     0.4873   10.26 6.79e-14 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
 ## Approximate significance of smooth terms:
 ##                   edf Ref.df     F  p-value    
-## s(year)     0.9896283      2 2.552 0.206464    
-## s(IHO)      0.0001353      4 0.000 0.003238 ** 
-## s(year,IHO) 4.6740326     14 0.874 0.052827 .  
-## s(chl,IHO)  6.8300492     23 4.235 0.000399 ***
-## s(v,IHO)    8.7284108     24 2.457 4.74e-06 ***
+## s(year)     6.798e-04      2 0.000  0.44519    
+## s(IHO)      1.592e-04      4 0.000  0.07363 .  
+## s(year,IHO) 5.021e+00     14 1.007  0.00453 ** 
+## s(chl,IHO)  1.149e+01     24 4.857  < 2e-16 ***
+## s(v,IHO)    7.461e+00     24 1.781 1.63e-05 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
-## R-sq.(adj) =  0.156   Deviance explained = 82.2%
-## -REML = 449.96  Scale est. = 1.1409    n = 74
+## R-sq.(adj) =   0.34   Deviance explained = 85.7%
+## -REML = 454.56  Scale est. = 0.80754   n = 75
 ```
 
-`s(IHO)` and `s(year,IHO)` can be dropped. Refit model without those terms.
+`s(IHO)` and `s(year)` can be dropped. Refit model without those terms.
 
 
 ```r
@@ -1081,7 +1085,7 @@ GAM_S2 <- gam(NASC_int ~
                 # First order effects
                 # s(chl, bs = "tp", k = 5) +
                 # s(v, bs = "tp", k = 5) +
-                s(year, bs = "re") +
+                # s(year, bs = "re") +
                 # s(IHO, bs = "re") +
                 # te(xc, yc, by = year, k = 5) +
                 # Second order random effects
@@ -1099,26 +1103,25 @@ summary(GAM_S2)
 ## Link function: log 
 ## 
 ## Formula:
-## NASC_int ~ s(year, bs = "re") + s(year, IHO, bs = "re") + s(chl, 
-##     IHO, bs = "fs", k = 5) + s(v, IHO, bs = "fs", k = 5)
+## NASC_int ~ s(year, IHO, bs = "re") + s(chl, IHO, bs = "fs", k = 5) + 
+##     s(v, IHO, bs = "fs", k = 5)
 ## 
 ## Parametric coefficients:
 ##             Estimate Std. Error t value Pr(>|t|)    
-## (Intercept)   4.7222     0.6536   7.225 2.22e-09 ***
+## (Intercept)   5.0505     0.4463   11.31 1.96e-15 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
 ## Approximate significance of smooth terms:
-##               edf Ref.df     F  p-value    
-## s(year)     0.865      2 2.039 0.214584    
-## s(year,IHO) 4.860     14 0.915 0.044452 *  
-## s(chl,IHO)  6.699     23 4.000 0.000503 ***
-## s(v,IHO)    8.815     24 2.496 4.12e-06 ***
+##                edf Ref.df     F  p-value    
+## s(year,IHO)  4.933     14 0.955  0.00552 ** 
+## s(chl,IHO)  11.202     24 4.695  < 2e-16 ***
+## s(v,IHO)     7.561     24 1.846 1.03e-05 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
-## R-sq.(adj) =   0.15   Deviance explained = 82.3%
-## -ML = 450.47  Scale est. = 1.1501    n = 74
+## R-sq.(adj) =  0.326   Deviance explained = 85.5%
+## -ML = 454.78  Scale est. = 0.82123   n = 75
 ```
 
 Compare models.
@@ -1152,8 +1155,8 @@ data.frame(model = c("GAM_S", "GAM_S2"),
 ```
 
 ```{=html}
-<div id="htmlwidget-9a225069e15adab0877b" style="width:100%;height:auto;" class="datatables html-widget"></div>
-<script type="application/json" data-for="htmlwidget-9a225069e15adab0877b">{"x":{"filter":"none","vertical":false,"data":[["GAM_S","GAM_S2"],[28.585,28.586],[82.25,82.25],[0.15,0.15],[450.47,450.47],[888.703,888.704],[0,0],[0.50012,0.49988]],"container":"<table class=\"cell-border stribe\">\n  <thead>\n    <tr>\n      <th>model<\/th>\n      <th>df<\/th>\n      <th>dev_expl<\/th>\n      <th>r2<\/th>\n      <th>reml<\/th>\n      <th>AIC<\/th>\n      <th>dAIC<\/th>\n      <th>w_AIC<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[1,2,3,4,5,6,7]}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
+<div id="htmlwidget-de3a3fe47dae5548822d" style="width:100%;height:auto;" class="datatables html-widget"></div>
+<script type="application/json" data-for="htmlwidget-de3a3fe47dae5548822d">{"x":{"filter":"none","vertical":false,"data":[["GAM_S","GAM_S2"],[31.615,31.616],[85.49,85.49],[0.33,0.33],[454.78,454.78],[891.273,891.274],[0,0],[0.50012,0.49988]],"container":"<table class=\"cell-border stribe\">\n  <thead>\n    <tr>\n      <th>model<\/th>\n      <th>df<\/th>\n      <th>dev_expl<\/th>\n      <th>r2<\/th>\n      <th>reml<\/th>\n      <th>AIC<\/th>\n      <th>dAIC<\/th>\n      <th>w_AIC<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[1,2,3,4,5,6,7]}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
 ```
 
 Refit model with REML
@@ -1164,7 +1167,7 @@ GAM_S3 <- gam(NASC_int ~
                 # First order effects
                 # s(chl, bs = "tp", k = 5) +
                 # s(v, bs = "tp", k = 5) +
-                s(year, bs = "re") +
+                # s(year, bs = "re") +
                 # s(IHO, bs = "re") +
                 # te(xc, yc, by = year, k = 5) +
                 # Second order random effects
@@ -1182,26 +1185,25 @@ summary(GAM_S3)
 ## Link function: log 
 ## 
 ## Formula:
-## NASC_int ~ s(year, bs = "re") + s(year, IHO, bs = "re") + s(chl, 
-##     IHO, bs = "fs", k = 5) + s(v, IHO, bs = "fs", k = 5)
+## NASC_int ~ s(year, IHO, bs = "re") + s(chl, IHO, bs = "fs", k = 5) + 
+##     s(v, IHO, bs = "fs", k = 5)
 ## 
 ## Parametric coefficients:
 ##             Estimate Std. Error t value Pr(>|t|)    
-## (Intercept)   4.6900     0.7186   6.527 2.86e-08 ***
+## (Intercept)   4.9976     0.4873   10.26 6.79e-14 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
 ## Approximate significance of smooth terms:
 ##                edf Ref.df     F  p-value    
-## s(year)     0.9896      2 2.552 0.206456    
-## s(year,IHO) 4.6740     14 0.874 0.052812 .  
-## s(chl,IHO)  6.8313     23 4.239 0.000403 ***
-## s(v,IHO)    8.7282     24 2.457 4.74e-06 ***
+## s(year,IHO)  5.022     14 1.007  0.00452 ** 
+## s(chl,IHO)  11.490     24 4.857  < 2e-16 ***
+## s(v,IHO)     7.461     24 1.781 1.63e-05 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
-## R-sq.(adj) =  0.156   Deviance explained = 82.2%
-## -REML = 449.96  Scale est. = 1.1408    n = 74
+## R-sq.(adj) =   0.34   Deviance explained = 85.7%
+## -REML = 454.56  Scale est. = 0.80752   n = 75
 ```
 
 Check residuals.
@@ -1284,33 +1286,33 @@ summary(GAM_I_p)
 ## 
 ## Parametric coefficients:
 ##             Estimate Std. Error t value Pr(>|t|)    
-## (Intercept)   4.4586     0.3155   14.13   <2e-16 ***
+## (Intercept)    4.911      0.585   8.395 2.16e-11 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
 ## Approximate significance of smooth terms:
 ##                        edf Ref.df      F  p-value    
-## s(year)          5.019e-01      2  3.075 0.256074    
-## s(IHO)           1.634e-03      4  0.000 0.479564    
-## s(year,IHO)      1.013e+01     14  4.301 0.001651 ** 
-## s(chl):IHOWAO_BF 1.662e+00      4  8.849 0.001228 ** 
-## s(chl):IHOCAA    5.238e-05      4  0.000 0.899640    
-## s(chl):IHOBB     1.053e+00      4  0.833 0.133095    
-## s(chl):IHODS     8.679e-05      4  0.000 0.550335    
-## s(chl):IHOEAO    9.396e-01      4  7.633 0.000147 ***
-## s(v):IHOWAO_BF   8.746e-01      4  5.331 0.007627 ** 
-## s(v):IHOCAA      5.009e-05      4  0.000 0.836416    
-## s(v):IHOBB       2.320e+00      4 11.346 9.37e-07 ***
-## s(v):IHODS       3.824e-02      4  0.008 0.395027    
-## s(v):IHOEAO      2.937e+00      4 58.673  < 2e-16 ***
+## s(year)          0.0002099      2  0.000  0.42969    
+## s(IHO)           3.5654745      4 19.663  0.00741 ** 
+## s(year,IHO)      5.6284931     14  2.103  0.01617 *  
+## s(chl):IHOWAO_BF 0.8113599      4  3.741  0.02132 *  
+## s(chl):IHOCAA    0.0001485      4  0.000  0.85730    
+## s(chl):IHOBB     1.3681335      4  1.947  0.09123 .  
+## s(chl):IHODS     0.0001356      4  0.000  0.68266    
+## s(chl):IHOEAO    3.0644557      4 88.978  < 2e-16 ***
+## s(v):IHOWAO_BF   0.8606060      4  3.646  0.00668 ** 
+## s(v):IHOCAA      0.0001942      4  0.000  0.94369    
+## s(v):IHOBB       2.2107359      4  8.754 4.98e-06 ***
+## s(v):IHODS       0.3527712      4  0.202  0.18380    
+## s(v):IHOEAO      1.7483209      4  2.759  0.01191 *  
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
-## R-sq.(adj) =  0.497   Deviance explained = 87.4%
-## -REML = 441.88  Scale est. = 0.8146    n = 74
+## R-sq.(adj) =  0.534   Deviance explained = 85.4%
+## -REML = 450.74  Scale est. = 0.74979   n = 75
 ```
 
-`s(year)`, `s(IHO)`, and `s(year,IHO)` can be dropped. Refit model without those terms.
+`s(year)` can be dropped. Refit model without those terms.
 
 
 ```r
@@ -1320,7 +1322,7 @@ GAM_I2 <- gam(NASC_int ~
                  # s(chl, bs = "tp", k = 5) +
                  # s(v, bs = "tp", k = 5) +
                  # s(year, bs = "re") +
-                 # s(IHO, bs = "re") +
+                 s(IHO, bs = "re") +
                  # te(xc, yc, by = year, k = 5) +
                  # Second order random effects
                  s(year, IHO, bs = "re") +
@@ -1337,33 +1339,34 @@ summary(GAM_I2)
 ## Link function: log 
 ## 
 ## Formula:
-## NASC_int ~ s(year, IHO, bs = "re") + s(chl, by = IHO, k = 5, 
-##     bs = "tp") + s(v, by = IHO, k = 5, bs = "tp")
+## NASC_int ~ s(IHO, bs = "re") + s(year, IHO, bs = "re") + s(chl, 
+##     by = IHO, k = 5, bs = "tp") + s(v, by = IHO, k = 5, bs = "tp")
 ## 
 ## Parametric coefficients:
 ##             Estimate Std. Error t value Pr(>|t|)    
-## (Intercept)    4.458      0.328   13.59   <2e-16 ***
+## (Intercept)   5.0451     0.5616   8.984 3.49e-12 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
 ## Approximate significance of smooth terms:
 ##                    edf Ref.df      F  p-value    
-## s(year,IHO)      9.397 14.000  3.609 8.68e-06 ***
-## s(chl):IHOWAO_BF 1.000  1.000  7.517 0.008506 ** 
-## s(chl):IHOCAA    1.000  1.000  0.056 0.813959    
-## s(chl):IHOBB     1.000  1.000  2.293 0.136344    
-## s(chl):IHODS     1.000  1.000  0.270 0.605637    
-## s(chl):IHOEAO    1.000  1.000 11.384 0.001456 ** 
-## s(v):IHOWAO_BF   1.000  1.000  8.874 0.004489 ** 
-## s(v):IHOCAA      1.000  1.000  0.097 0.756643    
-## s(v):IHOBB       3.031  3.529  7.094 0.000326 ***
-## s(v):IHODS       1.000  1.000  0.822 0.369106    
-## s(v):IHOEAO      3.914  3.989 16.083  < 2e-16 ***
+## s(IHO)           2.744  4.000 14.405 0.000357 ***
+## s(year,IHO)      5.486 14.000  1.135 0.009729 ** 
+## s(chl):IHOWAO_BF 1.000  1.000  5.594 0.021788 *  
+## s(chl):IHOCAA    1.000  1.000  0.105 0.747683    
+## s(chl):IHOBB     1.000  1.000  3.291 0.075423 .  
+## s(chl):IHODS     1.000  1.000  0.002 0.960552    
+## s(chl):IHOEAO    1.000  1.000 24.237 9.42e-06 ***
+## s(v):IHOWAO_BF   1.000  1.000  7.951 0.006787 ** 
+## s(v):IHOCAA      1.000  1.000  0.054 0.817469    
+## s(v):IHOBB       2.601  3.097  5.619 0.001951 ** 
+## s(v):IHODS       1.000  1.000  1.161 0.286160    
+## s(v):IHOEAO      2.864  3.282 13.381 1.32e-06 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
-## R-sq.(adj) =  0.356   Deviance explained = 86.6%
-## -ML = 435.59  Scale est. = 0.92555   n = 74
+## R-sq.(adj) =  0.273   Deviance explained = 81.3%
+## -ML = 448.48  Scale est. = 1.072     n = 75
 ```
 Compare models
 
@@ -1396,8 +1399,8 @@ data.frame(model = c("GAM_I", "GAM_I2"),
 ```
 
 ```{=html}
-<div id="htmlwidget-a4e01288135cfa98f1ab" style="width:100%;height:auto;" class="datatables html-widget"></div>
-<script type="application/json" data-for="htmlwidget-a4e01288135cfa98f1ab">{"x":{"filter":"none","vertical":false,"data":[["GAM_I2","GAM_I"],[27.816,27.828],[86.62,86.62],[0.36,0.36],[435.59,435.59],[862.667,862.691],[0,0.02],[0.503,0.497]],"container":"<table class=\"cell-border stribe\">\n  <thead>\n    <tr>\n      <th>model<\/th>\n      <th>df<\/th>\n      <th>dev_expl<\/th>\n      <th>r2<\/th>\n      <th>reml<\/th>\n      <th>AIC<\/th>\n      <th>dAIC<\/th>\n      <th>w_AIC<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[1,2,3,4,5,6,7]}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
+<div id="htmlwidget-05d73f84b759225bf0b1" style="width:100%;height:auto;" class="datatables html-widget"></div>
+<script type="application/json" data-for="htmlwidget-05d73f84b759225bf0b1">{"x":{"filter":"none","vertical":false,"data":[["GAM_I","GAM_I2"],[27.353,27.388],[81.37,81.33],[0.27,0.27],[448.44,448.48],[901.007,901.286],[0,0.28],[0.53482,0.46518]],"container":"<table class=\"cell-border stribe\">\n  <thead>\n    <tr>\n      <th>model<\/th>\n      <th>df<\/th>\n      <th>dev_expl<\/th>\n      <th>r2<\/th>\n      <th>reml<\/th>\n      <th>AIC<\/th>\n      <th>dAIC<\/th>\n      <th>w_AIC<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[1,2,3,4,5,6,7]}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
 ```
 
 Refit model with REML
@@ -1409,7 +1412,7 @@ GAM_I3 <- gam(NASC_int ~
                  # s(chl, bs = "tp", k = 5) +
                  # s(v, bs = "tp", k = 5) +
                  # s(year, bs = "re") +
-                 # s(IHO, bs = "re") +
+                 s(IHO, bs = "re") +
                  # te(xc, yc, by = year, k = 5) +
                  # Second order random effects
                  s(year, IHO, bs = "re") +
@@ -1426,33 +1429,34 @@ summary(GAM_I3)
 ## Link function: log 
 ## 
 ## Formula:
-## NASC_int ~ s(year, IHO, bs = "re") + s(chl, by = IHO, k = 5, 
-##     bs = "tp") + s(v, by = IHO, k = 5, bs = "tp")
+## NASC_int ~ s(IHO, bs = "re") + s(year, IHO, bs = "re") + s(chl, 
+##     by = IHO, k = 5, bs = "tp") + s(v, by = IHO, k = 5, bs = "tp")
 ## 
 ## Parametric coefficients:
 ##             Estimate Std. Error t value Pr(>|t|)    
-## (Intercept)   4.5045     0.3338    13.5   <2e-16 ***
+## (Intercept)   5.0654     0.6204   8.165 1.06e-10 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
 ## Approximate significance of smooth terms:
 ##                    edf Ref.df      F  p-value    
-## s(year,IHO)      9.509 14.000  3.652 7.54e-06 ***
-## s(chl):IHOWAO_BF 2.156  2.531  4.511 0.010797 *  
-## s(chl):IHOCAA    1.000  1.000  0.086 0.770316    
-## s(chl):IHOBB     1.054  1.102  2.454 0.128780    
-## s(chl):IHODS     1.000  1.000  0.223 0.639091    
-## s(chl):IHOEAO    1.000  1.000 12.664 0.000865 ***
-## s(v):IHOWAO_BF   1.000  1.000  7.843 0.007379 ** 
-## s(v):IHOCAA      1.000  1.000  0.082 0.775425    
-## s(v):IHOBB       3.080  3.566  7.643 0.000194 ***
-## s(v):IHODS       1.000  1.000  0.916 0.343494    
-## s(v):IHOEAO      3.906  3.987 17.218  < 2e-16 ***
+## s(IHO)           3.094  4.000 12.533 8.58e-05 ***
+## s(year,IHO)      5.273 14.000  1.304 0.002209 ** 
+## s(chl):IHOWAO_BF 1.704  1.966  3.840 0.042829 *  
+## s(chl):IHOCAA    1.000  1.000  0.135 0.714988    
+## s(chl):IHOBB     1.592  1.938  3.477 0.065530 .  
+## s(chl):IHODS     1.000  1.000  0.032 0.858228    
+## s(chl):IHOEAO    3.180  3.408 20.905  < 2e-16 ***
+## s(v):IHOWAO_BF   1.000  1.000 10.431 0.002215 ** 
+## s(v):IHOCAA      1.000  1.000  0.054 0.816448    
+## s(v):IHOBB       2.762  3.223  6.966 0.000509 ***
+## s(v):IHODS       1.000  1.000  1.520 0.223455    
+## s(v):IHOEAO      2.301  2.660  3.326 0.026850 *  
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
-## R-sq.(adj) =  0.352   Deviance explained = 87.8%
-## -REML = 432.55  Scale est. = 0.84441   n = 74
+## R-sq.(adj) =  0.526   Deviance explained = 86.2%
+## -REML =  438.7  Scale est. = 0.7512    n = 75
 ```
 
 Check residuals.
@@ -1827,8 +1831,8 @@ data.frame(model = c("GAMSA_G", "GAMSA_S", "GAMSA_I"),
 ```
 
 ```{=html}
-<div id="htmlwidget-5e77df0472a57a5b9302" style="width:100%;height:auto;" class="datatables html-widget"></div>
-<script type="application/json" data-for="htmlwidget-5e77df0472a57a5b9302">{"x":{"filter":"none","vertical":false,"data":[["GAMSA_I","GAMSA_S","GAMSA_G"],[27.269,24.496,16.064],[76.72,65.45,49.47],[0.66,0.55,0.41],[234.6,247.86,251.15],[466.752,490.414,501.679],[0,23.66,34.93],[0.99999,1e-05,0]],"container":"<table class=\"cell-border stribe\">\n  <thead>\n    <tr>\n      <th>model<\/th>\n      <th>df<\/th>\n      <th>dev_expl<\/th>\n      <th>r2<\/th>\n      <th>reml<\/th>\n      <th>AIC<\/th>\n      <th>dAIC<\/th>\n      <th>w_AIC<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[1,2,3,4,5,6,7]}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
+<div id="htmlwidget-b3a545726bf05e15f700" style="width:100%;height:auto;" class="datatables html-widget"></div>
+<script type="application/json" data-for="htmlwidget-b3a545726bf05e15f700">{"x":{"filter":"none","vertical":false,"data":[["GAMSA_I","GAMSA_G","GAMSA_S"],[27.435,16.322,23.739],[71.61,53.85,61.92],[0.6,0.46,0.52],[243.5,252.04,251.05],[486.813,501.027,501.453],[0,14.21,14.64],[0.99852,0.00082,0.00066]],"container":"<table class=\"cell-border stribe\">\n  <thead>\n    <tr>\n      <th>model<\/th>\n      <th>df<\/th>\n      <th>dev_expl<\/th>\n      <th>r2<\/th>\n      <th>reml<\/th>\n      <th>AIC<\/th>\n      <th>dAIC<\/th>\n      <th>w_AIC<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[1,2,3,4,5,6,7]}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
 ```
 
 Model G summary.
@@ -1849,22 +1853,22 @@ summary(GAMSA_G)
 ## 
 ## Parametric coefficients:
 ##             Estimate Std. Error t value Pr(>|t|)    
-## (Intercept)   17.375      2.015   8.622  3.2e-12 ***
+## (Intercept)   17.453      1.943   8.984 7.01e-13 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
 ## Approximate significance of smooth terms:
-##               edf Ref.df     F p-value  
-## s(v)        2.122  2.576 1.830  0.1238  
-## s(chl)      2.432  2.922 4.351  0.0157 *
-## s(IHO)      2.706  4.000 3.061  0.0298 *
-## s(year)     1.157  2.000 2.466  0.0816 .
-## s(IHO,year) 2.282 14.000 0.252  0.2693  
+##               edf Ref.df     F  p-value    
+## s(v)        2.175  2.619 3.024 0.071144 .  
+## s(chl)      2.986  3.437 5.844 0.000957 ***
+## s(IHO)      2.709  4.000 3.119 0.019731 *  
+## s(year)     1.200  2.000 2.485 0.074106 .  
+## s(IHO,year) 2.029 14.000 0.213 0.277891    
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
-## R-sq.(adj) =  0.408   Deviance explained = 49.5%
-## -ML = 251.15  Scale est. = 39.626    n = 74
+## R-sq.(adj) =  0.457   Deviance explained = 53.8%
+## -ML = 252.04  Scale est. = 35.987    n = 75
 ```
 
 Model S summary.
@@ -1886,22 +1890,22 @@ summary(GAMSA_S)
 ## 
 ## Parametric coefficients:
 ##             Estimate Std. Error t value Pr(>|t|)    
-## (Intercept)   18.470      2.134   8.655 6.46e-12 ***
+## (Intercept)   19.419      1.564   12.42   <2e-16 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
 ## Approximate significance of smooth terms:
-##                   edf Ref.df     F p-value   
-## s(year)     1.2713710      2 3.862 0.05641 . 
-## s(IHO)      0.0000689      4 0.000 0.02670 * 
-## s(year,IHO) 3.0831882     14 0.418 0.09009 . 
-## s(chl,IHO)  5.4541198     23 1.276 0.00351 **
-## s(v,IHO)    7.1015949     24 1.097 0.00106 **
+##                   edf Ref.df     F  p-value    
+## s(year)     1.0653251      2 1.970 0.083698 .  
+## s(IHO)      0.0001275      4 0.000 0.337403    
+## s(year,IHO) 2.4773644     14 0.275 0.124203    
+## s(chl,IHO)  5.8562273     24 1.063 0.000392 ***
+## s(v,IHO)    6.3236830     24 1.258 0.000224 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
-## R-sq.(adj) =   0.55   Deviance explained = 65.5%
-## -ML = 247.86  Scale est. = 30.096    n = 74
+## R-sq.(adj) =  0.516   Deviance explained = 61.9%
+## -ML = 251.05  Scale est. = 32.053    n = 75
 ```
 
 Model I summary.
@@ -1923,30 +1927,30 @@ summary(GAMSA_I)
 ## 
 ## Parametric coefficients:
 ##             Estimate Std. Error t value Pr(>|t|)    
-## (Intercept)   18.122      1.613   11.23 2.54e-15 ***
+## (Intercept)   19.158      1.763   10.87 5.57e-15 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
 ## Approximate significance of smooth terms:
 ##                        edf Ref.df     F  p-value    
-## s(year)          0.7796398  2.000 3.642  0.16863    
-## s(IHO)           0.0007437  4.000 0.000  0.24128    
-## s(year,IHO)      7.2443237 14.000 2.198  0.00949 ** 
-## s(chl):IHOWAO_BF 1.0000017  1.000 7.546  0.00834 ** 
-## s(chl):IHOCAA    1.0000020  1.000 0.378  0.54146    
-## s(chl):IHOBB     1.0000083  1.000 2.455  0.12348    
-## s(chl):IHODS     1.0000041  1.000 0.322  0.57311    
-## s(chl):IHOEAO    1.0000016  1.000 6.675  0.01275 *  
-## s(v):IHOWAO_BF   1.0000066  1.000 5.191  0.02701 *  
-## s(v):IHOCAA      1.0000056  1.000 0.163  0.68827    
-## s(v):IHOBB       2.7980542  3.319 4.559  0.00605 ** 
-## s(v):IHODS       1.0000020  1.000 0.270  0.60555    
-## s(v):IHOEAO      3.8457898  3.974 9.574 9.36e-06 ***
+## s(year)          7.306e-01  2.000 3.428 0.157866    
+## s(IHO)           4.949e-05  4.000 0.000 0.197844    
+## s(year,IHO)      7.240e+00 14.000 2.026 0.011269 *  
+## s(chl):IHOWAO_BF 1.000e+00  1.000 7.625 0.007937 ** 
+## s(chl):IHOCAA    1.000e+00  1.000 0.472 0.495066    
+## s(chl):IHOBB     1.000e+00  1.000 3.428 0.069767 .  
+## s(chl):IHODS     1.000e+00  1.000 0.031 0.861808    
+## s(chl):IHOEAO    1.000e+00  1.000 8.733 0.004688 ** 
+## s(v):IHOWAO_BF   1.000e+00  1.000 3.636 0.062069 .  
+## s(v):IHOCAA      1.000e+00  1.000 0.012 0.911806    
+## s(v):IHOBB       2.383e+00  2.877 3.275 0.027167 *  
+## s(v):IHODS       1.000e+00  1.000 0.536 0.467464    
+## s(v):IHOEAO      3.703e+00  3.894 6.208 0.000436 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
-## R-sq.(adj) =  0.662   Deviance explained = 76.7%
-## -ML =  234.6  Scale est. = 22.601    n = 74
+## R-sq.(adj) =  0.596   Deviance explained = 71.6%
+## -ML =  243.5  Scale est. = 26.807    n = 75
 ```
 
 ## Model checking
@@ -1968,11 +1972,11 @@ k.check(GAMSA_S)
 
 ```
 ##             k'          edf   k-index p-value
-## s(year)      3 1.271371e+00        NA      NA
-## s(IHO)       5 6.889963e-05        NA      NA
-## s(year,IHO) 15 3.083188e+00        NA      NA
-## s(chl,IHO)  25 5.454120e+00 0.9111277    0.15
-## s(v,IHO)    25 7.101595e+00 1.3201760    1.00
+## s(year)      3 1.0653251124        NA      NA
+## s(IHO)       5 0.0001274537        NA      NA
+## s(year,IHO) 15 2.4773644245        NA      NA
+## s(chl,IHO)  25 5.8562272649 1.0488638  0.6275
+## s(v,IHO)    25 6.3236830476 0.8341003  0.0675
 ```
 
 
@@ -1987,20 +1991,20 @@ k.check(GAMSA_I)
 ```
 
 ```
-##                  k'          edf  k-index p-value
-## s(year)           3 0.7796397826       NA      NA
-## s(IHO)            5 0.0007437184       NA      NA
-## s(year,IHO)      15 7.2443236549       NA      NA
-## s(chl):IHOWAO_BF  4 1.0000016671 1.017476  0.5675
-## s(chl):IHOCAA     4 1.0000019724 1.017476  0.5150
-## s(chl):IHOBB      4 1.0000082991 1.017476  0.4875
-## s(chl):IHODS      4 1.0000040730 1.017476  0.5000
-## s(chl):IHOEAO     4 1.0000015648 1.017476  0.5125
-## s(v):IHOWAO_BF    4 1.0000065535 1.288842  0.9900
-## s(v):IHOCAA       4 1.0000056198 1.288842  0.9875
-## s(v):IHOBB        4 2.7980542052 1.288842  0.9900
-## s(v):IHODS        4 1.0000019761 1.288842  0.9850
-## s(v):IHOEAO       4 3.8457897781 1.288842  0.9975
+##                  k'          edf   k-index p-value
+## s(year)           3 7.305644e-01        NA      NA
+## s(IHO)            5 4.949212e-05        NA      NA
+## s(year,IHO)      15 7.239932e+00        NA      NA
+## s(chl):IHOWAO_BF  4 1.000001e+00 0.9771774  0.3875
+## s(chl):IHOCAA     4 1.000002e+00 0.9771774  0.3550
+## s(chl):IHOBB      4 1.000002e+00 0.9771774  0.4125
+## s(chl):IHODS      4 1.000002e+00 0.9771774  0.3725
+## s(chl):IHOEAO     4 1.000000e+00 0.9771774  0.3800
+## s(v):IHOWAO_BF    4 1.000005e+00 0.8523421  0.0725
+## s(v):IHOCAA       4 1.000002e+00 0.8523421  0.0900
+## s(v):IHOBB        4 2.382724e+00 0.8523421  0.0825
+## s(v):IHODS        4 1.000001e+00 0.8523421  0.0825
+## s(v):IHOEAO       4 3.702662e+00 0.8523421  0.0775
 ```
 
 ### Resiudals against covariates
@@ -2139,22 +2143,22 @@ summary(GAMSA_S_p)
 ## 
 ## Parametric coefficients:
 ##             Estimate Std. Error t value Pr(>|t|)    
-## (Intercept)   18.410      2.379   7.738 2.09e-10 ***
+## (Intercept)   19.389      1.772   10.95 9.32e-16 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
 ## Approximate significance of smooth terms:
-##                   edf Ref.df     F p-value   
-## s(year)     1.4248613      2 4.564 0.05379 . 
-## s(IHO)      0.0001855      4 0.000 0.03282 * 
-## s(year,IHO) 2.9022111     14 0.384 0.10571   
-## s(chl,IHO)  5.6652294     23 1.352 0.00378 **
-## s(v,IHO)    7.0078790     24 1.065 0.00134 **
+##                  edf Ref.df     F  p-value    
+## s(year)     1.348089      2 2.882 0.071413 .  
+## s(IHO)      0.000171      4 0.000 0.309684    
+## s(year,IHO) 2.381668     14 0.258 0.142743    
+## s(chl,IHO)  5.671724     24 1.021 0.000484 ***
+## s(v,IHO)    6.362679     24 1.293 0.000208 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
-## R-sq.(adj) =  0.551   Deviance explained = 65.6%
-## -REML = 246.13  Scale est. = 30.039    n = 74
+## R-sq.(adj) =  0.516   Deviance explained = 61.9%
+## -REML = 249.63  Scale est. = 32.096    n = 75
 ```
 
 `s(IHO)` and `s(year,IHO)` can be dropped. Refit the model without those terms.
@@ -2189,21 +2193,21 @@ summary(GAMSA_S2)
 ## 
 ## Parametric coefficients:
 ##             Estimate Std. Error t value Pr(>|t|)    
-## (Intercept)   18.470      2.134   8.655 6.47e-12 ***
+## (Intercept)   19.419      1.564   12.42   <2e-16 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
 ## Approximate significance of smooth terms:
-##               edf Ref.df     F p-value   
-## s(year)     1.271      2 3.862 0.05641 . 
-## s(year,IHO) 3.083     14 0.418 0.09009 . 
-## s(chl,IHO)  5.454     23 1.276 0.00349 **
-## s(v,IHO)    7.102     24 1.097 0.00106 **
+##               edf Ref.df     F  p-value    
+## s(year)     1.065      2 1.970 0.083698 .  
+## s(year,IHO) 2.477     14 0.275 0.124201    
+## s(chl,IHO)  5.856     24 1.063 0.000392 ***
+## s(v,IHO)    6.324     24 1.258 0.000224 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
-## R-sq.(adj) =   0.55   Deviance explained = 65.5%
-## -ML = 247.86  Scale est. = 30.096    n = 74
+## R-sq.(adj) =  0.516   Deviance explained = 61.9%
+## -ML = 251.05  Scale est. = 32.053    n = 75
 ```
 
 Compare models.
@@ -2237,8 +2241,8 @@ data.frame(model = c("GAMSA_S", "GAMSA_S2"),
 ```
 
 ```{=html}
-<div id="htmlwidget-8bf9df23e16f9ca1d46e" style="width:100%;height:auto;" class="datatables html-widget"></div>
-<script type="application/json" data-for="htmlwidget-8bf9df23e16f9ca1d46e">{"x":{"filter":"none","vertical":false,"data":[["GAMSA_S","GAMSA_S2"],[24.496,24.496],[65.45,65.45],[0.55,0.55],[247.86,247.86],[490.414,490.414],[0,0],[0.5,0.5]],"container":"<table class=\"cell-border stribe\">\n  <thead>\n    <tr>\n      <th>model<\/th>\n      <th>df<\/th>\n      <th>dev_expl<\/th>\n      <th>r2<\/th>\n      <th>reml<\/th>\n      <th>AIC<\/th>\n      <th>dAIC<\/th>\n      <th>w_AIC<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[1,2,3,4,5,6,7]}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
+<div id="htmlwidget-7aa489ac00d1006a05af" style="width:100%;height:auto;" class="datatables html-widget"></div>
+<script type="application/json" data-for="htmlwidget-7aa489ac00d1006a05af">{"x":{"filter":"none","vertical":false,"data":[["GAMSA_S","GAMSA_S2"],[23.739,23.739],[61.92,61.92],[0.52,0.52],[251.05,251.05],[501.453,501.453],[0,0],[0.5,0.5]],"container":"<table class=\"cell-border stribe\">\n  <thead>\n    <tr>\n      <th>model<\/th>\n      <th>df<\/th>\n      <th>dev_expl<\/th>\n      <th>r2<\/th>\n      <th>reml<\/th>\n      <th>AIC<\/th>\n      <th>dAIC<\/th>\n      <th>w_AIC<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[1,2,3,4,5,6,7]}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
 ```
 
 Refit model with REML
@@ -2272,21 +2276,21 @@ summary(GAMSA_S3)
 ## 
 ## Parametric coefficients:
 ##             Estimate Std. Error t value Pr(>|t|)    
-## (Intercept)   18.410      2.379   7.738 2.09e-10 ***
+## (Intercept)   19.389      1.772   10.95 9.32e-16 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
 ## Approximate significance of smooth terms:
-##               edf Ref.df     F p-value   
-## s(year)     1.425      2 4.564 0.05379 . 
-## s(year,IHO) 2.902     14 0.384 0.10571   
-## s(chl,IHO)  5.665     23 1.352 0.00378 **
-## s(v,IHO)    7.008     24 1.065 0.00134 **
+##               edf Ref.df     F  p-value    
+## s(year)     1.348      2 2.882 0.071412 .  
+## s(year,IHO) 2.382     14 0.258 0.142735    
+## s(chl,IHO)  5.672     24 1.021 0.000484 ***
+## s(v,IHO)    6.363     24 1.293 0.000208 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
-## R-sq.(adj) =  0.551   Deviance explained = 65.6%
-## -REML = 246.13  Scale est. = 30.039    n = 74
+## R-sq.(adj) =  0.516   Deviance explained = 61.9%
+## -REML = 249.63  Scale est. = 32.096    n = 75
 ```
 
 Check residuals.
@@ -2369,33 +2373,33 @@ summary(GAMSA_I_p)
 ## 
 ## Parametric coefficients:
 ##             Estimate Std. Error t value Pr(>|t|)    
-## (Intercept)   18.211      1.699   10.72 4.45e-15 ***
+## (Intercept)   18.836      2.098   8.979 1.19e-12 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
 ## Approximate significance of smooth terms:
-##                        edf Ref.df      F  p-value    
-## s(year)          1.206e+00      2  9.506  0.11275    
-## s(IHO)           8.076e-01      4  0.382  0.52040    
-## s(year,IHO)      7.065e+00     14  1.998  0.04804 *  
-## s(chl):IHOWAO_BF 1.469e+00      4  5.004  0.00277 ** 
-## s(chl):IHOCAA    7.828e-06      4  0.000  0.63994    
-## s(chl):IHOBB     7.056e-01      4  1.011  0.06722 .  
-## s(chl):IHODS     1.899e-05      4  0.000  0.60024    
-## s(chl):IHOEAO    9.085e-01      4  4.123  0.00164 ** 
-## s(v):IHOWAO_BF   8.032e-01      4  2.449  0.02701 *  
-## s(v):IHOCAA      7.124e-06      4  0.000  0.93272    
-## s(v):IHOBB       2.187e+00      4  7.320 3.68e-05 ***
-## s(v):IHODS       1.131e-05      4  0.000  0.55418    
-## s(v):IHOEAO      2.875e+00      4 22.008  < 2e-16 ***
+##                        edf Ref.df     F p-value   
+## s(year)          1.380e+00      2 4.754 0.07834 . 
+## s(IHO)           2.641e+00      4 2.718 0.11265   
+## s(year,IHO)      3.331e+00     14 0.514 0.17467   
+## s(chl):IHOWAO_BF 8.165e-01      4 2.644 0.02226 * 
+## s(chl):IHOCAA    1.744e-05      4 0.000 0.66686   
+## s(chl):IHOBB     7.795e-01      4 1.921 0.03363 * 
+## s(chl):IHODS     1.700e-05      4 0.000 0.93978   
+## s(chl):IHOEAO    1.335e+00      4 4.194 0.00238 **
+## s(v):IHOWAO_BF   6.348e-01      4 0.679 0.10202   
+## s(v):IHOCAA      1.466e-05      4 0.000 0.99890   
+## s(v):IHOBB       1.900e+00      4 3.106 0.00406 **
+## s(v):IHODS       3.237e-05      4 0.000 0.47637   
+## s(v):IHOEAO      1.898e+00      4 3.607 0.00264 **
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
-## R-sq.(adj) =  0.694   Deviance explained =   77%
-## -REML = 239.63  Scale est. = 20.476    n = 74
+## R-sq.(adj) =  0.552   Deviance explained = 64.1%
+## -REML = 247.96  Scale est. = 29.717    n = 75
 ```
 
-`s(IHO)`, and `s(year,IHO)` can be dropped. Refit model without those terms.
+I remove `s(year)` from the model.
 
 
 ```r
@@ -2405,7 +2409,7 @@ GAMSA_I2 <- gam(SA_int ~
                   # s(chl, bs = "tp", k = 5) +
                   # s(v, bs = "tp", k = 5) +
                   # s(year, bs = "re") +
-                  # s(IHO, bs = "re") +
+                  s(IHO, bs = "re") +
                   # te(xc, yc, by = year, k = 5) +
                   # Second order random effects
                   s(year, IHO, bs = "re") +
@@ -2422,48 +2426,49 @@ summary(GAMSA_I2)
 ## Link function: identity 
 ## 
 ## Formula:
-## SA_int ~ s(year, IHO, bs = "re") + s(chl, by = IHO, k = 5, bs = "tp") + 
-##     s(v, by = IHO, k = 5, bs = "tp")
+## SA_int ~ s(IHO, bs = "re") + s(year, IHO, bs = "re") + s(chl, 
+##     by = IHO, k = 5, bs = "tp") + s(v, by = IHO, k = 5, bs = "tp")
 ## 
 ## Parametric coefficients:
 ##             Estimate Std. Error t value Pr(>|t|)    
-## (Intercept)   18.065      1.417   12.75   <2e-16 ***
+## (Intercept)   19.056      1.577   12.08   <2e-16 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
 ## Approximate significance of smooth terms:
-##                    edf Ref.df     F  p-value    
-## s(year,IHO)      8.282 14.000 2.436 0.000168 ***
-## s(chl):IHOWAO_BF 1.000  1.000 7.481 0.008603 ** 
-## s(chl):IHOCAA    1.000  1.000 0.326 0.570656    
-## s(chl):IHOBB     1.000  1.000 2.221 0.142447    
-## s(chl):IHODS     1.000  1.000 0.454 0.503592    
-## s(chl):IHOEAO    1.000  1.000 6.760 0.012227 *  
-## s(v):IHOWAO_BF   1.000  1.000 5.259 0.026077 *  
-## s(v):IHOCAA      1.000  1.000 0.150 0.700128    
-## s(v):IHOBB       2.828  3.348 4.674 0.005230 ** 
-## s(v):IHODS       1.000  1.000 0.204 0.653806    
-## s(v):IHOEAO      3.844  3.973 9.509 1.01e-05 ***
+##                        edf Ref.df     F  p-value    
+## s(IHO)           1.417e-05  4.000 0.000 0.259204    
+## s(year,IHO)      8.324e+00 14.000 2.285 0.000286 ***
+## s(chl):IHOWAO_BF 1.000e+00  1.000 7.281 0.009374 ** 
+## s(chl):IHOCAA    1.000e+00  1.000 0.412 0.523607    
+## s(chl):IHOBB     1.000e+00  1.000 3.128 0.082821 .  
+## s(chl):IHODS     1.000e+00  1.000 0.093 0.761421    
+## s(chl):IHOEAO    1.000e+00  1.000 8.947 0.004241 ** 
+## s(v):IHOWAO_BF   1.000e+00  1.000 3.558 0.064857 .  
+## s(v):IHOCAA      1.000e+00  1.000 0.013 0.909243    
+## s(v):IHOBB       2.412e+00  2.908 3.424 0.022698 *  
+## s(v):IHODS       1.000e+00  1.000 0.478 0.492481    
+## s(v):IHOEAO      3.719e+00  3.900 6.349 0.000358 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
-## R-sq.(adj) =  0.662   Deviance explained = 76.8%
-## -ML = 234.75  Scale est. = 22.61     n = 74
+## R-sq.(adj) =  0.599   Deviance explained = 72.1%
+## -ML = 243.63  Scale est. = 26.561    n = 75
 ```
 
 Compare models
 
 
 ```r
-# Summary metrics
-GAMSAI_AIC <- AIC(GAMSA_I, GAMSA_I2) %>% 
+# # Summary metrics
+GAMSAI_AIC <- AIC(GAMSA_I, GAMSA_I2) %>%
   rownames_to_column() %>%
   rename(model = rowname)
 # Metrics data frame
 data.frame(model = c("GAMSA_I", "GAMSA_I2"),
            reml = round(c(GAMSA_I$gcv.ubre,
-                          GAMSA_I2$gcv.ubre), 
-                        2), 
+                          GAMSA_I2$gcv.ubre),
+                        2),
            dev_expl = round(c(
              (1 - (GAMSA_I$deviance / GAMSA_I$null.deviance)) * 100,
              (1 - (GAMSA_I2$deviance / GAMSA_I2$null.deviance)) * 100),
@@ -2477,13 +2482,13 @@ data.frame(model = c("GAMSA_I", "GAMSA_I2"),
          dAIC = round(AIC - min(AIC), 2),
          w_AIC = round(Weights(AIC), 5)) %>%
   dplyr::select(model, df, dev_expl, r2, reml, AIC, dAIC, w_AIC) %>%
-  arrange(AIC) %>% 
+  arrange(AIC) %>%
   datatable(class = "cell-border stribe", rownames = F)
 ```
 
 ```{=html}
-<div id="htmlwidget-75e59650e01462edf656" style="width:100%;height:auto;" class="datatables html-widget"></div>
-<script type="application/json" data-for="htmlwidget-75e59650e01462edf656">{"x":{"filter":"none","vertical":false,"data":[["GAMSA_I2","GAMSA_I"],[26.457,27.269],[76.84,76.72],[0.66,0.66],[234.75,234.6],[464.735,466.752],[0,2.02],[0.73273,0.26727]],"container":"<table class=\"cell-border stribe\">\n  <thead>\n    <tr>\n      <th>model<\/th>\n      <th>df<\/th>\n      <th>dev_expl<\/th>\n      <th>r2<\/th>\n      <th>reml<\/th>\n      <th>AIC<\/th>\n      <th>dAIC<\/th>\n      <th>w_AIC<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[1,2,3,4,5,6,7]}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
+<div id="htmlwidget-55f2587958d988967792" style="width:100%;height:auto;" class="datatables html-widget"></div>
+<script type="application/json" data-for="htmlwidget-55f2587958d988967792">{"x":{"filter":"none","vertical":false,"data":[["GAMSA_I2","GAMSA_I"],[26.87,27.435],[72.09,71.61],[0.6,0.6],[243.63,243.5],[484.412,486.813],[0,2.4],[0.76861,0.23139]],"container":"<table class=\"cell-border stribe\">\n  <thead>\n    <tr>\n      <th>model<\/th>\n      <th>df<\/th>\n      <th>dev_expl<\/th>\n      <th>r2<\/th>\n      <th>reml<\/th>\n      <th>AIC<\/th>\n      <th>dAIC<\/th>\n      <th>w_AIC<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[1,2,3,4,5,6,7]}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
 ```
 
 Refit model with REML
@@ -2495,7 +2500,7 @@ GAMSA_I3 <- gam(SA_int ~
                   # s(chl, bs = "tp", k = 5) +
                   # s(v, bs = "tp", k = 5) +
                   # s(year, bs = "re") +
-                  # s(IHO, bs = "re") +
+                  s(IHO, bs = "re") +
                   # te(xc, yc, by = year, k = 5) +
                   # Second order random effects
                   s(year, IHO, bs = "re") +
@@ -2512,33 +2517,34 @@ summary(GAMSA_I3)
 ## Link function: identity 
 ## 
 ## Formula:
-## SA_int ~ s(year, IHO, bs = "re") + s(chl, by = IHO, k = 5, bs = "tp") + 
-##     s(v, by = IHO, k = 5, bs = "tp")
+## SA_int ~ s(IHO, bs = "re") + s(year, IHO, bs = "re") + s(chl, 
+##     by = IHO, k = 5, bs = "tp") + s(v, by = IHO, k = 5, bs = "tp")
 ## 
 ## Parametric coefficients:
 ##             Estimate Std. Error t value Pr(>|t|)    
-## (Intercept)   18.635      1.393   13.38   <2e-16 ***
+## (Intercept)   20.358      2.168   9.388 1.54e-12 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
 ## Approximate significance of smooth terms:
 ##                    edf Ref.df     F  p-value    
-## s(year,IHO)      7.808 14.000 2.013 0.000553 ***
-## s(chl):IHOWAO_BF 2.146  2.524 4.626 0.009831 ** 
-## s(chl):IHOCAA    1.000  1.000 0.377 0.542096    
-## s(chl):IHOBB     1.000  1.000 2.413 0.126793    
-## s(chl):IHODS     1.000  1.000 0.268 0.607005    
-## s(chl):IHOEAO    1.000  1.000 7.474 0.008687 ** 
-## s(v):IHOWAO_BF   1.000  1.000 6.448 0.014328 *  
-## s(v):IHOCAA      1.000  1.000 0.073 0.788337    
-## s(v):IHOBB       2.852  3.369 4.742 0.004876 ** 
-## s(v):IHODS       1.000  1.000 0.235 0.629840    
-## s(v):IHOEAO      3.820  3.967 9.637 9.78e-06 ***
+## s(IHO)           1.883  4.000 2.290 0.058709 .  
+## s(year,IHO)      5.946 14.000 1.245 0.007802 ** 
+## s(chl):IHOWAO_BF 1.915  2.193 4.190 0.020166 *  
+## s(chl):IHOCAA    1.000  1.000 0.469 0.496795    
+## s(chl):IHOBB     1.000  1.001 3.688 0.060636 .  
+## s(chl):IHODS     1.000  1.000 0.005 0.946767    
+## s(chl):IHOEAO    2.884  3.122 6.572 0.000681 ***
+## s(v):IHOWAO_BF   1.000  1.000 4.453 0.039977 *  
+## s(v):IHOCAA      1.000  1.000 0.004 0.951627    
+## s(v):IHOBB       2.581  3.077 3.919 0.013577 *  
+## s(v):IHODS       1.000  1.000 0.635 0.429303    
+## s(v):IHOEAO      3.692  3.889 5.533 0.001476 ** 
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
-## R-sq.(adj) =  0.673   Deviance explained = 77.9%
-## -REML = 215.43  Scale est. = 21.892    n = 74
+## R-sq.(adj) =  0.659   Deviance explained = 77.4%
+## -REML = 220.87  Scale est. = 22.575    n = 75
 ```
 
 Check residuals.
@@ -2674,7 +2680,7 @@ predSA_I <- predict(GAMSA_I3, SA_new, type = "link", se.fit = TRUE) %>% # Predic
 
 ```r
 # Save data
-save(predSA_S, predSA_I, GAMSA_S3, GAMSA_I3, file = "data/statistics/GAMSA_results.RData")
+save(predSA_S, predSA_I, GAMSA_S3, GAMSA_I3, SA_df, file = "data/statistics/GAMSA_results.RData")
 ```
 
 ## Model visualization
