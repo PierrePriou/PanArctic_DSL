@@ -1,11 +1,14 @@
 ---
 title: "PanArctic DSL - Statistics"
 author: "[Pierre Priou](mailto:pierre.priou@mi.mun.ca)"
-date: "2022/05/30 at 14:41"
+date: "2022/05/30 at 17:31"
 output: 
   html_document:
-    keep_md: yes
     code_folding: hide
+    keep_md: yes
+    toc: true
+    toc_float: true
+    toc_collapsed: true
   github_document:
     always_allow_html: true
 ---
@@ -373,7 +376,7 @@ phy_grid_laea %>%
 
 ![](PanArctic_DSL_statistics_files/figure-html/map-velocity380-1.png)<!-- -->
 
-# Spatial and interannual variability {.tabset .tabset-pills}
+# Spatial and interannual variability
 
 
 ```r
@@ -467,7 +470,7 @@ SA_diff %>% # Kruskal wallis interannual difference SA within group
 
 There were some interannual differences in SA within some region (WAO_BF - H = 6.4670868, *p* = 0.0394; CAA - H = 11.8260406, *p* = 0.0027; BB - H = 5.0981791, *p* = 0.0782; DS - H = 0.3282051, *p* = 0.8490; EAO - H = 4.9779498, *p* = 0.0830).
 
-# LM - Latitude - S\~A\~ int {.tabset .tabset-pills}
+# LM - Latitude - S\~A\~ int
 
 A number of studies show decreasing mesopelagic backscatter with increasing latitude. To test this hypothesis, I use a linear regression. Because there are some high mesopelagic backscatter values in the East Arctic Ocean I transformed the nautical area scattering coefficient into nautical area scattering strength in dB.
 
@@ -611,7 +614,7 @@ save(LM_area_coefs, LM_area_fit, LM_area_res,
      file = "data/statistics/LM_results.RData")
 ```
 
-# HGAM - Gamma NASC {.tabset .tabset-pills}
+# HGAM - Gamma NASC
 
 ## Data preparation
 
@@ -746,8 +749,8 @@ data.frame(model = c("GAM_G", "GAM_S", "GAM_I"),
 ```
 
 ```{=html}
-<div id="htmlwidget-636f2f798240cdca55a0" style="width:100%;height:auto;" class="datatables html-widget"></div>
-<script type="application/json" data-for="htmlwidget-636f2f798240cdca55a0">{"x":{"filter":"none","vertical":false,"data":[["GAM_S","GAM_I","GAM_G"],[31.615,27.353,20.42],[85.49,81.37,76.68],[0.33,0.27,0.13],[454.78,448.44,458.9],[891.273,901.007,906.478],[0,9.73,15.2],[0.99187,0.00763,0.0005]],"container":"<table class=\"cell-border stribe\">\n  <thead>\n    <tr>\n      <th>model<\/th>\n      <th>df<\/th>\n      <th>dev_expl<\/th>\n      <th>r2<\/th>\n      <th>reml<\/th>\n      <th>AIC<\/th>\n      <th>dAIC<\/th>\n      <th>w_AIC<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[1,2,3,4,5,6,7]}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
+<div id="htmlwidget-104693b95379fec89712" style="width:100%;height:auto;" class="datatables html-widget"></div>
+<script type="application/json" data-for="htmlwidget-104693b95379fec89712">{"x":{"filter":"none","vertical":false,"data":[["GAM_S","GAM_I","GAM_G"],[31.615,27.353,20.42],[85.49,81.37,76.68],[0.33,0.27,0.13],[454.78,448.44,458.9],[891.273,901.007,906.478],[0,9.73,15.2],[0.99187,0.00763,0.0005]],"container":"<table class=\"cell-border stribe\">\n  <thead>\n    <tr>\n      <th>model<\/th>\n      <th>df<\/th>\n      <th>dev_expl<\/th>\n      <th>r2<\/th>\n      <th>reml<\/th>\n      <th>AIC<\/th>\n      <th>dAIC<\/th>\n      <th>w_AIC<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[1,2,3,4,5,6,7]}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
 ```
 
 Model G summary.
@@ -890,8 +893,8 @@ k.check(GAM_S)
 ## s(year)      3 1.862448e-04        NA      NA
 ## s(IHO)       5 5.792909e-05        NA      NA
 ## s(year,IHO) 15 4.933321e+00        NA      NA
-## s(chl,IHO)  25 1.120141e+01 0.8800380  0.2825
-## s(v,IHO)    25 7.561252e+00 0.7491447  0.0325
+## s(chl,IHO)  25 1.120141e+01 0.8800380  0.3425
+## s(v,IHO)    25 7.561252e+00 0.7491447  0.0350
 ```
 
 
@@ -910,16 +913,16 @@ k.check(GAM_I)
 ## s(year)           3 0.5520565        NA      NA
 ## s(IHO)            5 2.7882951        NA      NA
 ## s(year,IHO)      15 4.9113733        NA      NA
-## s(chl):IHOWAO_BF  4 1.0000002 0.8992914  0.4250
-## s(chl):IHOCAA     4 1.0000076 0.8992914  0.3675
-## s(chl):IHOBB      4 1.0000316 0.8992914  0.3875
-## s(chl):IHODS      4 1.0000113 0.8992914  0.3725
-## s(chl):IHOEAO     4 1.0000015 0.8992914  0.3550
-## s(v):IHOWAO_BF    4 1.0000320 0.7773980  0.0700
-## s(v):IHOCAA       4 1.0000098 0.7773980  0.0925
-## s(v):IHOBB        4 2.5876860 0.7773980  0.0650
-## s(v):IHODS        4 1.0000037 0.7773980  0.0775
-## s(v):IHOEAO       4 2.8479169 0.7773980  0.1000
+## s(chl):IHOWAO_BF  4 1.0000002 0.8992914  0.4300
+## s(chl):IHOCAA     4 1.0000076 0.8992914  0.4125
+## s(chl):IHOBB      4 1.0000316 0.8992914  0.3700
+## s(chl):IHODS      4 1.0000113 0.8992914  0.3900
+## s(chl):IHOEAO     4 1.0000015 0.8992914  0.3650
+## s(v):IHOWAO_BF    4 1.0000320 0.7773980  0.0600
+## s(v):IHOCAA       4 1.0000098 0.7773980  0.0575
+## s(v):IHOBB        4 2.5876860 0.7773980  0.0575
+## s(v):IHODS        4 1.0000037 0.7773980  0.0725
+## s(v):IHOEAO       4 2.8479169 0.7773980  0.0775
 ```
 
 ### Resiudals against covariates
@@ -1155,8 +1158,8 @@ data.frame(model = c("GAM_S", "GAM_S2"),
 ```
 
 ```{=html}
-<div id="htmlwidget-de3a3fe47dae5548822d" style="width:100%;height:auto;" class="datatables html-widget"></div>
-<script type="application/json" data-for="htmlwidget-de3a3fe47dae5548822d">{"x":{"filter":"none","vertical":false,"data":[["GAM_S","GAM_S2"],[31.615,31.616],[85.49,85.49],[0.33,0.33],[454.78,454.78],[891.273,891.274],[0,0],[0.50012,0.49988]],"container":"<table class=\"cell-border stribe\">\n  <thead>\n    <tr>\n      <th>model<\/th>\n      <th>df<\/th>\n      <th>dev_expl<\/th>\n      <th>r2<\/th>\n      <th>reml<\/th>\n      <th>AIC<\/th>\n      <th>dAIC<\/th>\n      <th>w_AIC<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[1,2,3,4,5,6,7]}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
+<div id="htmlwidget-5abecdc8ccda2cc6c25c" style="width:100%;height:auto;" class="datatables html-widget"></div>
+<script type="application/json" data-for="htmlwidget-5abecdc8ccda2cc6c25c">{"x":{"filter":"none","vertical":false,"data":[["GAM_S","GAM_S2"],[31.615,31.616],[85.49,85.49],[0.33,0.33],[454.78,454.78],[891.273,891.274],[0,0],[0.50012,0.49988]],"container":"<table class=\"cell-border stribe\">\n  <thead>\n    <tr>\n      <th>model<\/th>\n      <th>df<\/th>\n      <th>dev_expl<\/th>\n      <th>r2<\/th>\n      <th>reml<\/th>\n      <th>AIC<\/th>\n      <th>dAIC<\/th>\n      <th>w_AIC<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[1,2,3,4,5,6,7]}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
 ```
 
 Refit model with REML
@@ -1399,8 +1402,8 @@ data.frame(model = c("GAM_I", "GAM_I2"),
 ```
 
 ```{=html}
-<div id="htmlwidget-05d73f84b759225bf0b1" style="width:100%;height:auto;" class="datatables html-widget"></div>
-<script type="application/json" data-for="htmlwidget-05d73f84b759225bf0b1">{"x":{"filter":"none","vertical":false,"data":[["GAM_I","GAM_I2"],[27.353,27.388],[81.37,81.33],[0.27,0.27],[448.44,448.48],[901.007,901.286],[0,0.28],[0.53482,0.46518]],"container":"<table class=\"cell-border stribe\">\n  <thead>\n    <tr>\n      <th>model<\/th>\n      <th>df<\/th>\n      <th>dev_expl<\/th>\n      <th>r2<\/th>\n      <th>reml<\/th>\n      <th>AIC<\/th>\n      <th>dAIC<\/th>\n      <th>w_AIC<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[1,2,3,4,5,6,7]}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
+<div id="htmlwidget-c6f6c946d0e835ed2831" style="width:100%;height:auto;" class="datatables html-widget"></div>
+<script type="application/json" data-for="htmlwidget-c6f6c946d0e835ed2831">{"x":{"filter":"none","vertical":false,"data":[["GAM_I","GAM_I2"],[27.353,27.388],[81.37,81.33],[0.27,0.27],[448.44,448.48],[901.007,901.286],[0,0.28],[0.53482,0.46518]],"container":"<table class=\"cell-border stribe\">\n  <thead>\n    <tr>\n      <th>model<\/th>\n      <th>df<\/th>\n      <th>dev_expl<\/th>\n      <th>r2<\/th>\n      <th>reml<\/th>\n      <th>AIC<\/th>\n      <th>dAIC<\/th>\n      <th>w_AIC<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[1,2,3,4,5,6,7]}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
 ```
 
 Refit model with REML
@@ -1748,7 +1751,7 @@ rm(GAMI_velo, GAMI_chl)
 ```
 
 
-# HGAM - Gaussian SA {.tabset .tabset-pills}
+# HGAM - Gaussian SA
 
 ## Model fitting
 
@@ -1831,8 +1834,8 @@ data.frame(model = c("GAMSA_G", "GAMSA_S", "GAMSA_I"),
 ```
 
 ```{=html}
-<div id="htmlwidget-b3a545726bf05e15f700" style="width:100%;height:auto;" class="datatables html-widget"></div>
-<script type="application/json" data-for="htmlwidget-b3a545726bf05e15f700">{"x":{"filter":"none","vertical":false,"data":[["GAMSA_I","GAMSA_G","GAMSA_S"],[27.435,16.322,23.739],[71.61,53.85,61.92],[0.6,0.46,0.52],[243.5,252.04,251.05],[486.813,501.027,501.453],[0,14.21,14.64],[0.99852,0.00082,0.00066]],"container":"<table class=\"cell-border stribe\">\n  <thead>\n    <tr>\n      <th>model<\/th>\n      <th>df<\/th>\n      <th>dev_expl<\/th>\n      <th>r2<\/th>\n      <th>reml<\/th>\n      <th>AIC<\/th>\n      <th>dAIC<\/th>\n      <th>w_AIC<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[1,2,3,4,5,6,7]}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
+<div id="htmlwidget-ce1f4087b524af687bde" style="width:100%;height:auto;" class="datatables html-widget"></div>
+<script type="application/json" data-for="htmlwidget-ce1f4087b524af687bde">{"x":{"filter":"none","vertical":false,"data":[["GAMSA_I","GAMSA_G","GAMSA_S"],[27.435,16.322,23.739],[71.61,53.85,61.92],[0.6,0.46,0.52],[243.5,252.04,251.05],[486.813,501.027,501.453],[0,14.21,14.64],[0.99852,0.00082,0.00066]],"container":"<table class=\"cell-border stribe\">\n  <thead>\n    <tr>\n      <th>model<\/th>\n      <th>df<\/th>\n      <th>dev_expl<\/th>\n      <th>r2<\/th>\n      <th>reml<\/th>\n      <th>AIC<\/th>\n      <th>dAIC<\/th>\n      <th>w_AIC<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[1,2,3,4,5,6,7]}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
 ```
 
 Model G summary.
@@ -1976,7 +1979,7 @@ k.check(GAMSA_S)
 ## s(IHO)       5 0.0001274537        NA      NA
 ## s(year,IHO) 15 2.4773644245        NA      NA
 ## s(chl,IHO)  25 5.8562272649 1.0488638  0.6275
-## s(v,IHO)    25 6.3236830476 0.8341003  0.0675
+## s(v,IHO)    25 6.3236830476 0.8341003  0.0475
 ```
 
 
@@ -1995,16 +1998,16 @@ k.check(GAMSA_I)
 ## s(year)           3 7.305644e-01        NA      NA
 ## s(IHO)            5 4.949212e-05        NA      NA
 ## s(year,IHO)      15 7.239932e+00        NA      NA
-## s(chl):IHOWAO_BF  4 1.000001e+00 0.9771774  0.3875
-## s(chl):IHOCAA     4 1.000002e+00 0.9771774  0.3550
-## s(chl):IHOBB      4 1.000002e+00 0.9771774  0.4125
-## s(chl):IHODS      4 1.000002e+00 0.9771774  0.3725
-## s(chl):IHOEAO     4 1.000000e+00 0.9771774  0.3800
-## s(v):IHOWAO_BF    4 1.000005e+00 0.8523421  0.0725
-## s(v):IHOCAA       4 1.000002e+00 0.8523421  0.0900
-## s(v):IHOBB        4 2.382724e+00 0.8523421  0.0825
+## s(chl):IHOWAO_BF  4 1.000001e+00 0.9771774  0.3425
+## s(chl):IHOCAA     4 1.000002e+00 0.9771774  0.3500
+## s(chl):IHOBB      4 1.000002e+00 0.9771774  0.3450
+## s(chl):IHODS      4 1.000002e+00 0.9771774  0.3825
+## s(chl):IHOEAO     4 1.000000e+00 0.9771774  0.3600
+## s(v):IHOWAO_BF    4 1.000005e+00 0.8523421  0.0675
+## s(v):IHOCAA       4 1.000002e+00 0.8523421  0.0950
+## s(v):IHOBB        4 2.382724e+00 0.8523421  0.0875
 ## s(v):IHODS        4 1.000001e+00 0.8523421  0.0825
-## s(v):IHOEAO       4 3.702662e+00 0.8523421  0.0775
+## s(v):IHOEAO       4 3.702662e+00 0.8523421  0.0975
 ```
 
 ### Resiudals against covariates
@@ -2241,8 +2244,8 @@ data.frame(model = c("GAMSA_S", "GAMSA_S2"),
 ```
 
 ```{=html}
-<div id="htmlwidget-7aa489ac00d1006a05af" style="width:100%;height:auto;" class="datatables html-widget"></div>
-<script type="application/json" data-for="htmlwidget-7aa489ac00d1006a05af">{"x":{"filter":"none","vertical":false,"data":[["GAMSA_S","GAMSA_S2"],[23.739,23.739],[61.92,61.92],[0.52,0.52],[251.05,251.05],[501.453,501.453],[0,0],[0.5,0.5]],"container":"<table class=\"cell-border stribe\">\n  <thead>\n    <tr>\n      <th>model<\/th>\n      <th>df<\/th>\n      <th>dev_expl<\/th>\n      <th>r2<\/th>\n      <th>reml<\/th>\n      <th>AIC<\/th>\n      <th>dAIC<\/th>\n      <th>w_AIC<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[1,2,3,4,5,6,7]}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
+<div id="htmlwidget-a79eaadb426eb0dfb5ff" style="width:100%;height:auto;" class="datatables html-widget"></div>
+<script type="application/json" data-for="htmlwidget-a79eaadb426eb0dfb5ff">{"x":{"filter":"none","vertical":false,"data":[["GAMSA_S","GAMSA_S2"],[23.739,23.739],[61.92,61.92],[0.52,0.52],[251.05,251.05],[501.453,501.453],[0,0],[0.5,0.5]],"container":"<table class=\"cell-border stribe\">\n  <thead>\n    <tr>\n      <th>model<\/th>\n      <th>df<\/th>\n      <th>dev_expl<\/th>\n      <th>r2<\/th>\n      <th>reml<\/th>\n      <th>AIC<\/th>\n      <th>dAIC<\/th>\n      <th>w_AIC<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[1,2,3,4,5,6,7]}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
 ```
 
 Refit model with REML
@@ -2487,8 +2490,8 @@ data.frame(model = c("GAMSA_I", "GAMSA_I2"),
 ```
 
 ```{=html}
-<div id="htmlwidget-55f2587958d988967792" style="width:100%;height:auto;" class="datatables html-widget"></div>
-<script type="application/json" data-for="htmlwidget-55f2587958d988967792">{"x":{"filter":"none","vertical":false,"data":[["GAMSA_I2","GAMSA_I"],[26.87,27.435],[72.09,71.61],[0.6,0.6],[243.63,243.5],[484.412,486.813],[0,2.4],[0.76861,0.23139]],"container":"<table class=\"cell-border stribe\">\n  <thead>\n    <tr>\n      <th>model<\/th>\n      <th>df<\/th>\n      <th>dev_expl<\/th>\n      <th>r2<\/th>\n      <th>reml<\/th>\n      <th>AIC<\/th>\n      <th>dAIC<\/th>\n      <th>w_AIC<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[1,2,3,4,5,6,7]}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
+<div id="htmlwidget-03f12ba122db251569af" style="width:100%;height:auto;" class="datatables html-widget"></div>
+<script type="application/json" data-for="htmlwidget-03f12ba122db251569af">{"x":{"filter":"none","vertical":false,"data":[["GAMSA_I2","GAMSA_I"],[26.87,27.435],[72.09,71.61],[0.6,0.6],[243.63,243.5],[484.412,486.813],[0,2.4],[0.76861,0.23139]],"container":"<table class=\"cell-border stribe\">\n  <thead>\n    <tr>\n      <th>model<\/th>\n      <th>df<\/th>\n      <th>dev_expl<\/th>\n      <th>r2<\/th>\n      <th>reml<\/th>\n      <th>AIC<\/th>\n      <th>dAIC<\/th>\n      <th>w_AIC<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[1,2,3,4,5,6,7]}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
 ```
 
 Refit model with REML

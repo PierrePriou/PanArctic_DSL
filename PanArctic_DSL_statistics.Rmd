@@ -4,8 +4,11 @@ author: "[Pierre Priou](mailto:pierre.priou@mi.mun.ca)"
 date: "`r format(Sys.time(), '%Y/%m/%d at %H:%M')`"
 output: 
   html_document:
-    keep_md: yes
     code_folding: hide
+    keep_md: yes
+    toc: true
+    toc_float: true
+    toc_collapsed: true
   github_document:
     always_allow_html: true
 ---
@@ -335,7 +338,7 @@ phy_grid_laea %>%
         axis.title = element_blank())
 ```
 
-# Spatial and interannual variability {.tabset .tabset-pills}
+# Spatial and interannual variability
 
 ```{r prep-diff}
 SA_diff <- SA_grid_laea %>%
@@ -399,7 +402,7 @@ SA_diff %>% # Kruskal wallis interannual difference SA within group
 
 There were some interannual differences in SA within some region (WAO_BF - H = 6.4670868, *p* = 0.0394; CAA - H = 11.8260406, *p* = 0.0027; BB - H = 5.0981791, *p* = 0.0782; DS - H = 0.3282051, *p* = 0.8490; EAO - H = 4.9779498, *p* = 0.0830).
 
-# LM - Latitude - S\~A\~ int {.tabset .tabset-pills}
+# LM - Latitude - S\~A\~ int
 
 A number of studies show decreasing mesopelagic backscatter with increasing latitude. To test this hypothesis, I use a linear regression. Because there are some high mesopelagic backscatter values in the East Arctic Ocean I transformed the nautical area scattering coefficient into nautical area scattering strength in dB.
 
@@ -500,7 +503,7 @@ save(LM_area_coefs, LM_area_fit, LM_area_res,
      file = "data/statistics/LM_results.RData")
 ```
 
-# HGAM - Gamma NASC {.tabset .tabset-pills}
+# HGAM - Gamma NASC
 
 ## Data preparation
 
@@ -1223,7 +1226,7 @@ rm(GAMI_velo, GAMI_chl)
 ```
 
 
-# HGAM - Gaussian SA {.tabset .tabset-pills}
+# HGAM - Gaussian SA
 
 ## Model fitting
 
