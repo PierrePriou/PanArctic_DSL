@@ -112,12 +112,13 @@ trawl_latlon <- trawl_station %>% # Location of trawls
 # Remote sensing data
 load(paste0("data/remote_sensing/physics_grids_", cell_res, "km.RData"))
 phy_grid_laea_150 <- phy_grid_laea
-load(paste0("data/remote_sensing/physics_grids_", "25", "km.RData"))
+load(paste0("data/remote_sensing/physics_grids_", "50", "km.RData"))
 phy_grid_laea_hd <- phy_grid_laea
 load(paste0("data/remote_sensing/chl_grids_", cell_res, "km.RData"))
 chl_grid_laea_150 <- chl_grid_laea
-load(paste0("data/remote_sensing/chl_grids_", "25", "km.RData"))
-chl_grid_laea_hd <- chl_grid_laea
+load(paste0("data/remote_sensing/chl_grids_", "50", "km.RData"))
+chl_grid_laea_hd <- chl_grid_laea %>%
+  filter(cell_res == 50)
 
 # Statistics
 load("data/statistics/LM_results.RData")
@@ -950,11 +951,12 @@ trawl_station_df <- trawl %>%
                               name == "The Northwestern Passages" ~ "CAA",
                               name == "Baffin Bay" ~ "BB",
                               name == "Davis Strait" ~ "DS"),
-         fish_species2 = case_when(fish_species == "boreogadus_saida" ~ "Arctic cod",
-                                   fish_species == "liparidae" ~ "Snailfish",
-                                   fish_species == "myctophidae" ~ "Lanternfish",
-                                   fish_species == "sebastes_sp" ~ "Redfish",
-                                   !fish_species %in% c("boreogadus_saida", "liparidae", "myctophidae", "sebastes_sp") ~ "Other")) %>%
+         fish_species2 = case_when(
+           fish_species == "boreogadus_saida" ~ "Arctic cod",
+           fish_species == "liparidae" ~ "Snailfish",
+           fish_species == "myctophidae" ~ "Lanternfish",
+           fish_species == "sebastes_sp" ~ "Redfish",
+           !fish_species %in% c("boreogadus_saida", "liparidae", "myctophidae", "sebastes_sp") ~ "Other")) %>%
   dplyr::select(-name, -fname, -id, -longitude, -latitude, -min_x, -min_y,
                 -max_x, -max_y, -area.y, -mrgid, -bearings, -name_1, -mrgid_1, 
                 -name_2,-mrgid_2, -name_3, -mrgid_3) %>%
@@ -1186,30 +1188,10 @@ p_map_NASC_LM
 ## Figure 5. HGAM
 
 ```{r HGAM-plot}
-# GAM velocity
-GAMSAI_velo <- predSA_I %>%
-  mutate(lty = factor(case_when(IHO %in% c("WAO_BF", "BB", "EAO") ~ 1,
-                                !IHO %in% c("WAO_BF", "BB", "EAO") ~ 2))) %>%
-  filter(var == "v") %>%
-  ggplot() +
-  geom_line(aes(x = v, y = SA_fit, col = IHO, linetype = lty), size = 0.6) +
-  geom_ribbon(aes(x = v, ymin = SA_lwr_ci, ymax = SA_upr_ci, fill = IHO), 
-              alpha = 0.05) +
-  scale_colour_manual(values = met.brewer("Johnson", n = 6, direction = -1)) +
-  scale_fill_manual(values = met.brewer("Johnson", n = 6, direction = -1)) +
-  coord_cartesian(xlim = c(0, 4), ylim = c(0, 40)) +
-  scale_x_continuous(breaks = seq(0, 10, 1)) +
-  labs(x = expression("Mean velocity at 318 m (cm s"^-1*")"),
-       y = expression("S"[A]*" (dB re 1 m"^2*" nmi"^-2*")")) +
-  theme(panel.border = element_blank(),
-        axis.line = element_line(),
-        legend.title = element_blank(), 
-        legend.position = "none")
-
 # GAM chlorophyll
 GAMSAI_chl <- predSA_I %>%
-  mutate(lty = factor(case_when(IHO %in% c("WAO_BF", "EAO") ~ 1,
-                                !IHO %in% c("WAO_BF", "EAO") ~ 2)),
+  mutate(lty = factor(case_when(IHO %in% c("WAO_BF", "BB", "EAO") ~ 1,
+                                !IHO %in% c("WAO_BF", "BB", "EAO") ~ 2)),
          IHO = as.character(IHO),
          IHO = factor(
            case_when(IHO == "WAO_BF" ~ "West Arctic Ocean\n& Beaufort Sea", 
@@ -1227,7 +1209,7 @@ GAMSAI_chl <- predSA_I %>%
               alpha = 0.05) +
   scale_colour_manual(values = met.brewer("Johnson", n = 6, direction = -1)) +
   scale_fill_manual(values = met.brewer("Johnson", n = 6, direction = -1)) +
-  coord_cartesian(xlim = c(0, 2.1), ylim = c(0, 40), expand = T) +
+  coord_cartesian(xlim = c(0, 1.7), ylim = c(0, 45)) +
   scale_x_continuous(breaks = seq(0, 10, 0.5)) +
   labs(x = expression("Mean chlorophyll (mg m"^-3*")"),
        y = expression("S"[A]*" (dB re 1 m"^2*" nmi"^-2*")")) +
@@ -1238,7 +1220,31 @@ GAMSAI_chl <- predSA_I %>%
         axis.line = element_line(),
         legend.title = element_blank(), 
         legend.position = "none",
-        legend.box.margin = margin(0, 0, , 0))
+        legend.box.margin = margin(0, 0, 0, 0),
+        plot.margin = unit(c(0, 0, 0, 0), "in"))
+
+# GAM velocity
+GAMSAI_velo <- predSA_I %>%
+  mutate(lty = factor(case_when(IHO %in% c("WAO_BF", "BB", "EAO") ~ 1,
+                                !IHO %in% c("WAO_BF", "BB", "EAO") ~ 2))) %>%
+  filter(var == "v") %>%
+  ggplot() +
+  geom_line(aes(x = v, y = SA_fit, col = IHO, linetype = lty), size = 0.6) +
+  geom_ribbon(aes(x = v, ymin = SA_lwr_ci, ymax = SA_upr_ci, fill = IHO), 
+              alpha = 0.05) +
+  scale_colour_manual(values = met.brewer("Johnson", n = 6, direction = -1)) +
+  scale_fill_manual(values = met.brewer("Johnson", n = 6, direction = -1)) +
+  coord_cartesian(xlim = c(0, 4.1), ylim = c(0, 45)) +
+  scale_x_continuous(breaks = seq(0, 10, 1)) +
+  labs(x = expression("Mean velocity at 318 m (cm s"^-1*")"),
+       y = expression("S"[A]*" (dB re 1 m"^2*" nmi"^-2*")")) +
+  theme(panel.border = element_blank(),
+        axis.line = element_line(),
+        # axis.title.y = element_blank(),
+        # axis.text.y = element_blank(),
+        legend.title = element_blank(), 
+        legend.position = "none",
+        plot.margin = unit(c(0, 0, 0, 0), "in"))
 
 # Legend for plots
 legend <- get_legend(GAMSAI_chl + 
@@ -1247,7 +1253,9 @@ legend <- get_legend(GAMSAI_chl +
 
 # Combine plots
 HGAM <- plot_grid(legend, 
-                  plot_grid(GAMSAI_chl, GAMSAI_velo, ncol = 2, labels = "auto", label_size = 9),
+                  plot_grid(GAMSAI_chl, GAMSAI_velo, ncol = 2,
+                            labels = "auto", label_size = 9,
+                            align = "hv", axis = "tblr"),
                   ncol = 1, rel_heights = c(0.2, 1))
 # Save and display plot
 ggsave("plots/Figure_HGAM_SAI3.png", HGAM, 
@@ -1257,41 +1265,37 @@ HGAM
 
 # Supplementary data
 
-
 ## Figure SX Map chlorophyll a and current velocity
 
 ```{r map-chla-velo}
 # Map chlorophyll a
-map_chla <- chl_grid_laea_50 %>%
+map_chla <- chl_grid_laea_150 %>%
   ggplot() +
-  # # Bathymetry
-  # geom_raster(data = bathy_laea, aes(x = xc, y = yc, fill = depth_d),
-  #             alpha = 0.8) + 
-  # scale_fill_grey("Depth (m)", start = 0.9, end = 0.3) +
-  # guides(fill = "none") + 
-  # new_scale_fill() + 
+  # Bathymetry
+  geom_raster(data = bathy_laea, aes(x = xc, y = yc, fill = depth_d),
+              alpha = 0.8) +
+  scale_fill_grey("Depth (m)", start = 0.9, end = 0.3) +
+  guides(fill = "none") +
+  new_scale_fill() +
   # Chlorophyll a
-  geom_tile(aes(x = xc, y = yc, fill = chl)) + 
-  # scale_fill_viridis_c(expression("Chl a (mg m"^-3*")"),
-  #                      option = "viridis", limits = c(0, 2.5), 
-  #                      na.value = "#FDE725FF") +
-  scale_fill_cmocean(expression("Chl a (mg m"^-3*")"),
-                       name = "algae", limits = c(0, 2.5), 
-                       na.value = "#122414FF") +
+  geom_tile(aes(x = xc, y = yc, fill = chl_mean)) + 
+  scale_fill_cmocean(expression("Chl a\n(mg m"^-3*")"),
+                       name = "tempo", limits = c(0, 2.5),
+                       na.value = "#151D44FF") +
   # Coastlines
   geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), 
                fill = "grey25") + 
-  coord_fixed(xlim = c(-2450, 1000), ylim = c(-1500, 1850), expand = F) +
+  coord_fixed(xlim = c(-2450, 650), ylim = c(-1500, 1850), expand = F) +
   # Coords 
   geom_tile(data = SA_grid_laea, aes(x = xc, y = yc), fill = NA,
-            colour = "red", size = 0.5) + 
+            colour = "red", size = 0.25) + 
   # North Pole
   geom_point(aes(x = 0, y = 0), size = 0.05) +
   # Facets
   facet_wrap(~ year) + 
   # Legend over 2 rows
   theme(#legend.position = "right", 
-        # legend.title = element_text(vjust = 1),
+        legend.title = element_text(hjust = 0.5),
         # legend.key.height = unit(0.1, "in"),
         legend.key.width = unit(0.1, "in"),
         axis.text = element_blank(),
@@ -1299,34 +1303,34 @@ map_chla <- chl_grid_laea_50 %>%
         axis.title = element_blank())
 
 # Map current velocity
-map_velo <- phy_grid_laea_50 %>%
+map_velo <- phy_grid_laea_150 %>%
   filter(depth == 318) %>%
   ggplot() +
   # Bathymetry
-  # geom_raster(data = bathy_laea, aes(x = xc, y = yc, fill = depth_d),
-  #             alpha = 0.8) + 
-  # scale_fill_grey("Depth (m)", start = 0.9, end = 0.3) +
-  # guides(fill = "none") + 
-  # new_scale_fill() + 
+  geom_raster(data = bathy_laea, aes(x = xc, y = yc, fill = depth_d),
+              alpha = 0.8) +
+  scale_fill_grey("Depth (m)", start = 0.9, end = 0.3) +
+  guides(fill = "none") +
+  new_scale_fill() +
   # Chlorophyll a
-  geom_tile(aes(x = xc, y = yc, fill = velocity * 100)) + 
-  scale_fill_cmocean(expression("Velocity (cm s"^-1*")"),
+  geom_tile(aes(x = xc, y = yc, fill = v_mean * 100)) + 
+  scale_fill_cmocean(expression("Velocity\n(cm s"^-1*")"),
                        name = "speed", limits = c(0, 4.5), 
                        na.value = "#172313FF") +
   # Coastlines
   geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), 
                fill = "grey25") + 
-  coord_fixed(xlim = c(-2450, 1000), ylim = c(-1500, 1850), expand = F) +
+  coord_fixed(xlim = c(-2450, 650), ylim = c(-1500, 1850), expand = F) +
   # North Pole
   geom_point(aes(x = 0, y = 0), size = 0.05) +
   # Coords 
   geom_tile(data = SA_grid_laea, aes(x = xc, y = yc), fill = NA,
-            colour = "red", size = 0.5) + 
+            colour = "red", size = 0.25) + 
   # Facets
   facet_wrap(~ year) + 
   # Legend over 2 rows
   theme(#legend.position = "right", 
-        # legend.title = element_text(vjust = 1),
+        legend.title = element_text(hjust = 0.5),
         # legend.key.height = unit(0.1, "in"),
         legend.key.width = unit(0.1, "in"),
         axis.text = element_blank(),
@@ -1337,10 +1341,6 @@ map_velo <- phy_grid_laea_50 %>%
 map_env <- plot_grid(map_chla, map_velo, ncol = 1, align = "hv", axis = "tblr",
                      labels = "auto", label_size = 9)
 # Save and display plot
-ggsave("plots/Figure_map_chla.png", map_chla, 
-       height = 2.5, width = 6.5, dpi = 600, units = "in")
-ggsave("plots/Figure_map_velo.png", map_velo, 
-       height = 2.5, width = 6.5, dpi = 600, units = "in")
 ggsave("plots/Figure_map_chl_velo.png", map_env, 
        height = 5, width = 6.5, dpi = 600, units = "in")
 ```
