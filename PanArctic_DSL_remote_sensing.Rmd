@@ -4,7 +4,11 @@ author: "[Pierre Priou](mailto:pierre.priou@mi.mun.ca)"
 date: "`r format(Sys.time(), '%Y/%m/%d at %H:%M')`"
 output: 
   html_document:
+    code_folding: hide
     keep_md: yes
+    toc: true
+    toc_float: true
+    toc_collapsed: true
   github_document:
     always_allow_html: true
 ---
@@ -388,64 +392,6 @@ The variables are:
 -   latitude: latitude
 -   longitude: longitude
 
-## Exploratory code
-
-```{r processing-trial-sf}
-# Read sea ice data and mixed layer depth
-test_ice <- tidync("data/remote_sensing/physics/20150115_222m_phy_CMEMS.nc") %>% 
-  activate("D0,D1,D2") %>%
-  hyper_tibble() 
-# Read temperature, salinity, and current velocity
-test_oce <- tidync("data/remote_sensing/physics/20150115_222m_phy_CMEMS.nc") %>% 
-  activate("D0,D1,D3,D2") %>% # D0 = x, D1 = y, D3 = depth, D2 = time
-  hyper_tibble()
-# Read sea ice data and mixed layer depth
-test_meta <- tidync("data/remote_sensing/physics/20150115_222m_phy_CMEMS.nc") %>%
-  activate("D0,D1") %>%
-  hyper_tibble()
-
-# Combine data
-test <- left_join(test_ice, test_oce, by = c("x", "y", "time")) %>% 
-  left_join(., test_meta, by = c("x", "y")) %>%
-  # Remove data from land or below seafloor
-  filter(is.na(depth) == F) %>% 
-  # Calculate date
-  mutate(date = as.POSIXct(time * 3600, 
-                           origin = "1950-01-01 00:00:00",
-                           tz = "UTC")) %>% 
-  rename(lat = latitude, lon = longitude) %>%
-  dplyr::select(-time)
-
-# Define projection
-proj_original <- "+proj=stere +a=6378273.0 +b=6378273.0 +lon_0=-45.0 +lat_0=90.0 +lat_ts=90.0 +ellps=sphere +units=m" 
-
-# Convert dataframe to sf
-test_sf <- st_as_sf(test, coords = c("x", "y"), crs = proj_original)
-plot(test_sf["vxo"], axes = TRUE)
-
-# Convert dataframe to sf
-test_sf2 <- st_as_sf(test, coords = c("x", "y"), crs = proj_original) %>% 
-  # Transform to EPSG:4326
-  st_transform(., crs = "EPSG:4326") 
-# Not working
-plot(test_sf2["vxo"], axes = TRUE) 
-
-# Convert dataframe to sf with correct CRS
-test_sf3 <- st_as_sf(test, coords = c("lon", "lat"), crs = "EPSG:4326") 
-# Working!
-plot(test_sf3["vxo"], axes = TRUE) 
-
-# Convert dataframe to sf with correct CRS
-test_sf4 <- st_as_sf(test, coords = c("lon", "lat"), crs = "EPSG:4326") %>% 
-  # Convert to EPSG:6931
-  st_transform(., crs = "EPSG:6931") 
-# Working
-plot(test_sf4["vxo"], axes = TRUE) 
-
-# Remove temporary data
-rm(test_ice, test_meta, test_oce, test_sf, test_sf2, test_sf3, test_sf4, test)
-```
-
 ## Load NetCDF
 
 Batch processing of Arctic Ocean Physics Reanalysis data. For convenience, all NetCDF data is combined per year and saved as csv. Since I downloaded physics data in two batches—0, 222, 380, 644, 1062 m depth and 266 and 318 m depth, I split the tidying into two chunks.
@@ -584,13 +530,13 @@ Data is projected on the EPSG:6931 projection and the median value is extracted.
 
 ```{r EPSG-6931-physics-grid-median}
 # Projection, cell resolution in km
-cell_res <- 150
+cell_res <- 100
 arctic_laea <- raster(extent(-2700, 2700, -2700, 2700), crs = "EPSG:6931") 
 projection(arctic_laea) <- gsub("units=m", "units=km", projection(arctic_laea)) 
 res(arctic_laea) <- c(cell_res, cell_res)
 
 # Empty dataframe
-phy_grid_laea <- data.frame() 
+phy_month_grid_laea <- data.frame() 
 
 # Loop through each year
 for (i in seq(2015, 2017, 1)) {
@@ -632,7 +578,7 @@ for (i in seq(2015, 2017, 1)) {
         dplyr::select(year, month, area, lat, lon, xc, yc, depth, thetao, 
                       velocity) 
       # Combine data
-      phy_grid_laea <- bind_rows(phy_grid_laea, phy_tmp_laea)
+      phy_month_grid_laea <- bind_rows(phy_month_grid_laea, phy_tmp_laea)
     }
   }
 }
@@ -646,7 +592,7 @@ Calculate annual average and median
 
 ```{r tidy-phy-grid-laea}
 # Add cell resolution anc calculate annual average
-phy_grid_laea <- phy_grid_laea %>%
+phy_grid_laea <- phy_month_grid_laea %>%
   mutate(cell_res = cell_res) %>% 
   group_by(year, area, depth, xc, yc, cell_res, lat, lon) %>%
   summarise(v_mean = mean(velocity),
@@ -682,6 +628,165 @@ phy_grid_laea %>%
         axis.title = element_blank())
 ```
 
+# Global Ocean Biogeochemistry Hindcast
+
+I downloaded chl, O2, and net primary production data from the [Global Ocean Biogeochemistry Hindcast](https://resources.marine.copernicus.eu/product-detail/GLOBAL_MULTIYEAR_BGC_001_029/INFORMATION) of CMEMS. The time variable is hours since 1950-01-01 00:00:00.
+
+##  Load NetCDF
+
+I convert the NetCDF file to csv.
+
+```{r nc-to-csv}
+# List files
+file_list <- list.files("data/remote_sensing/biogeochemistry/nc",
+                        pattern = ".nc", full.names = T) 
+# Empty dataframe
+biogeo <- data.frame()
+# Loop through each file per year
+for (i in file_list) { 
+  # Extract date
+  year_file <- str_remove(i, pattern = "data/remote_sensing/biogeochemistry/nc/") %>%
+    str_remove(., pattern = "_1m_chl_CMEMS.nc") 
+  # Chlorophyll data
+  biogeo_tmp <- tidync(i) %>%
+    activate("D3,D2,D1,D0") %>% 
+    hyper_tibble() %>%
+    rename(lat = latitude, lon = longitude) %>%
+    mutate(date = as.POSIXct(hours(time) , origin = "1950-01-01 00:00:00", tz = "UTC"),
+           year = year(date),
+           month = month(date),
+           depth = floor(depth)) %>%
+    dplyr::select(-date)
+  # Append data
+  biogeo <- bind_rows(biogeo, biogeo_tmp)
+}
+# Remove unused data
+rm(biogeo_tmp, file_list, year_file, i)
+```
+
+
+## Projection to EPSG:6931
+
+The data is in the EPSG:4528 and I now convert it to ESPG:6931. I calculate the median value for each grid cell. 
+
+```{r biogeo-EPSG-6391}
+# Projection, cell resolution in km
+cell_res <- 150
+arctic_laea <- raster(extent(-2700, 2700, -2700, 2700), crs = "EPSG:6931") 
+projection(arctic_laea) <- gsub("units=m", "units=km", projection(arctic_laea)) 
+res(arctic_laea) <- c(cell_res, cell_res)
+
+# Empty dataframe
+biogeo_month_grid_laea <- data.frame() 
+
+# Loop through each year
+for (i in seq(2015, 2017, 1)) {
+  # Loop through each month
+  for (j in seq(1, 12, 1)) {
+    biogeo_tmp <- biogeo %>%
+      # Select depth bin
+      filter(year == i & month == j) 
+    # Rasterize data in laea
+    biogeo_tmp_laea <- SpatialPointsDataFrame(
+      SpatialPoints(cbind(biogeo_tmp$lon, biogeo_tmp$lat),
+                    proj4string = CRS("EPSG:4326")), 
+      data.frame(lat = biogeo_tmp$lat,
+                 lon = biogeo_tmp$lon,
+                 chl = biogeo_tmp$chl,
+                 o2 = biogeo_tmp$o2,
+                 nppv = biogeo_tmp$nppv)) %>%
+      # Change projection to EPSG:6931
+      spTransform(., CRSobj = crs(arctic_laea)) %>% 
+      # Rasterize 
+      rasterize(., arctic_laea, fun = median, na.rm = T) %>% 
+      # Remove ID layer
+      dropLayer(1) %>% 
+      # Convert raster to data frame
+      rasterToPoints() %>% 
+      as.data.frame() %>%
+      # Rename variables
+      rename(xc = x, yc = y) %>% 
+      mutate(year = i, 
+             month = j,
+             depth = 0,
+             area = factor(
+               case_when(lon > -155 & lon <= -95 & lat > 65 & lat <= 82 ~ "BF_CAA",
+                         lon > -95 & lon <= -50 & lat > 66 & lat <= 82 ~ "BB",
+                         lon >= -25 & lon <= 145 & lat > 77 & lat <= 90 ~ "SV"),
+               levels = c("BF_CAA", "BB", "SV"))) %>%
+      dplyr::select(year, month, area, lat, lon, xc, yc, depth, chl, nppv, o2)
+    # Combine data
+    biogeo_month_grid_laea <- bind_rows(biogeo_month_grid_laea, biogeo_tmp_laea)
+  }
+}
+# Remove temporary data
+rm(biogeo_tmp, biogeo_tmp_laea, i, j) 
+```
+
+## Annual average
+
+Now that I have monthly data in the right resolution, I calculate the annual average for each grid cell. 
+
+```{r biogeo-annual-average}
+# Add cell resolution and calculate annual average
+biogeo_grid_laea <- biogeo_month_grid_laea %>%
+  mutate(cell_res = cell_res) %>% 
+  group_by(year, area, depth, xc, yc, cell_res, lat, lon) %>%
+  summarise(chl_mean = mean(chl),
+            chl_median = median(chl),
+            nppv_mean = mean(nppv),
+            nppv_median = median(nppv),
+            o2_mean = mean(o2),
+            o2_median = median(o2)) %>% 
+  ungroup()
+```
+
+Gridding worked correctly, the following plot shows current velocity at all depth levels.
+
+```{r biogeo-map, fig.width=6.5, fig.height=6}
+coast_10m_laea <- readOGR("data/bathy/ne_10m_land.shp", verbose = F) %>% 
+  spTransform(CRSobj = crs("EPSG:4326")) %>% 
+  crop(extent(-180, 180, 0, 90)) %>% # Crop shapefile
+  spTransform(CRSobj = crs(arctic_laea)) %>% # Project shapefile in laea
+  fortify() %>% # Convert to a dataframe for ggplot
+  rename(xc = long, yc = lat)
+
+plot_grid(biogeo_grid_laea %>% 
+            ggplot() +
+            geom_tile(aes(x = xc, y = yc, fill = chl_mean)) +
+            scale_fill_viridis_c("Chl", limits = c(0, 2)) +
+            geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group),
+                         fill = "grey80") +
+            facet_grid(~ year) +
+            coord_fixed(xlim = c(-2600, 1100), ylim = c(-1800, 1900), expand = F) + 
+            theme(axis.text = element_blank(),
+                  axis.ticks = element_blank(),
+                  axis.title = element_blank()),
+          biogeo_grid_laea %>% 
+            ggplot() +
+            geom_tile(aes(x = xc, y = yc, fill = nppv_mean)) +
+            scale_fill_viridis_c("NPP", option = "magma", limits = c(0, 5)) +
+            geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group),
+                         fill = "grey80") +
+            facet_grid(~ year) +
+            coord_fixed(xlim = c(-2600, 1100), ylim = c(-1800, 1900), expand = F) + 
+            theme(axis.text = element_blank(),
+                  axis.ticks = element_blank(),
+                  axis.title = element_blank()),
+          biogeo_grid_laea %>% 
+            ggplot() +
+            geom_tile(aes(x = xc, y = yc, fill = o2_mean)) +
+            scale_fill_viridis_c("O2", option = "cividis") +
+            geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group),
+                         fill = "grey80") +
+            facet_grid(~ year) +
+            coord_fixed(xlim = c(-2600, 1100), ylim = c(-1800, 1900), expand = F) + 
+            theme(axis.text = element_blank(),
+                  axis.ticks = element_blank(),
+                  axis.title = element_blank()),
+          ncol = 1, align = "hv", axis = "tblr")
+```
+
 # Ocean colour data
 
 Data downloaded from Copernicus Marine. The ocean colour data comes from the [OCEANCOLOUR_ARC_CHL_L4_REP_OBSERVATIONS_009_088](https://resources.marine.copernicus.eu/product-detail/OCEANCOLOUR_ARC_CHL_L4_REP_OBSERVATIONS_009_088/INFORMATION) dataset. Data is monthly averaged and has a cell resolution of 1 x 1 km on a WGS 84 / Plate Carree (EPSG:32662) projection.
@@ -690,7 +795,7 @@ I load the data and project it on the arctic laea grid (EPSG:6931 `r cell_res` x
 
 ```{r chl-to-csv, cache=TRUE}
 # Sea ice projection
-cell_res <- 150
+cell_res <- 100
 arctic_laea <- raster(extent(-2700, 2700, -2700, 2700), crs = "EPSG:6931") 
 projection(arctic_laea) <- gsub("units=m", "units=km", projection(arctic_laea)) 
 res(arctic_laea) <- c(cell_res, cell_res)
@@ -776,11 +881,24 @@ chl_grid_laea <- list.files("data/remote_sensing/ocean_colour",
 # Save data
 
 ```{r save-data}
-# Save data
+# Seaice
 save(seaice_grid_laea,
      file = paste0("data/remote_sensing/seaice_grids_", cell_res, "km.RData"))
+write_csv(seaice_grid_laea,
+          file = paste0("data/remote_sensing/seaice_grids_", cell_res, "km.csv"))
+# Physics
 save(phy_grid_laea, 
      file = paste0("data/remote_sensing/physics_grids_", cell_res, "km.RData"))
+write_csv(phy_grid_laea, 
+          file = paste0("data/remote_sensing/physics_grids_", cell_res, "km.csv"))
+# Biogeochemistry
+save(biogeo_grid_laea, 
+     file = paste0("data/remote_sensing/biogeo_grids_", cell_res, "km.RData"))
+write_csv(biogeo_grid_laea, 
+          file = paste0("data/remote_sensing/biogeo_grids_", cell_res, "km.csv"))
+# Ocean Colour
 save(chl_grid_laea, 
      file = paste0("data/remote_sensing/chl_grids_", cell_res, "km.RData"))
+write_csv(chl_grid_laea, 
+          file = paste0("data/remote_sensing/chl_grids_", cell_res, "km.csv"))
 ```
