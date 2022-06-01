@@ -273,20 +273,24 @@ SA_all_area <- SA_grid_laea %>%
   # filter(empty_clean == F) %>%
   group_by(year) %>% # per year
   summarise(n = n(),
-            NASC_median = median(NASC_int, na.rm = T),
-            NASC_mad = mad(NASC_int, na.rm = T), 
-            NASC_mean = mean(NASC_int, na.rm = T),
-            NASC_sd = sd(NASC_int, na.rm = T), 
+            NASC_int_median = median(NASC_int, na.rm = T),
+            NASC_int_mad = mad(NASC_int, na.rm = T), 
+            NASC_int_mean = mean(NASC_int, na.rm = T),
+            NASC_int_sd = sd(NASC_int, na.rm = T), 
+            NASC_mean2 = mean(NASC_mean, na.rm = T),
+            NASC_sd2 = sd(NASC_mean, na.rm = T),
             CM_median = median(CM, na.rm = T),
             CM_mad = mad(CM, na.rm = T),
             CM_mean = mean(CM, na.rm = T),
             CM_sd = sd(CM, na.rm = T)) %>%
   ungroup() %>%
   summarise(n = sum(n), # Mean across all areas and years
-            NASC_median = round(mean(NASC_median, na.rm = T), 1),
-            NASC_mad = round(mean(NASC_mad, na.rm = T), 1),
-            NASC_mean = round(mean(NASC_mean, na.rm = T), 1),
-            NASC_sd = round(mean(NASC_sd, na.rm = T), 1),
+            NASC_int_median = round(mean(NASC_int_median, na.rm = T), 1),
+            NASC_int_mad = round(mean(NASC_int_mad, na.rm = T), 1),
+            NASC_int_mean = round(mean(NASC_int_mean, na.rm = T), 1),
+            NASC_int_sd = round(mean(NASC_int_sd, na.rm = T), 1),
+            NASC_mean2 = round(mean(NASC_mean2, na.rm = T), 3),
+            NASC_sd2 = round(mean(NASC_sd2, na.rm = T), 3),
             CM_median = round(mean(CM_median, na.rm = T)),
             CM_mad = round(mean(CM_mad, na.rm = T)),
             CM_mean = round(mean(CM_mean, na.rm = T)),
@@ -299,21 +303,25 @@ SA_grid_laea %>%
   mutate(IHO_area == as.character(IHO_area)) %>%
   group_by(IHO_area, year) %>%  # median per year
   summarise(n = n(),
-            NASC_median = median(NASC_int, na.rm = T),
-            NASC_mad = mad(NASC_int, na.rm = T), 
-            NASC_mean = mean(NASC_int, na.rm = T),
-            NASC_sd = sd(NASC_int, na.rm = T), 
+            NASC_int_median = median(NASC_int, na.rm = T),
+            NASC_int_mad = mad(NASC_int, na.rm = T), 
+            NASC_int_mean = mean(NASC_int, na.rm = T),
+            NASC_int_sd = sd(NASC_int, na.rm = T), 
+            NASC_mean2 = mean(NASC_mean, na.rm = T),
+            NASC_sd2 = median(NASC_mean, na.rm = T),
             CM_median = median(CM, na.rm = T),
             CM_mad = mad(CM, na.rm = T),
             CM_mean = mean(CM, na.rm = T),
             CM_sd = sd(CM, na.rm = T)) %>%
   ungroup() %>%
   group_by(IHO_area) %>% # Mean per area
- summarise(n = sum(n), # Mean across all areas and years
-            NASC_median = round(mean(NASC_median, na.rm = T), 1),
-            NASC_mad = round(mean(NASC_mad, na.rm = T), 1),
-            NASC_mean = round(mean(NASC_mean, na.rm = T), 1),
-            NASC_sd = round(mean(NASC_sd, na.rm = T), 1),
+  summarise(n = sum(n), # Mean across all areas and years
+            NASC_int_median = round(mean(NASC_int_median, na.rm = T), 1),
+            NASC_int_mad = round(mean(NASC_int_mad, na.rm = T), 1),
+            NASC_int_mean = round(mean(NASC_int_mean, na.rm = T), 1),
+            NASC_int_sd = round(mean(NASC_int_sd, na.rm = T), 1),
+            NASC_mean2 = round(mean(NASC_mean2, na.rm = T), 3),
+            NASC_sd2 = round(mean(NASC_sd2, na.rm = T), 3),
             CM_median = round(mean(CM_median, na.rm = T)),
             CM_mad = round(mean(CM_mad, na.rm = T)),
             CM_mean = round(mean(CM_mean, na.rm = T)),
@@ -331,10 +339,13 @@ SA_grid_laea %>%
     levels = c("West Arctic\nOcean", "Beaufort Sea", "Can. Arctic\nArchipelago",
                "Baffin Bay", "Davis Strait", "East Arctic\nOcean", 
                "All areas"))) %>%
+  arrange(IHO_area) %>%
   # dplyr::select(-CM_median, -CM_mad) %>%
   kbl() %>%
   kable_classic()
 ```
+
+
 
 # Plots
 
@@ -817,6 +828,42 @@ ggsave("plots/Fig3_map_pointrange_NASC.png", p_map_pointrange_NASC,
 p_map_pointrange_NASC
 ```
 
+### Just boxplot
+
+```{r fig3-boxplot}
+boxplot_NASC <- SA_grid_laea %>% # Pointrange of SA per region
+  mutate(IHO_area = factor(
+    case_when(
+    IHO_area == "East Arctic Ocean" ~ "EAO",
+    IHO_area == "West Arctic Ocean" ~ "WAO",
+    IHO_area == "Beaufort Sea" ~ "BF",
+    IHO_area == "The Northwestern Passages" ~ "CAA",
+    IHO_area == "Baffin Bay" ~ "BB",
+    IHO_area == "Davis Strait" ~ "DS"),
+    levels = c("WAO", "BF", "CAA", "BB", "DS", "EAO")), 
+    year = factor(year)) %>%
+  ggplot(aes(x = IHO_area)) +
+  geom_boxplot(aes(y = SA_int, fill = year), size = 0.4, outlier.size = 0.7,
+               alpha = 0.8, position = position_dodge(preserve = "single")) +
+  scale_fill_manual(values = c("#0086a8", "#f6c200", "#d04e00")) +
+  scale_y_continuous(
+    expression("S"[A]*" (dB re 1 m"^2*" nmi"^-2*")"),
+    position = "right",
+    sec.axis = 
+      sec_axis(trans = ~10^(./10), 
+               name = expression("s"[A]*" ( m"^2*" nmi"^-2*")"),
+               breaks = c(1, 5, 10, 50, 100, 500, 1000, 5000, 10000))) +
+  theme(axis.title.x = element_blank(),
+        legend.title = element_blank(),
+        legend.key.width = unit(0.15, "in"),
+        legend.key.height = unit(0.15, "in"),
+        plot.margin = unit(c(0.1, 0.1, 0, 0), "in"))
+# Save and display plot
+ggsave("plots/Fig3_boxplot_NASC.png", boxplot_NASC, 
+       height = 2.5, width = 6.5, dpi = 600, units = "in")
+boxplot_NASC
+```
+
 ### Just points
 
 ```{r fig3-points}
@@ -1190,8 +1237,8 @@ p_map_NASC_LM
 ```{r HGAM-plot}
 # GAM chlorophyll
 GAMSAI_chl <- predSA_I %>%
-  mutate(lty = factor(case_when(IHO %in% c("WAO_BF", "BB", "EAO") ~ 1,
-                                !IHO %in% c("WAO_BF", "BB", "EAO") ~ 2)),
+  mutate(lty = factor(case_when(IHO %in% c("WAO_BF", "EAO") ~ 1,
+                                !IHO %in% c("WAO_BF", "EAO") ~ 2)),
          IHO = as.character(IHO),
          IHO = factor(
            case_when(IHO == "WAO_BF" ~ "West Arctic Ocean\n& Beaufort Sea", 
@@ -1209,7 +1256,7 @@ GAMSAI_chl <- predSA_I %>%
               alpha = 0.05) +
   scale_colour_manual(values = met.brewer("Johnson", n = 6, direction = -1)) +
   scale_fill_manual(values = met.brewer("Johnson", n = 6, direction = -1)) +
-  coord_cartesian(xlim = c(0, 1.7), ylim = c(0, 45)) +
+  coord_cartesian(xlim = c(0, 1.7), ylim = c(0, 47.5)) +
   scale_x_continuous(breaks = seq(0, 10, 0.5)) +
   labs(x = expression("Mean chlorophyll (mg m"^-3*")"),
        y = expression("S"[A]*" (dB re 1 m"^2*" nmi"^-2*")")) +
@@ -1225,8 +1272,8 @@ GAMSAI_chl <- predSA_I %>%
 
 # GAM velocity
 GAMSAI_velo <- predSA_I %>%
-  mutate(lty = factor(case_when(IHO %in% c("WAO_BF", "BB", "EAO") ~ 1,
-                                !IHO %in% c("WAO_BF", "BB", "EAO") ~ 2))) %>%
+  mutate(lty = factor(case_when(IHO %in% c("WAO_BF", "EAO") ~ 1,
+                                !IHO %in% c("WAO_BF", "EAO") ~ 2))) %>%
   filter(var == "v") %>%
   ggplot() +
   geom_line(aes(x = v, y = SA_fit, col = IHO, linetype = lty), size = 0.6) +
@@ -1234,14 +1281,12 @@ GAMSAI_velo <- predSA_I %>%
               alpha = 0.05) +
   scale_colour_manual(values = met.brewer("Johnson", n = 6, direction = -1)) +
   scale_fill_manual(values = met.brewer("Johnson", n = 6, direction = -1)) +
-  coord_cartesian(xlim = c(0, 4.1), ylim = c(0, 45)) +
+  coord_cartesian(xlim = c(0, 4.1), ylim = c(0, 47.5)) +
   scale_x_continuous(breaks = seq(0, 10, 1)) +
   labs(x = expression("Mean velocity at 318 m (cm s"^-1*")"),
        y = expression("S"[A]*" (dB re 1 m"^2*" nmi"^-2*")")) +
   theme(panel.border = element_blank(),
         axis.line = element_line(),
-        # axis.title.y = element_blank(),
-        # axis.text.y = element_blank(),
         legend.title = element_blank(), 
         legend.position = "none",
         plot.margin = unit(c(0, 0, 0, 0), "in"))
