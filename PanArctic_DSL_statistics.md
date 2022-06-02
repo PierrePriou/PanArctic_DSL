@@ -1,10 +1,10 @@
 ---
 title: "PanArctic DSL - Statistics"
 author: "[Pierre Priou](mailto:pierre.priou@mi.mun.ca)"
-date: "2022/06/01 at 15:11"
+date: "2022/06/02 at 10:41"
 output: 
   html_document:
-    code_folding: hide
+    code_folding: show
     keep_md: yes
     toc: true
     toc_float: true
@@ -760,8 +760,8 @@ data.frame(model = c("GAM_G",
 ```
 
 ```{=html}
-<div id="htmlwidget-b716e09b8c8f1cab09a5" style="width:100%;height:auto;" class="datatables html-widget"></div>
-<script type="application/json" data-for="htmlwidget-b716e09b8c8f1cab09a5">{"x":{"filter":"none","vertical":false,"data":[["GAM_G","GAM_I"],[20.423,28.454],[78.8,82.33],[0.15,0.39],[441.22,435.04],[870.794,872.156],[0,1.36],[0.66396,0.33604]],"container":"<table class=\"cell-border stribe\">\n  <thead>\n    <tr>\n      <th>model<\/th>\n      <th>df<\/th>\n      <th>dev_expl<\/th>\n      <th>r2<\/th>\n      <th>reml<\/th>\n      <th>AIC<\/th>\n      <th>dAIC<\/th>\n      <th>w_AIC<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[1,2,3,4,5,6,7]}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
+<div id="htmlwidget-1e9d5b8e1b36f0ef12d2" style="width:100%;height:auto;" class="datatables html-widget"></div>
+<script type="application/json" data-for="htmlwidget-1e9d5b8e1b36f0ef12d2">{"x":{"filter":"none","vertical":false,"data":[["GAM_G","GAM_I"],[20.423,28.454],[78.8,82.33],[0.15,0.39],[441.22,435.04],[870.794,872.156],[0,1.36],[0.66396,0.33604]],"container":"<table class=\"cell-border stribe\">\n  <thead>\n    <tr>\n      <th>model<\/th>\n      <th>df<\/th>\n      <th>dev_expl<\/th>\n      <th>r2<\/th>\n      <th>reml<\/th>\n      <th>AIC<\/th>\n      <th>dAIC<\/th>\n      <th>w_AIC<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[1,2,3,4,5,6,7]}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
 ```
 
 Model G summary.
@@ -880,16 +880,16 @@ k.check(GAM_I)
 ## s(year)           3 0.0001686593        NA      NA
 ## s(IHO)            5 2.4076505437        NA      NA
 ## s(year,IHO)      15 7.4165714240        NA      NA
-## s(chl):IHOWAO_BF  4 1.0000040953 0.8254481  0.1950
-## s(chl):IHOCAA     4 1.0000034978 0.8254481  0.1400
-## s(chl):IHOBB      4 1.0000126627 0.8254481  0.1925
-## s(chl):IHODS      4 1.0000063020 0.8254481  0.1225
-## s(chl):IHOEAO     4 1.0000126173 0.8254481  0.1375
-## s(v):IHOWAO_BF    4 1.0000157092 0.8258448  0.1725
-## s(v):IHOCAA       4 1.0000052920 0.8258448  0.1700
-## s(v):IHOBB        4 2.6591573911 0.8258448  0.1700
-## s(v):IHODS        4 1.0000019600 0.8258448  0.1675
-## s(v):IHOEAO       4 2.5256034072 0.8258448  0.1925
+## s(chl):IHOWAO_BF  4 1.0000040953 0.8254481  0.2025
+## s(chl):IHOCAA     4 1.0000034978 0.8254481  0.1650
+## s(chl):IHOBB      4 1.0000126627 0.8254481  0.1800
+## s(chl):IHODS      4 1.0000063020 0.8254481  0.1400
+## s(chl):IHOEAO     4 1.0000126173 0.8254481  0.1725
+## s(v):IHOWAO_BF    4 1.0000157092 0.8258448  0.1750
+## s(v):IHOCAA       4 1.0000052920 0.8258448  0.1175
+## s(v):IHOBB        4 2.6591573911 0.8258448  0.1725
+## s(v):IHODS        4 1.0000019600 0.8258448  0.1800
+## s(v):IHOEAO       4 2.5256034072 0.8258448  0.1800
 ```
 
 ### Resiudals against covariates
@@ -1269,8 +1269,8 @@ data.frame(model = c("GAM_I", "GAM_I2"),
 ```
 
 ```{=html}
-<div id="htmlwidget-bd2b9f167bb955f27421" style="width:100%;height:auto;" class="datatables html-widget"></div>
-<script type="application/json" data-for="htmlwidget-bd2b9f167bb955f27421">{"x":{"filter":"none","vertical":false,"data":[["GAM_I","GAM_I2"],[28.454,28.454],[82.33,82.33],[0.39,0.39],[435.04,435.04],[872.156,872.156],[0,0],[0.5,0.5]],"container":"<table class=\"cell-border stribe\">\n  <thead>\n    <tr>\n      <th>model<\/th>\n      <th>df<\/th>\n      <th>dev_expl<\/th>\n      <th>r2<\/th>\n      <th>reml<\/th>\n      <th>AIC<\/th>\n      <th>dAIC<\/th>\n      <th>w_AIC<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[1,2,3,4,5,6,7]}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
+<div id="htmlwidget-8df9a3b3601f710bd3d2" style="width:100%;height:auto;" class="datatables html-widget"></div>
+<script type="application/json" data-for="htmlwidget-8df9a3b3601f710bd3d2">{"x":{"filter":"none","vertical":false,"data":[["GAM_I","GAM_I2"],[28.454,28.454],[82.33,82.33],[0.39,0.39],[435.04,435.04],[872.156,872.156],[0,0],[0.5,0.5]],"container":"<table class=\"cell-border stribe\">\n  <thead>\n    <tr>\n      <th>model<\/th>\n      <th>df<\/th>\n      <th>dev_expl<\/th>\n      <th>r2<\/th>\n      <th>reml<\/th>\n      <th>AIC<\/th>\n      <th>dAIC<\/th>\n      <th>w_AIC<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[1,2,3,4,5,6,7]}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
 ```
 
 Refit model with REML
@@ -1719,8 +1719,8 @@ data.frame(model = c("GAMSA_G",
 ```
 
 ```{=html}
-<div id="htmlwidget-6010a8e3a3b228e3f1dc" style="width:100%;height:auto;" class="datatables html-widget"></div>
-<script type="application/json" data-for="htmlwidget-6010a8e3a3b228e3f1dc">{"x":{"filter":"none","vertical":false,"data":[["GAMSA_I","GAMSA_G"],[27.177,15.186],[70.77,56.02],[0.58,0.48],[234.3,239.68],[470.856,476.3],[0,5.44],[0.93831,0.06169]],"container":"<table class=\"cell-border stribe\">\n  <thead>\n    <tr>\n      <th>model<\/th>\n      <th>df<\/th>\n      <th>dev_expl<\/th>\n      <th>r2<\/th>\n      <th>reml<\/th>\n      <th>AIC<\/th>\n      <th>dAIC<\/th>\n      <th>w_AIC<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[1,2,3,4,5,6,7]}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
+<div id="htmlwidget-be49bf1a94b82ef78e5c" style="width:100%;height:auto;" class="datatables html-widget"></div>
+<script type="application/json" data-for="htmlwidget-be49bf1a94b82ef78e5c">{"x":{"filter":"none","vertical":false,"data":[["GAMSA_I","GAMSA_G"],[27.177,15.186],[70.77,56.02],[0.58,0.48],[234.3,239.68],[470.856,476.3],[0,5.44],[0.93831,0.06169]],"container":"<table class=\"cell-border stribe\">\n  <thead>\n    <tr>\n      <th>model<\/th>\n      <th>df<\/th>\n      <th>dev_expl<\/th>\n      <th>r2<\/th>\n      <th>reml<\/th>\n      <th>AIC<\/th>\n      <th>dAIC<\/th>\n      <th>w_AIC<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[1,2,3,4,5,6,7]}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
 ```
 
 Model G summary.
@@ -1839,16 +1839,16 @@ k.check(GAMSA_I)
 ## s(year)           3 1.1335299        NA      NA
 ## s(IHO)            5 0.8570963        NA      NA
 ## s(year,IHO)      15 5.9099077        NA      NA
-## s(chl):IHOWAO_BF  4 1.0000002 0.9541349  0.3050
-## s(chl):IHOCAA     4 1.0000013 0.9541349  0.3050
+## s(chl):IHOWAO_BF  4 1.0000002 0.9541349  0.3175
+## s(chl):IHOCAA     4 1.0000013 0.9541349  0.3150
 ## s(chl):IHOBB      4 1.0000162 0.9541349  0.3000
-## s(chl):IHODS      4 1.0000023 0.9541349  0.2900
-## s(chl):IHOEAO     4 1.0000018 0.9541349  0.3225
-## s(v):IHOWAO_BF    4 1.0000035 0.9397667  0.2950
-## s(v):IHOCAA       4 1.0000020 0.9397667  0.2850
-## s(v):IHOBB        4 2.2402550 0.9397667  0.2800
-## s(v):IHODS        4 1.0000010 0.9397667  0.2750
-## s(v):IHOEAO       4 3.4445105 0.9397667  0.2725
+## s(chl):IHODS      4 1.0000023 0.9541349  0.3200
+## s(chl):IHOEAO     4 1.0000018 0.9541349  0.3075
+## s(v):IHOWAO_BF    4 1.0000035 0.9397667  0.2775
+## s(v):IHOCAA       4 1.0000020 0.9397667  0.2700
+## s(v):IHOBB        4 2.2402550 0.9397667  0.2350
+## s(v):IHODS        4 1.0000010 0.9397667  0.2400
+## s(v):IHOEAO       4 3.4445105 0.9397667  0.2575
 ```
 
 ### Resiudals against covariates
@@ -2228,8 +2228,8 @@ data.frame(model = c("GAMSA_I", "GAMSA_I2"),
 ```
 
 ```{=html}
-<div id="htmlwidget-a559d13e43398e0bf731" style="width:100%;height:auto;" class="datatables html-widget"></div>
-<script type="application/json" data-for="htmlwidget-a559d13e43398e0bf731">{"x":{"filter":"none","vertical":false,"data":[["GAMSA_I2","GAMSA_I"],[27.073,27.177],[72.46,70.77],[0.6,0.58],[234.53,234.3],[466.367,470.856],[0,4.49],[0.90418,0.09582]],"container":"<table class=\"cell-border stribe\">\n  <thead>\n    <tr>\n      <th>model<\/th>\n      <th>df<\/th>\n      <th>dev_expl<\/th>\n      <th>r2<\/th>\n      <th>reml<\/th>\n      <th>AIC<\/th>\n      <th>dAIC<\/th>\n      <th>w_AIC<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[1,2,3,4,5,6,7]}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
+<div id="htmlwidget-0acf23d6d8f36c902f28" style="width:100%;height:auto;" class="datatables html-widget"></div>
+<script type="application/json" data-for="htmlwidget-0acf23d6d8f36c902f28">{"x":{"filter":"none","vertical":false,"data":[["GAMSA_I2","GAMSA_I"],[27.073,27.177],[72.46,70.77],[0.6,0.58],[234.53,234.3],[466.367,470.856],[0,4.49],[0.90418,0.09582]],"container":"<table class=\"cell-border stribe\">\n  <thead>\n    <tr>\n      <th>model<\/th>\n      <th>df<\/th>\n      <th>dev_expl<\/th>\n      <th>r2<\/th>\n      <th>reml<\/th>\n      <th>AIC<\/th>\n      <th>dAIC<\/th>\n      <th>w_AIC<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[1,2,3,4,5,6,7]}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
 ```
 
 Refit model with REML
