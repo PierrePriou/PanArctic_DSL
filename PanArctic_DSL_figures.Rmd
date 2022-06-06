@@ -191,37 +191,37 @@ area_SV_laea <- SpatialPoints(cbind(c(40, 40, 0, 0), c(85, 78, 78, 85)),
   rename(xc = coords.x1, yc = coords.x2)
 
 # IHO regions
-IHO_EAO <- readOGR("data/arctic_regions/iho_eastern_arctic_ocean.shp",
+IHO_EAO <- readOGR("data/arctic_regions/IHO/iho_eastern_arctic_ocean.shp",
                    verbose = F) %>% # Eastern Arctic Ocean
   spTransform(CRSobj = crs(arctic_latlon)) %>% 
   spTransform(CRSobj = crs(arctic_laea)) %>% # Project shapefile in laea
   fortify() %>% # Convert to dataframe for ggplot
   rename(xc = long, yc = lat)
-IHO_WAO <- readOGR("data/arctic_regions/iho_western_arctic_ocean.shp",
+IHO_WAO <- readOGR("data/arctic_regions/IHO/iho_western_arctic_ocean.shp",
                    verbose = F) %>% # Western Arctic Ocean
   spTransform(CRSobj = crs(arctic_latlon)) %>% 
   spTransform(CRSobj = crs(arctic_laea)) %>% # Project shapefile in laea
   fortify() %>% # Convert to dataframe for ggplot
   rename(xc = long, yc = lat)
-IHO_BF <- readOGR("data/arctic_regions/iho_beaufort_sea.shp",
+IHO_BF <- readOGR("data/arctic_regions/IHO/iho_beaufort_sea.shp",
                   verbose = F) %>% # Beaufort Sea
   spTransform(CRSobj = crs(arctic_latlon)) %>% 
   spTransform(CRSobj = crs(arctic_laea)) %>% # Project shapefile in laea
   fortify() %>% # Convert to dataframe for ggplot
   rename(xc = long, yc = lat)
-IHO_CAA <- readOGR("data/arctic_regions/iho_northwestern_passages.shp",
+IHO_CAA <- readOGR("data/arctic_regions/IHO/iho_northwestern_passages.shp",
                    verbose = F) %>% # Canadian Arctic Archipelago
   spTransform(CRSobj = crs(arctic_latlon)) %>% 
   spTransform(CRSobj = crs(arctic_laea)) %>% # Project shapefile in laea
   fortify() %>% # Convert to dataframe for ggplot
   rename(xc = long, yc = lat)
-IHO_BB <- readOGR("data/arctic_regions/iho_baffin_bay.shp",
+IHO_BB <- readOGR("data/arctic_regions/IHO/iho_baffin_bay.shp",
                   verbose = F) %>% # Baffin Bay
   spTransform(CRSobj = crs(arctic_latlon)) %>% 
   spTransform(CRSobj = crs(arctic_laea)) %>% # Project shapefile in laea
   fortify() %>% # Convert to dataframe for ggplot
   rename(xc = long, yc = lat)
-IHO_DS <- readOGR("data/arctic_regions/iho_davis_strait.shp", 
+IHO_DS <- readOGR("data/arctic_regions/IHO/iho_davis_strait.shp", 
                   verbose = F) %>% # Davis Strait
   spTransform(CRSobj = crs(arctic_latlon)) %>% 
   spTransform(CRSobj = crs(arctic_laea)) %>% # Project shapefile in laea
@@ -231,13 +231,22 @@ IHO_DS <- readOGR("data/arctic_regions/iho_davis_strait.shp",
 IHO_regions <- bind_rows(IHO_EAO, IHO_WAO, IHO_BF, IHO_CAA, IHO_BB, IHO_DS) 
 rm(IHO_EAO, IHO_WAO, IHO_BF, IHO_CAA, IHO_BB, IHO_DS)
 # IHO areas
-IHO_sf_latlon <- dir_ls("data/arctic_regions/", glob = "*.shp") %>% 
+IHO_sf_latlon <- dir_ls("data/arctic_regions/IHO", glob = "*.shp") %>% 
   tibble(fname = .) %>%
   mutate(data = map(fname, read_sf)) %>%
   unnest(data) %>%
   st_as_sf() %>%
   st_transform(crs = crs(arctic_latlon)) %>%
   st_make_valid()
+
+# LME regions
+LME_sf <- read_sf("data/arctic_regions/LME/LME_2013_polygon.shp") %>%
+    st_transform(crs = crs(arctic_laea))
+LME <- readOGR("data/arctic_regions/LME/LME_2013_polygon.shp",
+                  verbose = F) %>% 
+  spTransform(CRSobj = crs(arctic_laea)) %>% # Project shapefile in laea
+  fortify() %>% # Convert to dataframe for ggplot
+  rename(xc = long, yc = lat)
 
 # Location of trawls
 trawl_laea <- SpatialPointsDataFrame(
@@ -248,14 +257,18 @@ trawl_laea <- SpatialPointsDataFrame(
              lon = trawl_latlon$lon)) %>%
   spTransform(., CRSobj = crs(arctic_laea)) %>% # Change projection to EPSG:6931
   as.data.frame() %>%
-  st_as_sf(coords = c("lon", "lat"), crs = st_crs(arctic_latlon), remove = F) %>%
-  st_join(., IHO_sf_latlon, join = st_within) %>% # Append IHO region
+  rename(xc = coords.x1, yc = coords.x2) %>%
+  st_as_sf(coords = c("xc", "yc"), crs = st_crs(arctic_laea), remove = F) %>%
+  st_join(., LME_sf, join = st_within) %>% # Append IHO region
   st_drop_geometry() %>%
-  mutate(name = if_else(name == "The Northwestern Passages" & coords.x2 < 0, "Baffin Bay",
-                if_else(name == "Arctic Ocean" & name_3 == "West Arctic Ocean", "West Arctic Ocean",
-                if_else(name == "Arctic Ocean" & name_3 == "East Arctic Ocean", "East Arctic Ocean", name)))) %>%
-  rename(xc = coords.x1, yc = coords.x2, IHO_area = name) %>%
-  dplyr::select(year, IHO_area, lat, lon, xc, yc)
+  # mutate(name = if_else(name == "The Northwestern Passages" & coords.x2 < 0,
+  #                       "Baffin Bay",
+  #               if_else(name == "Arctic Ocean" & name_3 == "West Arctic Ocean", 
+  #                       "West Arctic Ocean",
+  #               if_else(name == "Arctic Ocean" & name_3 == "East Arctic Ocean",
+  #                       "East Arctic Ocean", name)))) %>%
+  # rename(xc = coords.x1, yc = coords.x2, IHO_area = name) %>%
+  dplyr::select(year, LME, lat, lon, xc, yc)
 
 # Location of acoustic data
 MVBS_laea <- SpatialPoints(cbind(MVBS_latlon$lon, MVBS_latlon$lat), 
@@ -357,23 +370,40 @@ p_map_laea <- bathy_laea %>%
   ggplot(aes(x = xc, y = yc)) +
   # Plot bathy
   geom_raster(aes(fill = depth_d)) +
-  scale_fill_cmocean("Depth (m)", name = "deep", discrete = T, na.value = NA, alpha = 0.3) +
+  scale_fill_cmocean("Depth (m)", name = "deep",
+                     discrete = T, na.value = NA, alpha = 0.3) +
+  new_scale_fill() +
   # Areas of interest
-  geom_polygon(data = IHO_WAO, aes(x = xc, y = yc, group = group), fill = NA, col = "red", lwd = 0.3, lty = 1) +
-  geom_shape(data = IHO_BF, aes(x = xc, y = yc, group = group), fill = NA, col = "purple", lwd = 0.3, lty = 1) +
-  geom_shape(data = IHO_CAA, aes(x = xc, y = yc, group = group), fill = NA, col = "orange", lwd = 0.3, lty = 1) +
-  geom_shape(data = IHO_BB, aes(x = xc, y = yc, group = group), fill = NA, col = "blue", lwd = 0.3, lty = 1) +
-  geom_shape(data = IHO_DS, aes(x = xc, y = yc, group = group), fill = NA, col = "green", lwd = 0.3, lty = 1) +
-  geom_shape(data = IHO_EAO, aes(x = xc, y = yc, group = group), fill = NA, col = "yellow", lwd = 0.3, lty = 1) +
+  # geom_polygon(data = IHO_WAO, aes(x = xc, y = yc, group = group),
+  #              fill = NA, col = "red", lwd = 0.3, lty = 1) +
+  # geom_shape(data = IHO_BF, aes(x = xc, y = yc, group = group),
+  #            fill = NA, col = "purple", lwd = 0.3, lty = 1) +
+  # geom_shape(data = IHO_CAA, aes(x = xc, y = yc, group = group),
+  #            fill = NA, col = "orange", lwd = 0.3, lty = 1) +
+  # geom_shape(data = IHO_BB, aes(x = xc, y = yc, group = group),
+  #            fill = NA, col = "blue", lwd = 0.3, lty = 1) +
+  # geom_shape(data = IHO_DS, aes(x = xc, y = yc, group = group),
+  #            fill = NA, col = "green", lwd = 0.3, lty = 1) +
+  # geom_shape(data = IHO_EAO, aes(x = xc, y = yc, group = group),
+  #            fill = NA, col = "yellow", lwd = 0.3, lty = 1) +
+  geom_polygon(data = LME, aes(x = xc, y = yc, group = group, fill = group),
+               col = "red", alpha = 0.5, lwd = 0.3, lty = 1) +
   # Plot coastlines
-  geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), fill = "grey30") +
+  geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group),
+               fill = "grey30") +
   # Arctic circle
-  geom_path(data = arctic_circle_laea, aes(x = xc, y = yc), col = "grey10", lty = 2, size = 0.3) +
+  geom_path(data = arctic_circle_laea, aes(x = xc, y = yc), 
+            col = "grey10", lty = 2, size = 0.3) +
   coord_fixed(xlim = c(-2450, 600), ylim = c(-1500, 1800), expand = F) +
-  guides(fill = guide_legend(keywidth = 0.2, keyheight = 0.2, default.unit = "in"), color = "none") +
-  theme(legend.position = "right", panel.border = element_rect(fill = NA), axis.text = element_blank(),
-        axis.ticks = element_blank(), axis.title = element_blank())
-ggsave("plots/base_map_laeamap_stations.png", p_map_laea, height = 3, width = 6, dpi = 600, units = "in")
+  guides(fill = guide_legend(keywidth = 0.2, keyheight = 0.2,
+                             default.unit = "in"), color = "none") +
+  theme(legend.position = "right", 
+        panel.border = element_rect(fill = NA),
+        axis.text = element_blank(),
+        axis.ticks = element_blank(), 
+        axis.title = element_blank())
+ggsave("plots/base_map_laeamap_stations.png",
+       p_map_laea, height = 3, width = 6, dpi = 600, units = "in")
 p_map_laea
 ```
 
