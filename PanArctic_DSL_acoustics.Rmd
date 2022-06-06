@@ -194,7 +194,7 @@ SA_grid_laea_year <- data.frame() # Empty dataframe
 
 for (i in seq(2015, 2017, 1)) { # Data gridding
   SA_tmp <- SA_integrated %>%
-    filter(year == i & day_night == "day" & bottom_depth > 400)
+    filter(year == i & day_night == "day")
   # Rasterize data in latlon
   SA_tmp_laea <- SpatialPointsDataFrame(
     SpatialPoints(cbind(SA_tmp$lon, SA_tmp$lat), proj4string = CRS("EPSG:4326")),

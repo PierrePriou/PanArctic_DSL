@@ -365,7 +365,7 @@ pre code {
 <h1 class="title toc-ignore">PanArctic DSL - Acoustic gridding</h1>
 <h4 class="author"><a href="mailto:pierre.priou@mi.mun.ca">Pierre
 Priou</a></h4>
-<h4 class="date">2022/05/24 at 16:47</h4>
+<h4 class="date">2022/06/06 at 19:01</h4>
 
 </div>
 
@@ -389,8 +389,11 @@ library(RColorBrewer) # Diverging color palette
 theme_set(theme_bw())
 theme_update(axis.text = element_text(size = 9),
              axis.title = element_text(size = 9),
-             strip.text.x = element_text(size = 9, face = &quot;plain&quot;, hjust = 0.5),
-             strip.background = element_rect(colour = &quot;transparent&quot;, fill = &quot;transparent&quot;),
+             strip.text.x = element_text(size = 9,
+                                         face = &quot;plain&quot;, 
+                                         hjust = 0.5),
+             strip.background = element_rect(colour = &quot;transparent&quot;, 
+                                             fill = &quot;transparent&quot;),
              legend.title = element_text(size = 9, vjust = 1),
              legend.margin = margin(0, 0, 0, 0),
              legend.box.margin = margin(0, 0, -8, 0),
@@ -401,23 +404,23 @@ options(dplyr.summarise.inform = F) # Suppress summarise() warning</code></pre>
 <p>I use the area definitions from IHO Sea Areas (International
 Hydrographic Organization) to combine data.</p>
 <pre class="r"><code># Projections
-arctic_latlon &lt;- raster(extent(-155, 35, 66, 85), # Base projection for acoustic and CTD data
-                        crs = &quot;EPSG:4326&quot;, 
-                        res = c(2, 1)) # cells of 2 degree longitude per 1 degree latitude
-arctic_laea &lt;- raster(extent(-2700, 2700, -2700, 2700), crs = &quot;EPSG:6931&quot;) # Seaice projection
-projection(arctic_laea) &lt;- gsub(&quot;units=m&quot;, &quot;units=km&quot;, projection(arctic_laea)) # Convert proj unit from m to km
+arctic_latlon &lt;- raster(extent(-155, 35, 66, 85), crs = &quot;EPSG:4326&quot;)
 cell_res &lt;- 100 # Cell resolution in km
+arctic_laea &lt;- raster(extent(-2700, 2700, -2700, 2700), crs = &quot;EPSG:6931&quot;)
+projection(arctic_laea) &lt;- gsub(&quot;units=m&quot;,
+                                &quot;units=km&quot;,
+                                projection(arctic_laea)) 
 res(arctic_laea) &lt;- c(cell_res, cell_res) # Define the 100 km cell resolution
 
 # IHO areas
-IHO_sf_latlon &lt;- dir_ls(&quot;data/arctic_regions/&quot;, glob = &quot;*.shp&quot;) %&gt;% 
+IHO_sf_latlon &lt;- dir_ls(&quot;data/arctic_regions/IHO&quot;, glob = &quot;*.shp&quot;) %&gt;% 
   tibble(fname = .) %&gt;%
   mutate(data = map(fname, read_sf)) %&gt;%
   unnest(data) %&gt;%
   st_as_sf() %&gt;%
   st_transform(crs = crs(arctic_latlon)) %&gt;%
   st_make_valid()
-IHO_sf_laea &lt;- dir_ls(&quot;data/arctic_regions/&quot;, glob = &quot;*.shp&quot;) %&gt;% 
+IHO_sf_laea &lt;- dir_ls(&quot;data/arctic_regions/IHO&quot;, glob = &quot;*.shp&quot;) %&gt;% 
   tibble(fname = .) %&gt;%
   mutate(data = map(fname, read_sf)) %&gt;%
   unnest(data) %&gt;%
@@ -426,8 +429,18 @@ IHO_sf_laea &lt;- dir_ls(&quot;data/arctic_regions/&quot;, glob = &quot;*.shp&qu
   st_transform(crs = crs(arctic_laea)) %&gt;%
   st_make_valid()
 
-# Bathy data from marmap: for extracting bottom depth
-bathy &lt;- getNOAA.bathy(lon1 = -152, lon2 = 35, lat1 = 65, lat2 = 84, resolution = 2, keep = T, path = &quot;data/bathy/&quot;)</code></pre>
+# LME regions
+LME_sf_latlon &lt;- read_sf(&quot;data/arctic_regions/LME/LME_2013_polygon.shp&quot;) %&gt;%
+    st_transform(crs = crs(arctic_latlon))
+LME &lt;- readOGR(&quot;data/arctic_regions/LME/LME_2013_polygon.shp&quot;,
+                  verbose = F) %&gt;% 
+  spTransform(CRSobj = crs(arctic_laea)) %&gt;% # Project shapefile in laea
+  fortify() %&gt;% # Convert to dataframe for ggplot
+  rename(xc = long, yc = lat)</code></pre>
+<pre><code>## Regions defined for each Polygons</code></pre>
+<pre class="r"><code># Bathy data from marmap: for extracting bottom depth
+bathy &lt;- getNOAA.bathy(lon1 = -152, lon2 = 35, lat1 = 65, lat2 = 84,
+                       resolution = 2, keep = T, path = &quot;data/bathy/&quot;)</code></pre>
 <pre><code>## File already exists ; loading &#39;marmap_coord_-152;65;35;84_res_2.csv&#39;</code></pre>
 </div>
 <div id="integrated-sa-and-centre-of-mass" class="section level1">
@@ -447,9 +460,10 @@ Canadian Arctic Archipelago, Baffin Bay, and Svalbard—per year.</p>
 <pre class="r"><code># Load and tidy files
 MVBS_raw &lt;- list.files(&quot;C:/Users/cfer/PhD/Chapt 2 - Arctic Mesopelagic DSL/data/acoustics/90dB threshold&quot;,
 # MVBS_raw &lt;- list.files(&quot;D:/Travail/PhD/Chapt 2 - Arctic Mesopelagic DSL/data/acoustics/90dB threshold&quot;, 
-                       pattern = &quot;*.csv&quot;, full.names = TRUE) %&gt;% # list files in folder
+                       pattern = &quot;*.csv&quot;, full.names = TRUE) %&gt;% 
   set_names() %&gt;%
-  map_dfr(.f = ~ read_csv(., show_col_types = FALSE), .id = &quot;filename&quot;) %&gt;% # reads file
+  map_dfr(.f = ~ read_csv(., show_col_types = FALSE), 
+          .id = &quot;filename&quot;) %&gt;% # read file
   dplyr::select(-Interval, -Layer, -Dist_S, -Sv_min, -Sv_max) %&gt;%
   rename(&quot;layer_depth_min&quot; = &quot;Layer_depth_min&quot;,
          &quot;layer_depth_max&quot; = &quot;Layer_depth_max&quot;,
@@ -458,13 +472,16 @@ MVBS_raw &lt;- list.files(&quot;C:/Users/cfer/PhD/Chapt 2 - Arctic Mesopelagic D
          &quot;frequency&quot; = &quot;Frequency&quot;) %&gt;%
   unite(date, Date_S, Time_S, sep = &quot; &quot;, remove = FALSE) %&gt;%
   mutate(filename = str_remove(filename, pattern = &quot;C:/Users/cfer/PhD/Chapt 2 - Arctic Mesopelagic DSL/data/acoustics/90dB threshold&quot;),
-         date = ymd_hm(format(ymd_hms(date, tz = &quot;UTC&quot;), format = &#39;%Y%m%d %H:%M&#39;), tz = &quot;UTC&quot;),
+         date = ymd_hm(format(ymd_hms(date, tz = &quot;UTC&quot;), 
+                              format = &#39;%Y%m%d %H:%M&#39;), tz = &quot;UTC&quot;),
          Date_S = as.character(ymd(Date_S)),
-         date_num = as.integer(as.Date(as.character(ymd(Date_S)))), # Used for left_join with suncalc dataset
-         area = factor(case_when(lon &gt; -155 &amp; lon &lt;= -95 &amp; lat &gt; 65 &amp; lat &lt;= 82 ~ &quot;BF_CAA&quot;,
-                                 lon &gt; -95 &amp; lon &lt;= -50 &amp; lat &gt; 66 &amp; lat &lt;= 82 ~ &quot;BB&quot;,
-                                 lon &gt;= -25 &amp; lon &lt;= 145 &amp; lat &gt; 77 &amp; lat &lt;= 90 ~ &quot;SV&quot;),
-                       levels = c(&quot;BF_CAA&quot;, &quot;BB&quot;, &quot;SV&quot;)))
+         # date_num used for left_join with suncalc dataset
+         date_num = as.integer(as.Date(as.character(ymd(Date_S)))), 
+         area = factor(
+           case_when(lon &gt; -155 &amp; lon &lt;= -95 &amp; lat &gt; 65 &amp; lat &lt;= 82 ~ &quot;BF_CAA&quot;,
+                     lon &gt; -95 &amp; lon &lt;= -50 &amp; lat &gt; 66 &amp; lat &lt;= 82 ~ &quot;BB&quot;,
+                     lon &gt;= -25 &amp; lon &lt;= 145 &amp; lat &gt; 77 &amp; lat &lt;= 90 ~ &quot;SV&quot;),
+           levels = c(&quot;BF_CAA&quot;, &quot;BB&quot;, &quot;SV&quot;)))
 
 # Find dawn and dusk times. Suncalc requires the variables to be named &quot;date&quot;, &quot;lat&quot;, and &quot;lon&quot;.
 MVBS_suncalc &lt;- MVBS_raw %&gt;%
@@ -473,7 +490,8 @@ MVBS_suncalc &lt;- MVBS_raw %&gt;%
             lon = mean(lon, na.rm = T)) %&gt;%
   ungroup() %&gt;%
   # find dusk and dawn time
-  mutate(suncalc = getSunlightTimes(data = data.frame(date = as.Date(Date_S), lat = lat, lon=  lon), 
+  mutate(suncalc = getSunlightTimes(data = data.frame(date = as.Date(Date_S),
+                                                      lat = lat, lon = lon), 
                                       keep = c(&quot;dusk&quot;, &quot;dawn&quot;), tz=&quot;UTC&quot;),
          dusk = suncalc$dusk,
          dawn = suncalc$dawn) %&gt;%
@@ -490,84 +508,105 @@ MVBS_bottom_depth &lt;- MVBS_raw %&gt;%
 
 # Append dawn and dusk times, bottom depth to main dataframe
 MVBS &lt;- MVBS_raw %&gt;%
-  left_join(., MVBS_suncalc, by = c(&quot;filename&quot;, &quot;area&quot;, &quot;date_num&quot;)) %&gt;%
-  left_join(., MVBS_bottom_depth, by = c(&quot;filename&quot;, &quot;date&quot;, &quot;lat&quot;, &quot;lon&quot;, &quot;area&quot;)) %&gt;%
-  mutate(year = year(date), 
-         month = month(date), 
-         day_night = factor(if_else(is.na(dawn) &amp; is.na(dusk) &amp; month &gt;= 4 &amp; month &lt;= 10, &quot;day&quot;, # polar day case
-                            if_else(is.na(dawn) &amp; is.na(dusk) &amp; month &lt; 4 | month &gt; 10, &quot;night&quot;, # polar night case
-                            if_else(date &gt;= dawn &amp; date &lt;= dusk, &quot;day&quot;, &quot;night&quot;))),
-                            levels = c(&quot;day&quot;, &quot;night&quot;)),
-         empty = factor(if_else(Sv_mean &lt; -90, T, F)), 
-         Sv_clean = if_else(empty == T, -999, Sv_mean), # Thresholded Sv
-         NASC_clean = if_else(empty == T, 0, NASC)) %&gt;%  # Thresholded NASC
+  left_join(., MVBS_suncalc,
+            by = c(&quot;filename&quot;, &quot;area&quot;, &quot;date_num&quot;)) %&gt;%
+  left_join(., MVBS_bottom_depth,
+            by = c(&quot;filename&quot;, &quot;date&quot;, &quot;lat&quot;, &quot;lon&quot;, &quot;area&quot;)) %&gt;%
+  mutate(
+    year = year(date), 
+    month = month(date), 
+    day_night = 
+      factor(if_else(is.na(dawn) &amp; is.na(dusk) &amp; month &gt;= 4 &amp; month &lt;= 10, &quot;day&quot;,
+             if_else(is.na(dawn) &amp; is.na(dusk) &amp; month &lt; 4 | month &gt; 10, &quot;night&quot;, 
+             if_else(date &gt;= dawn &amp; date &lt;= dusk, &quot;day&quot;, &quot;night&quot;))),
+             levels = c(&quot;day&quot;, &quot;night&quot;))) %&gt;%
   filter(layer_depth_min &lt;= 995 &amp; bottom_depth &gt; 200 &amp; lat != 999 &amp; lon != 999 &amp; Sv_mean &lt; -30) %&gt;% # Tidy data
-  dplyr::select(year, area, date, day_night, lat, lon, layer_depth_min, Sv_mean, Sv_clean, NASC, NASC_clean, empty, bottom_depth, frequency) </code></pre>
+  dplyr::select(year, area, date, day_night, lat, lon, layer_depth_min, 
+                Sv_mean, NASC, bottom_depth, frequency) </code></pre>
 <p>Calculate integrated NASC over mesopelagic depth (200 - 1000 m depth)
 and centre of mass for each 10 min cell.</p>
 <pre class="r"><code>SA_integrated &lt;- MVBS %&gt;%
-  filter(layer_depth_min &gt;= 200 &amp; layer_depth_min &lt;= 995) %&gt;% # Select mesopelagic depths
+  # Select mesopelagic depths
+  filter(layer_depth_min &gt;= 200 &amp; layer_depth_min &lt;= 995) %&gt;% 
   group_by(year, area, date, day_night, lat, lon, bottom_depth) %&gt;%
-  summarise(depth_integration = max(layer_depth_min) - min(layer_depth_min) + 5, # +5 because each cell is 5m high
-            NASC_int = sum(NASC), # integrated backscatter (linear) 
-            NASC_int_clean = sum(NASC_clean), # integrated backscatter (linear) thresholded
-            CM = sum(layer_depth_min * NASC) / sum(NASC)) %&gt;% # centre of mass in meters
+  summarise(
+    # +5 because each cell is 5m high
+    depth_integration = max(layer_depth_min) - min(layer_depth_min) + 5, 
+    # Integrated backscatter (linear)
+    NASC_int = sum(NASC), 
+    # Mean mesopelagic NASC
+    NASC_mean = mean(NASC),
+    # centre of mass in meters
+    CM = sum(layer_depth_min * NASC) / sum(NASC)) %&gt;% 
   ungroup() %&gt;%
-  mutate(SA_int = 10 * log10(NASC_int),
-         SA_int_clean = 10 * log10(NASC_int_clean))</code></pre>
+  mutate(SA_int = 10 * log10(NASC_int))</code></pre>
 <p>Save data.</p>
 <pre class="r"><code>save(MVBS, SA_integrated, file = &quot;data/acoustics/MVBS_2015_2017.RData&quot;)</code></pre>
 <div id="d-integrated-backscatter---epsg6931---ease-grid-2.0-north-lamberts-equal-area-azimuthal" class="section level2">
 <h2>2D Integrated backscatter - EPSG:6931 - EASE-Grid 2.0 North
 (Lambert’s equal-area, azimuthal)</h2>
 <p>More info on this projection can be found on the <a href="https://nsidc.org/data/ease/">NSIDC website</a>.</p>
-<pre class="r"><code>SA_grid_laea &lt;- data.frame() # Empty dataframe that will be filled with gridded CTD data
+<pre class="r"><code>SA_grid_laea_year &lt;- data.frame() # Empty dataframe
 
 for (i in seq(2015, 2017, 1)) { # Data gridding
   SA_tmp &lt;- SA_integrated %&gt;%
-    filter(year == i &amp; day_night == &quot;day&quot;) %&gt;%
-    dplyr::select(year, lat, lon, NASC_int, NASC_int_clean, CM)
+    filter(year == i &amp; day_night == &quot;day&quot;)
   # Rasterize data in latlon
-  SA_tmp_laea &lt;- SpatialPointsDataFrame(SpatialPoints(cbind(SA_tmp$lon, SA_tmp$lat), 
-                                                        proj4string = CRS(&quot;EPSG:4326&quot;)),
-                                          data.frame(lat = SA_tmp$lat,
-                                                     lon = SA_tmp$lon,
-                                                     NASC_int = SA_tmp$NASC_int,
-                                                     NASC_int_clean = SA_tmp$NASC_int_clean,
-                                                     CM = SA_tmp$CM)) %&gt;%
-    spTransform(., CRSobj = crs(arctic_laea)) %&gt;% # Change projection to EPSG:6931
-    rasterize(., arctic_laea, fun = mean, na.rm = T) %&gt;% # Rasterize data in latlon
-    dropLayer(1) %&gt;% # Remove ID layer
-    rasterToPoints() %&gt;% # Convert raster to data frame
+  SA_tmp_laea &lt;- SpatialPointsDataFrame(
+    SpatialPoints(cbind(SA_tmp$lon, SA_tmp$lat), proj4string = CRS(&quot;EPSG:4326&quot;)),
+    data.frame(lat = SA_tmp$lat,
+               lon = SA_tmp$lon,
+               NASC_int = SA_tmp$NASC_int,
+               NASC_mean = SA_tmp$NASC_mean,
+               CM = SA_tmp$CM)) %&gt;%
+    # Change projection to EPSG:6931
+    spTransform(., CRSobj = crs(arctic_laea)) %&gt;% 
+    # Calculate median in each raster cell
+    rasterize(., arctic_laea, fun = median, na.rm = T) %&gt;%
+    # Remove ID layer
+    dropLayer(1) %&gt;% 
+    # Convert raster to dataframe
+    rasterToPoints() %&gt;% 
     as.data.frame() %&gt;%
-    rename(xc = x, yc = y) %&gt;% # Rename variables
+    # Rename variables
+    rename(xc = x, yc = y) %&gt;%
     mutate(year = i, 
-           area = factor(case_when(lon &gt; -155 &amp; lon &lt;= -95 &amp; lat &gt; 65 &amp; lat &lt;= 82 ~ &quot;BF_CAA&quot;,
-                                   lon &gt; -95 &amp; lon &lt;= -50 &amp; lat &gt; 66 &amp; lat &lt;= 82 ~ &quot;BB&quot;,
-                                   lon &gt;= -25 &amp; lon &lt;= 145 &amp; lat &gt; 77 &amp; lat &lt;= 90 ~ &quot;SV&quot;),
-                         levels = c(&quot;BF_CAA&quot;, &quot;BB&quot;, &quot;SV&quot;))) %&gt;%
-    dplyr::select(year, area, lat, lon, xc, yc, NASC_int, NASC_int_clean, CM) 
-  SA_grid_laea &lt;- bind_rows(SA_grid_laea, SA_tmp_laea)
+           area = factor(
+             case_when(lon &gt; -155 &amp; lon &lt;= -95 &amp; lat &gt; 65 &amp; lat &lt;= 82 ~ &quot;BF_CAA&quot;,
+                       lon &gt; -95 &amp; lon &lt;= -50 &amp; lat &gt; 66 &amp; lat &lt;= 82 ~ &quot;BB&quot;,
+                       lon &gt;= -25 &amp; lon &lt;= 145 &amp; lat &gt; 77 &amp; lat &lt;= 90 ~ &quot;SV&quot;),
+             levels = c(&quot;BF_CAA&quot;, &quot;BB&quot;, &quot;SV&quot;))) %&gt;%
+    dplyr::select(year, area, lat, lon, xc, yc, NASC_int, NASC_mean, CM) 
+  SA_grid_laea_year &lt;- bind_rows(SA_grid_laea_year, SA_tmp_laea)
 }
-rm(SA_tmp, SA_tmp_laea, i) # Remove temporary data
 
-SA_grid_laea &lt;- SA_grid_laea %&gt;% # Calculate normalized backscatter anomalies
-  mutate(cell_res = cell_res, # Add cell resolution to dataframe
-         SA_int = 10 * log10(NASC_int),
-         SA_int_clean = 10 * log10(NASC_int_clean)) %&gt;% # Calculate integrated backscatter strength
-  st_as_sf(coords = c(&quot;lon&quot;, &quot;lat&quot;), crs = st_crs(arctic_latlon), remove = F) %&gt;%
-  st_join(., IHO_sf_latlon, join = st_within) %&gt;% # Append IHO region
+# Remove temporary data
+rm(SA_tmp, SA_tmp_laea, i)
+
+# Tidy data frame: add cell resolution, LME and IHO areas, and calculate SA
+SA_grid_laea &lt;- SA_grid_laea_year %&gt;%
+  mutate(cell_res = cell_res, 
+         SA_int = 10 * log10(NASC_int)) %&gt;%
+  # Convert tibble to sf
+  st_as_sf(coords = c(&quot;lon&quot;, &quot;lat&quot;), crs = st_crs(arctic_latlon), 
+           remove = F) %&gt;%
+  # Append IHO region
+  st_join(., IHO_sf_latlon, join = st_within) %&gt;% 
+  # Append LME 
+  st_join(., LME_sf_latlon, join = st_within) %&gt;% 
   st_drop_geometry() %&gt;%
-  mutate(name = if_else(name == &quot;The Northwestern Passages&quot; &amp; yc &lt; 0, &quot;Baffin Bay&quot;,
-                if_else(name == &quot;Arctic Ocean&quot; &amp; name_3 == &quot;West Arctic Ocean&quot;, &quot;West Arctic Ocean&quot;,
-                if_else(name == &quot;Arctic Ocean&quot; &amp; name_3 == &quot;East Arctic Ocean&quot;, &quot;East Arctic Ocean&quot;, name))),
-         empty = factor(if_else(SA_int &lt; 0, T, F)),
-         empty_clean = factor(if_else(SA_int_clean &lt; 0, T, F))) %&gt;%
-    rename(IHO_area = name, area = area.x) %&gt;%
-  dplyr::select(year, xc, yc, lon, lat, IHO_area, area, NASC_int, NASC_int_clean, SA_int, SA_int_clean, CM, empty, empty_clean, cell_res)</code></pre>
+  mutate(name = if_else(name == &quot;The Northwestern Passages&quot; &amp; yc &lt; 0,
+                        &quot;Baffin Bay&quot;,
+                if_else(name == &quot;Arctic Ocean&quot; &amp; name_3 == &quot;West Arctic Ocean&quot;,
+                        &quot;West Arctic Ocean&quot;,
+                if_else(name == &quot;Arctic Ocean&quot; &amp; name_3 == &quot;East Arctic Ocean&quot;,
+                        &quot;East Arctic Ocean&quot;, name)))) %&gt;%
+  rename(IHO_area = name, area = area.x) %&gt;%
+  dplyr::select(year, xc, yc, lon, lat, LME, IHO_area, area, NASC_int,
+                NASC_mean, SA_int, CM, cell_res)</code></pre>
 <p>Map to check whether the IHO regions are well implemented.</p>
-<pre class="r"><code>coast_10m_laea &lt;- readOGR(&quot;data/bathy/ne_10m_land.shp&quot;, verbose = F) %&gt;% # Coastline in laea
-  spTransform(CRSobj = crs(arctic_latlon)) %&gt;% # Make sure that the shapefile is in the right projection
+<pre class="r"><code>coast_10m_laea &lt;- readOGR(&quot;data/bathy/ne_10m_land.shp&quot;, verbose = F) %&gt;% 
+  spTransform(CRSobj = crs(arctic_latlon)) %&gt;% 
   crop(extent(-180, 180, 0, 90)) %&gt;% # Crop shapefile
   spTransform(CRSobj = crs(arctic_laea)) %&gt;% # Project shapefile in laea
   fortify() %&gt;% # Convert to a dataframe for ggplot
@@ -575,88 +614,93 @@ SA_grid_laea &lt;- SA_grid_laea %&gt;% # Calculate normalized backscatter anomal
 
 SA_grid_laea %&gt;%
   ggplot() +
-  geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), fill = &quot;grey80&quot;) +
-  geom_point(aes(x = xc, y = yc, col = IHO_area)) +
+  geom_polygon(data = LME, aes(x = xc, y = yc, group = group),
+               fill = NA, col = &quot;black&quot;) +
+  geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group),
+               fill = &quot;grey80&quot;) +
+  geom_point(aes(x = xc, y = yc, col = LME)) +
   coord_fixed(xlim = c(-2600, 1100), ylim = c(-1800, 1900), expand = F)</code></pre>
-<p><img src="data:image/png;base64,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" /><!-- --></p>
+<p><img src="data:image/png;base64,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" /><!-- --></p>
 <p>Instead of rasterizing data and having the mean value of each grid
 cell of the raster I also create a dataframe with the “raw” data
 re-projected.</p>
-<pre class="r"><code>SA_raw_laea &lt;- SA_integrated %&gt;% 
-  st_as_sf(coords = c(&quot;lon&quot;, &quot;lat&quot;), crs = st_crs(&quot;EPSG:4326&quot;), remove = F) %&gt;% # Transform into sf
-  st_join(., IHO_sf_latlon, join = st_within) %&gt;% # Append IHO region
-  st_transform(crs = st_crs(arctic_laea)) %&gt;% # Change projection
-  mutate(xc = st_coordinates(.)[,1],
-         yc = st_coordinates(.)[,2]) %&gt;%
-  st_drop_geometry() %&gt;%
-  mutate(name = if_else(name == &quot;The Northwestern Passages&quot; &amp; yc &lt; 0, &quot;Baffin Bay&quot;,
-                if_else(name == &quot;Arctic Ocean&quot; &amp; name_3 == &quot;West Arctic Ocean&quot;, &quot;West Arctic Ocean&quot;,
-                if_else(name == &quot;Arctic Ocean&quot; &amp; name_3 == &quot;East Arctic Ocean&quot;, &quot;East Arctic Ocean&quot;, name)))) %&gt;%
-  rename(IHO_area = name, area = area.x) %&gt;%
-  dplyr::select(year, xc, yc, lon, lat, day_night, IHO_area, area, NASC_int, SA_int, CM)</code></pre>
+<pre class="r"><code># SA_raw_laea &lt;- SA_integrated %&gt;% 
+#   st_as_sf(coords = c(&quot;lon&quot;, &quot;lat&quot;), 
+#            crs = st_crs(&quot;EPSG:4326&quot;), remove = F) %&gt;% # Transform into sf
+#   st_join(., IHO_sf_latlon, join = st_within) %&gt;% # Append IHO region
+#   st_transform(crs = st_crs(arctic_laea)) %&gt;% # Change projection
+#   mutate(xc = st_coordinates(.)[,1],
+#          yc = st_coordinates(.)[,2]) %&gt;%
+#   st_drop_geometry() %&gt;%
+#   mutate(name = if_else(name == &quot;The Northwestern Passages&quot; &amp; yc &lt; 0, &quot;Baffin Bay&quot;,
+#                 if_else(name == &quot;Arctic Ocean&quot; &amp; name_3 == &quot;West Arctic Ocean&quot;, &quot;West Arctic Ocean&quot;,
+#                 if_else(name == &quot;Arctic Ocean&quot; &amp; name_3 == &quot;East Arctic Ocean&quot;, &quot;East Arctic Ocean&quot;, name)))) %&gt;%
+#   rename(IHO_area = name, area = area.x) %&gt;%
+#   dplyr::select(year, xc, yc, lon, lat, day_night, IHO_area, area, NASC_int, SA_int, CM)</code></pre>
 </div>
 <div id="d-sv-profiles---epsg6931---ease-grid-2.0-north-lamberts-equal-area-azimuthal" class="section level2">
 <h2>3D S~V~ profiles - EPSG:6931 - EASE-Grid 2.0 North (Lambert’s
 equal-area, azimuthal)</h2>
 <p>More info on this projection can be found on the <a href="https://nsidc.org/data/ease/">NSIDC website</a>.I calculate the
 median Sv for each depth interval of each georeferenced grid cell.</p>
-<pre class="r"><code>Sv_grid_laea &lt;- data.frame() # Empty dataframe that will be filled with gridded CTD data
-
-for (i in seq(2015, 2017, 1)) { # Loop through every year
-  for (j in seq(20, 995,5)) { # Loop through each depth bin
-    Sv_tmp &lt;- MVBS %&gt;%
-     filter(year == i &amp; day_night == &quot;day&quot; &amp; layer_depth_min == j) %&gt;%
-      dplyr::select(year, lat, lon, layer_depth_min, Sv_mean) %&gt;%
-      mutate(sv_lin = 10 ^ (Sv_mean / 10)) # Transform into backscattering coefficient (lin)
-    # Calculate mean
-    Sv_tmp_median &lt;- SpatialPointsDataFrame(SpatialPoints(cbind(Sv_tmp$lon, Sv_tmp$lat), 
-                                                       proj4string = CRS(&quot;EPSG:4326&quot;)),
-                                         data.frame(lat = Sv_tmp$lat,
-                                                    lon = Sv_tmp$lon,
-                                                    sv_lin = Sv_tmp$sv_lin)) %&gt;%
-      spTransform(., CRSobj = crs(arctic_laea)) %&gt;% # Change projection to EPSG:6931
-      rasterize(., arctic_laea, fun = function(x, ...) {quantile(unique(na.omit(x)), 0.5)}, na.rm = F) %&gt;% 
-      dropLayer(1) %&gt;% # Remove ID layer
-      rasterToPoints() %&gt;% # Convert raster to data frame
-      as.data.frame() %&gt;%
-      rename(xc = x, yc = y, sv_lin_median = sv_lin) %&gt;% # Rename variables
-      mutate(year = i, depth = j)
-    Sv_grid_laea &lt;- bind_rows(Sv_grid_laea, Sv_tmp_median) # Combine data
-  }
-}
-rm(Sv_tmp, Sv_tmp_median) # Remove temporary data
-
-coord_equivalences &lt;- SA_grid_laea %&gt;% # Calculate coord equivalences between 4326 and 6931
-  group_by(xc, yc, area, IHO_area) %&gt;%
-  summarise()
-
-Sv_grid_laea &lt;- Sv_grid_laea %&gt;% # Tidy data
-    mutate(Sv_median = 10 * log10(sv_lin_median),
-           area = factor(case_when(lon &gt; -155 &amp; lon &lt;= -95 &amp; lat &gt; 65 &amp; lat &lt;= 82 ~ &quot;BF_CAA&quot;,
-                                   lon &gt; -95 &amp; lon &lt;= -50 &amp; lat &gt; 66 &amp; lat &lt;= 82 ~ &quot;BB&quot;,
-                                   lon &gt;= -25 &amp; lon &lt;= 145 &amp; lat &gt; 77 &amp; lat &lt;= 90 ~ &quot;SV&quot;),
-                         levels = c(&quot;BF_CAA&quot;, &quot;BB&quot;, &quot;SV&quot;)),
-           cell_res = cell_res,
-           empty = factor(if_else(Sv_median &lt; -90, T, F)),
-           sv_lin_median_clean = if_else(empty == T, 10^(-999/10), sv_lin_median),
-           Sv_median_clean = if_else(empty == T, -999, Sv_median)) %&gt;%
-  ungroup() %&gt;%
-  left_join(., coord_equivalences, by = c(&quot;xc&quot;, &quot;yc&quot;, &quot;area&quot;)) %&gt;%
-  dplyr::select(year, xc, yc, lon, lat, IHO_area, area, depth, sv_lin_median, sv_lin_median_clean,
-                Sv_median, Sv_median_clean, empty, cell_res)</code></pre>
+<pre class="r"><code># Sv_grid_laea &lt;- data.frame() # Empty dataframe that will be filled with gridded CTD data
+# 
+# for (i in seq(2015, 2017, 1)) { # Loop through every year
+#   for (j in seq(20, 995,5)) { # Loop through each depth bin
+#     Sv_tmp &lt;- MVBS %&gt;%
+#      filter(year == i &amp; day_night == &quot;day&quot; &amp; layer_depth_min == j) %&gt;%
+#       dplyr::select(year, lat, lon, layer_depth_min, Sv_mean) %&gt;%
+#       mutate(sv_lin = 10 ^ (Sv_mean / 10)) # Transform into backscattering coefficient (lin)
+#     # Calculate mean
+#     Sv_tmp_median &lt;- SpatialPointsDataFrame(SpatialPoints(cbind(Sv_tmp$lon, Sv_tmp$lat), 
+#                                                        proj4string = CRS(&quot;EPSG:4326&quot;)),
+#                                          data.frame(lat = Sv_tmp$lat,
+#                                                     lon = Sv_tmp$lon,
+#                                                     sv_lin = Sv_tmp$sv_lin)) %&gt;%
+#       spTransform(., CRSobj = crs(arctic_laea)) %&gt;% # Change projection to EPSG:6931
+#       rasterize(., arctic_laea, fun = function(x, ...) {quantile(unique(na.omit(x)), 0.5)}, na.rm = F) %&gt;% 
+#       dropLayer(1) %&gt;% # Remove ID layer
+#       rasterToPoints() %&gt;% # Convert raster to data frame
+#       as.data.frame() %&gt;%
+#       rename(xc = x, yc = y, sv_lin_median = sv_lin) %&gt;% # Rename variables
+#       mutate(year = i, depth = j)
+#     Sv_grid_laea &lt;- bind_rows(Sv_grid_laea, Sv_tmp_median) # Combine data
+#   }
+# }
+# rm(Sv_tmp, Sv_tmp_median) # Remove temporary data
+# 
+# coord_equivalences &lt;- SA_grid_laea %&gt;% # Calculate coord equivalences between 4326 and 6931
+#   group_by(xc, yc, area, IHO_area) %&gt;%
+#   summarise()
+# 
+# Sv_grid_laea &lt;- Sv_grid_laea %&gt;% # Tidy data
+#     mutate(Sv_median = 10 * log10(sv_lin_median),
+#            area = factor(case_when(lon &gt; -155 &amp; lon &lt;= -95 &amp; lat &gt; 65 &amp; lat &lt;= 82 ~ &quot;BF_CAA&quot;,
+#                                    lon &gt; -95 &amp; lon &lt;= -50 &amp; lat &gt; 66 &amp; lat &lt;= 82 ~ &quot;BB&quot;,
+#                                    lon &gt;= -25 &amp; lon &lt;= 145 &amp; lat &gt; 77 &amp; lat &lt;= 90 ~ &quot;SV&quot;),
+#                          levels = c(&quot;BF_CAA&quot;, &quot;BB&quot;, &quot;SV&quot;)),
+#            cell_res = cell_res,
+#            empty = factor(if_else(Sv_median &lt; -90, T, F)),
+#            sv_lin_median_clean = if_else(empty == T, 10^(-999/10), sv_lin_median),
+#            Sv_median_clean = if_else(empty == T, -999, Sv_median)) %&gt;%
+#   ungroup() %&gt;%
+#   left_join(., coord_equivalences, by = c(&quot;xc&quot;, &quot;yc&quot;, &quot;area&quot;)) %&gt;%
+#   dplyr::select(year, xc, yc, lon, lat, IHO_area, area, depth, sv_lin_median, sv_lin_median_clean,
+#                 Sv_median, Sv_median_clean, empty, cell_res)</code></pre>
 <p>There is an outlier in Baffin Bay at 995 m depth due to seafloor not
 being removed properly. I therefore clean the data myself.</p>
-<pre class="r"><code>Sv_grid_laea &lt;- Sv_grid_laea %&gt;%
-  mutate(sv_lin_median = if_else(year == 2015 &amp; area == &quot;BB&quot; &amp; xc == -1775 &amp; yc == -725 &amp; depth == 995, 1.258925e-100, sv_lin_median),
-         sv_lin_median_clean = if_else(year == 2015 &amp; area == &quot;BB&quot; &amp; xc == -1775 &amp; yc == -725 &amp; depth == 995, 1.258925e-100, sv_lin_median_clean),
-         Sv_median = if_else(year == 2015 &amp; area == &quot;BB&quot; &amp; xc == -1775 &amp; yc == -725 &amp; depth == 995, -999, Sv_median),
-         Sv_median_clean = if_else(year == 2015 &amp; area == &quot;BB&quot; &amp; xc == -1775 &amp; yc == -725 &amp; depth == 995, -999, Sv_median_clean))</code></pre>
+<pre class="r"><code># Sv_grid_laea &lt;- Sv_grid_laea %&gt;%
+#   mutate(sv_lin_median = if_else(year == 2015 &amp; area == &quot;BB&quot; &amp; xc == -1775 &amp; yc == -725 &amp; depth == 995, 1.258925e-100, sv_lin_median),
+#          sv_lin_median_clean = if_else(year == 2015 &amp; area == &quot;BB&quot; &amp; xc == -1775 &amp; yc == -725 &amp; depth == 995, 1.258925e-100, sv_lin_median_clean),
+#          Sv_median = if_else(year == 2015 &amp; area == &quot;BB&quot; &amp; xc == -1775 &amp; yc == -725 &amp; depth == 995, -999, Sv_median),
+#          Sv_median_clean = if_else(year == 2015 &amp; area == &quot;BB&quot; &amp; xc == -1775 &amp; yc == -725 &amp; depth == 995, -999, Sv_median_clean))</code></pre>
 </div>
 </div>
 <div id="save-data" class="section level1">
 <h1>Save data</h1>
-<pre class="r"><code>save(SA_grid_laea, SA_raw_laea, file = paste0(&quot;data/acoustics/SA_grids_&quot;, cell_res, &quot;km.RData&quot;)) # Save data
-save(Sv_grid_laea, file = paste0(&quot;data/acoustics/Sv_grids_&quot;, cell_res, &quot;km.RData&quot;)) # Save data</code></pre>
+<pre class="r"><code>save(SA_grid_laea,# SA_raw_laea,
+     file = paste0(&quot;data/acoustics/SA_grids_&quot;, cell_res, &quot;km.RData&quot;)) # Save data
+# save(Sv_grid_laea, file = paste0(&quot;data/acoustics/Sv_grids_&quot;, cell_res, &quot;km.RData&quot;)) # Save data</code></pre>
 </div>
 
 
