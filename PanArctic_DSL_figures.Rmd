@@ -40,7 +40,8 @@ source("R/rounder.R")
 theme_set(theme_bw())
 theme_update(axis.text = element_text(size = 9),
              axis.title = element_text(size = 9),
-             strip.text.x = element_text(size = 9, face = "plain", hjust = 0.5),
+             strip.text.x = element_text(size = 9, face = "plain",
+                                         hjust = 0.5),
              strip.background = element_rect(colour = "transparent", 
                                              fill = "transparent"),
              legend.title = element_text(size = 9),
@@ -363,7 +364,7 @@ SA_grid_laea %>%
 
 # Plots
 
-## Base map with IHO areas reprojcted
+## Figure 1. Base map with IHO areas reprojcted
 
 ```{r map-areas, fig.height=4, fig.width=6}
 # Bathymetric map of the Arctic with location of acoustic and trawl
@@ -416,7 +417,715 @@ ggsave("plots/base_map_laeamap_stations.png",
 p_map_laea
 ```
 
-## Figure 1. Bathy map with sampling locations
+## Figure 3. Boxplot mesopelagic NASC & Map detections
+
+### Map and Boxplot
+
+```{r fig3-boxplot-NASC, fig.width=6, fig.height=5}
+# Map NASC
+map_DSL <- SA_grid_laea %>% 
+  mutate(NASC_int_d = cut(NASC_int, c(0, 1, 10, 100, 1000, 10000, Inf))) %>%
+  ggplot(aes(x = xc,  y = yc)) +
+  geom_raster(data = bathy_laea, aes(x = xc, y = yc, fill = depth_d),
+              alpha = 0.8) + # bathy
+  scale_fill_grey("Depth (m)", start = 0.9, end = 0.3) +
+  guides(fill = "none") + 
+  new_scale_fill() + 
+  geom_polygon(data = LME, aes(x = xc, y = yc, group = group), 
+               col = "black", fill = NA, lwd = 0.3, alpha = 1) + # LME
+  geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), 
+               fill = "grey25") + # Coast
+  # geom_point(aes(col = NASC_int_d), size = 0.6) +
+  # scale_color_viridis_d(option = "plasma", 
+  #                       labels = c("< 1", "1-10", "11-100", "101-1000", 
+  #                                  "1001-10000", "> 10000")) +
+  geom_tile(aes(fill = NASC_int_d), size = 0.2, alpha = 0.8, col = "white") +
+  scale_fill_viridis_d(option = "viridis", 
+                       labels = c("< 1", "1-10", "11-100", "101-1000", 
+                                  "1001-10000", "> 10000")) +
+  facet_wrap(~ year) +
+  coord_fixed(xlim = c(-2450, 650), ylim = c(-1500, 1850), expand = F) +
+  guides(fill = guide_legend(override.aes = list(size = 2), 
+                               nrow = 1)) + 
+  # guides(fill = "none",
+  #        colour = guide_legend(override.aes = list(size = 2), 
+  #                              nrow = 1)) + # Increase symbol size in legend
+  theme(legend.position = "top",
+        legend.title = element_blank(),
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        axis.title = element_blank())
+# Bxplot SA
+p_boxplot_SA <-
+  SA_grid_laea %>% # Boxplot of SA per region
+  mutate(LME = factor(case_when(LME == "BF" ~ "Beaufort Sea",
+                                LME == "NAR" ~ "Nares Strait",
+                                LME == "BB" ~ "Baffin Bay",
+                                LME == "SV" ~ "Barents Sea"),
+                      levels = c("Beaufort Sea", "Nares Strait", 
+                                 "Baffin Bay", "Barents Sea"))) %>%
+  ggplot(aes(x = LME, y = SA_int)) + 
+  geom_boxplot(position = position_dodge(preserve = "single")) +
+  scale_y_continuous(expression("S"[A]*" (dB re 1 m"^2*" nmi"^-2*")")) +
+  theme(panel.border = element_blank(),
+        axis.title.x = element_blank(),
+        axis.line = element_line(),
+        legend.title = element_blank(), 
+        # legend.position = "none",
+        plot.margin = unit(c(0.1, 0.1, 0, 0), "in"))
+# Combine plots
+p_map_SA_DSL <- plot_grid(map_DSL, p_boxplot_SA, 
+                          ncol = 1, align = "v", axis = "lr",
+                          labels = "auto", label_size = 9) 
+# Save and display plots
+ggsave("plots/Fig3_map_boxplot_SA.png", p_map_SA_DSL,
+       height = 5, width = 6, dpi = 600, units = "in")
+p_map_SA_DSL
+```
+
+### Map and Points
+
+```{r fig3-map-points}
+map_DSL <- SA_grid_laea %>% 
+  mutate(NASC_int_d = cut(NASC_int, c(0, 1, 10, 100, 500, 1000, Inf))) %>%
+  ggplot(aes(x = xc,  y = yc)) +
+  geom_raster(data = bathy_laea, aes(x = xc, y = yc, fill = depth_d), 
+              alpha = 0.8) + # bathy
+  scale_fill_grey("Depth (m)", start = 0.9, end = 0.3) +
+  guides(fill = "none") + 
+  new_scale_fill() + 
+  geom_polygon(data = LME, aes(x = xc, y = yc, group = group), 
+               col = "black", fill = NA, lwd = 0.3, alpha = 1) + # LME
+  geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), 
+               fill = "grey25") + # Coast
+  geom_tile(aes(fill = NASC_int_d), size = 0.2, col = "white") +
+  scale_fill_viridis_d(expression("s"[A]*" ( m"^2*" nmi"^-2*")"),
+                       option = "viridis",
+                       labels = c("< 1", "1-10", "11-100", "101-500",
+                                  "501-1000", "> 1000")) +
+  geom_point(aes(x = 0, y = 0), size = 0.05) +
+  facet_wrap(~ year) +
+  coord_fixed(xlim = c(-2450, 650), ylim = c(-1500, 1850), expand = F) +
+  theme(legend.position = "right",
+        legend.key.height = unit(0.15, "in"),
+        legend.key.width = unit(0.15, "in"),
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        axis.title = element_blank())
+
+pointrange_NASC <- SA_grid_laea %>% # Pointrange of SA per region
+  mutate(LME = factor(case_when(LME == "BF" ~ "Beaufort Sea",
+                                LME == "NAR" ~ "Nares Strait",
+                                LME == "BB" ~ "Baffin Bay",
+                                LME == "SV" ~ "Barents Sea"),
+                      levels = c("Beaufort Sea", "Nares Strait", 
+                                 "Baffin Bay", "Barents Sea"))) %>%
+  group_by(LME, year) %>% # Median per year
+  summarise(NASC_median = median(NASC_int, na.rm = T),
+            NASC_mean = mean(NASC_int, na.rm = T),
+            NASC_q025 = quantile(NASC_int, 0.025),
+            NASC_q975 = quantile(NASC_int, 0.975)) %>%
+  ungroup() %>%
+  group_by(LME) %>% # Mean per area
+  summarise(NASC_median = mean(NASC_median, na.rm = T),
+            NASC_mean = mean(NASC_mean, na.rm = T),
+            NASC_q025 = min(NASC_q025, na.rm = T),
+            NASC_q975 = max(NASC_q975, na.rm = T)) %>%
+  ungroup() %>%
+  ggplot(aes(x = LME)) +
+  geom_point(aes(y = 10 * log10(NASC_mean)), 
+             shape = 18, size = 4.5, col = "black") +
+  geom_pointrange(aes(y = 10 * log10(NASC_median),
+                      ymin = 10 * log10(NASC_q025), 
+                      ymax = 10 * log10(NASC_q975)),
+                  col = "black", fill = "white", shape = 21) +
+  scale_y_continuous(
+    expression("S"[A]*" (dB re 1 m"^2*" nmi"^-2*")"),
+    sec.axis = 
+      sec_axis(trans = ~10^(./10), 
+               name = expression("s"[A]*" ( m"^2*" nmi"^-2*")"),
+               breaks = c(1, 5, 10, 50, 100, 500, 1000, 5000, 10000, 50000))) +
+  theme(axis.title.x = element_blank(),
+        plot.margin = unit(c(0.1, 0.1, 0, 0), "in"))
+# Combine plots
+p_map_pointrange_NASC <- plot_grid(pointrange_NASC, map_DSL,
+                                   ncol = 1, align = "v", axis = "lr",
+                                   labels = "auto", label_size = 9) 
+# Save and display plot
+ggsave("plots/Fig3_map_pointrange_NASC.png", p_map_pointrange_NASC, 
+       height = 5, width = 6.5, dpi = 600, units = "in")
+p_map_pointrange_NASC
+```
+
+### Just boxplot
+
+```{r fig3-boxplot}
+boxplot_NASC <- SA_grid_laea %>% # Pointrange of SA per region
+  mutate(LME = factor(case_when(LME == "BF" ~ "Beaufort Sea",
+                                LME == "NAR" ~ "Nares Strait",
+                                LME == "BB" ~ "Baffin Bay",
+                                LME == "SV" ~ "Barents Sea"),
+                      levels = c("Beaufort Sea", "Nares Strait", 
+                                 "Baffin Bay", "Barents Sea")),
+    year = factor(year)) %>%
+  ggplot(aes(x = LME)) +
+  geom_boxplot(aes(y = SA_int, fill = year), size = 0.4, outlier.size = 0.7,
+               alpha = 0.8, position = position_dodge(preserve = "single")) +
+  scale_fill_manual(values = met.brewer("Johnson", n = 6, direction = -1)) + 
+                      # c("#0086a8", "#f6c200", "#d04e00")) +
+  scale_y_continuous(
+    expression("S"[A]*" (dB re 1 m"^2*" nmi"^-2*")"),
+    position = "left",
+    sec.axis = 
+      sec_axis(trans = ~10^(./10), 
+               name = expression("s"[A]*" ( m"^2*" nmi"^-2*")"),
+               breaks = c(1, 5, 10, 50, 100, 500, 1000, 5000, 10000))) +
+  theme(axis.title.x = element_blank(),
+        legend.title = element_blank(),
+        legend.key.width = unit(0.15, "in"),
+        legend.key.height = unit(0.15, "in"),
+        plot.margin = unit(c(0.1, 0.1, 0, 0), "in"))
+# Save and display plot
+ggsave("plots/Fig3_boxplot_NASC.png", boxplot_NASC, 
+       height = 2.5, width = 6.5, dpi = 600, units = "in")
+boxplot_NASC
+```
+
+### Just points
+
+```{r fig3-points}
+pointrange_NASC <- SA_grid_laea %>% # Pointrange of SA per region
+  mutate(LME = factor(case_when(LME == "BF" ~ "Beaufort Sea",
+                                LME == "NAR" ~ "Nares Strait",
+                                LME == "BB" ~ "Baffin Bay",
+                                LME == "SV" ~ "Barents Sea"),
+                      levels = c("Beaufort Sea", "Nares Strait", 
+                                 "Baffin Bay", "Barents Sea"))) %>%
+  group_by(LME, year) %>% # Median per year
+  summarise(NASC_median = median(NASC_int, na.rm = T),
+            NASC_mean = mean(NASC_int, na.rm = T),
+            NASC_q025 = quantile(NASC_int, 0.025),
+            NASC_q975 = quantile(NASC_int, 0.975)) %>%
+  ungroup() %>%
+  group_by(LME) %>% # Mean per area
+  summarise(NASC_median = mean(NASC_median, na.rm = T),
+            NASC_mean = mean(NASC_mean, na.rm = T),
+            NASC_q025 = min(NASC_q025, na.rm = T),
+            NASC_q975 = max(NASC_q975, na.rm = T)) %>%
+  ungroup() %>%
+  ggplot(aes(x = LME)) +
+  geom_point(aes(y = 10 * log10(NASC_mean)), 
+             shape = 18, size = 4.5, col = "black") +
+  geom_pointrange(aes(y = 10 * log10(NASC_median),
+                      ymin = 10 * log10(NASC_q025), 
+                      ymax = 10 * log10(NASC_q975)),
+                  col = "black", fill = "white", shape = 21) +
+  scale_y_continuous(
+    expression("S"[A]*" (dB re 1 m"^2*" nmi"^-2*")"),
+    position = "left",
+    sec.axis = 
+      sec_axis(trans = ~10^(./10), 
+               name = expression("s"[A]*" ( m"^2*" nmi"^-2*")"),
+               breaks = c(1, 5, 10, 50, 100, 500, 1000, 5000, 10000))) +
+  theme(axis.title.x = element_blank(),
+        plot.margin = unit(c(0.1, 0.1, 0, 0), "in"))
+# Save and display plot
+ggsave("plots/Fig3_pointrange_NASC.png", pointrange_NASC, 
+       height = 2.5, width = 6.5, dpi = 600, units = "in")
+pointrange_NASC
+```
+
+## Map/table 1. Abundance mesopelagic fish and map
+
+### Data preparation
+
+I prepare the datasets for the table (relative abundance per area) and the map (relative abundance per station).
+
+```{r relative-abundance-area}
+trawl_area_df <- trawl %>%
+  # Find IHO area for each trawl deployment
+  st_as_sf(coords = c("lon", "lat"), crs = st_crs(arctic_latlon), 
+           remove = F) %>%
+  st_join(., LME_sf_latlon, join = st_within) %>% # Append IHO region
+  st_drop_geometry() %>%
+  mutate(LME = if_else(LME == "CAO" & lon > 0, "SV",
+               if_else(LME == "CAO" & lon < 0, "BF", LME))) %>%
+  # Calculate number of individual for each species per IHO region
+  group_by(LME, fish_species) %>% 
+  summarise(number_fish = sum(number_fish)) %>%
+  ungroup() %>%
+  # Calculate total number of fish per IHO region
+  group_by(LME) %>%
+  mutate(total_fish = sum(number_fish)) %>% 
+  ungroup() %>%
+  # Calculate relative abundance per station
+  mutate(RA = (number_fish / total_fish) * 100) %>%
+  mutate(LME = factor(
+    case_when(
+      LME == "Barents Sea LME" ~ "Barents Sea\nn = 464",
+      LME == "Beaufort Sea LME" ~ "Beaufort Sea\nn = 923",
+      LME == "Baffin Bay LME" ~ "Baffin Bay\nn = 232"),
+    levels = c("Beaufort Sea\nn = 923",
+               "Baffin Bay\nn = 232",
+               "Barents Sea\nn = 464"))) %>%
+  # Format species name appropriately
+  mutate(fish_species = str_replace(fish_species, pattern = "_", 
+                                    replacement = " "),
+         fish_species = str_replace(fish_species, pattern = " sp",
+                                    replacement = " sp."),
+         fish_species = str_to_sentence(fish_species),
+         fish_species = if_else(fish_species == "Notolepis rissoi",
+                                "Arctozenus risso", fish_species),
+         fish_species = factor(fish_species, 
+                               levels = c("Icelus bicornis",
+                                          "Anarhichas lupus",
+                                          "Reinhardtius hippoglossoides",
+                                          "Arctozenus risso",
+                                          "Melanogrammus aeglefinus",
+                                          "Gadus morhua",
+                                          "Leptoclinus maculatus",
+                                          "Sebastes sp.",
+                                          "Myctophidae",
+                                          "Liparidae",
+                                          "Boreogadus saida")),
+         color_text = if_else(RA >= 40, "white", "black")) 
+```
+
+```{r realtive-abundance-station}
+trawl_station_df <- trawl %>%
+  # Find LME for each trawl deployment
+  st_as_sf(coords = c("lon", "lat"), crs = st_crs(arctic_latlon),
+           remove = F) %>%
+  st_join(., LME_sf_latlon, join = st_within) %>% # Append LME
+  st_transform(crs = st_crs(arctic_laea)) %>% # Change projection
+  mutate(xc = st_coordinates(.)[,1],
+         yc = st_coordinates(.)[,2]) %>%
+  st_drop_geometry() %>%
+  mutate(fish_species2 = case_when(
+    fish_species == "boreogadus_saida" ~ "Arctic cod",
+    fish_species == "liparidae" ~ "Snailfish",
+    fish_species == "myctophidae" ~ "Lanternfish",
+    fish_species == "sebastes_sp" ~ "Redfish",
+    !fish_species %in% c("boreogadus_saida", "liparidae", 
+                         "myctophidae", "sebastes_sp") ~ "Other")) %>%
+  # Calculate number of individual for each species per station
+  group_by(year, LME, date, station, deployment, lat,
+           lon, xc, yc, fish_species2) %>% 
+  summarise(number_fish = sum(number_fish)) %>%
+  ungroup() %>%
+  # Calculate total number of fish per station
+  group_by(year, LME, date, station, deployment, lat, lon, xc, yc) %>% 
+  mutate(total_fish = sum(number_fish)) %>% 
+  ungroup() %>%
+  # Calculate relative abundance per station
+  mutate(RA = (number_fish / total_fish) * 100) %>%
+  dplyr::select(year, LME, xc, yc, RA, fish_species2) %>% 
+  pivot_wider(names_from = fish_species2, values_from = RA, 
+              values_fill = 0) %>%
+  # Jitter coordinates to avoid overplotting
+  mutate(row = seq(1, 18, 1),
+         xc_jit = case_when(xc == xc[1] & yc == yc[1] ~ xc[1],
+                            xc == xc[2] & yc == yc[2] ~ xc[2],
+                            xc == xc[3] & yc == yc[3] ~ xc[3] - 25,
+                            xc == xc[4] & yc == yc[4] ~ xc[4],
+                            xc == xc[5] & yc == yc[5] ~ xc[5] + 25,
+                            xc == xc[6] & yc == yc[6] ~ xc[6],
+                            xc == xc[7] & yc == yc[7] ~ xc[7],
+                            xc == xc[8] & yc == yc[8] ~ xc[8],
+                            xc == xc[9] & yc == yc[9] ~ xc[9],
+                            xc == xc[10] & yc == yc[10] ~ xc[10],
+                            xc == xc[11] & yc == yc[11] ~ xc[11],
+                            xc == xc[12] & yc == yc[12] ~ xc[12] + 130,
+                            xc == xc[13] & yc == yc[13] ~ xc[13],
+                            xc == xc[14] & yc == yc[14] ~ xc[14] - 130,
+                            xc == xc[15] & yc == yc[15] ~ xc[15],
+                            xc == xc[16] & yc == yc[16] ~ xc[16] + 75,
+                            xc == xc[17] & yc == yc[17] ~ xc[17],
+                            xc == xc[18] & yc == yc[18] ~ xc[18]),
+         yc_jit = case_when(xc == xc[1] & yc == yc[1] ~ yc[1] - 25,
+                            xc == xc[2] & yc == yc[2] ~ yc[2] + 25,
+                            xc == xc[3] & yc == yc[3] ~ yc[3],
+                            xc == xc[4] & yc == yc[4] ~ yc[4] - 60,
+                            xc == xc[5] & yc == yc[5] ~ yc[5] - 25,
+                            xc == xc[6] & yc == yc[6] ~ yc[6],
+                            xc == xc[7] & yc == yc[7] ~ yc[7] + 25,
+                            xc == xc[8] & yc == yc[8] ~ yc[8] - 50,
+                            xc == xc[9] & yc == yc[9] ~ yc[9] + 25,
+                            xc == xc[10] & yc == yc[10] ~ yc[10] + 50,
+                            xc == xc[11] & yc == yc[11] ~ yc[11] + 60,
+                            xc == xc[12] & yc == yc[12] ~ yc[12] + 35,
+                            xc == xc[13] & yc == yc[13] ~ yc[13],
+                            xc == xc[14] & yc == yc[14] ~ yc[14] - 35,
+                            xc == xc[15] & yc == yc[15] ~ yc[15],
+                            xc == xc[16] & yc == yc[16] ~ yc[16] - 125,
+                            xc == xc[17] & yc == yc[17] ~ yc[17],
+                            xc == xc[18] & yc == yc[18] ~ yc[18] - 50))
+```
+
+### Plot
+
+Plot the the heatmap and map together.
+
+```{r heatmap-map-trawl}
+# Heatmap
+heatmap_RA <- trawl_area_df %>%
+  ggplot() +
+  geom_tile(aes(x = LME, y = fish_species, fill = RA),
+            color = "white", lwd = 0.6) +
+  geom_text(aes(x = LME, y = fish_species, 
+                label = sprintf("%0.1f", round(RA, 1)),
+                color = color_text), size = 3) +
+  scale_x_discrete(expand = c(0, 0)) +
+  scale_y_discrete(labels = c("Twohorn sculpin",
+                              "Atlantic wolffish",
+                              "Greenland halibut",
+                              "Spotted barracudina",
+                              "Haddock",
+                              "Atlantic cod",
+                              "Daubed shanny",
+                              "Redfish",
+                              "Lanternfish",
+                              "Snailfish",
+                              "Polar cod"),
+                   expand = c(0, 0)) +
+  scale_colour_identity() +
+  scale_fill_viridis_c("Relative\nabundance (%)  ", option = "mako",
+                       breaks = seq(0, 100, 20), limits = c(0, 100),
+                       direction = -1) +
+  guides(fill = guide_colorbar(label.position = "top")) +
+  theme(axis.title = element_blank(),
+        legend.position = "top",
+        legend.title = element_text(vjust = 0),
+        legend.title.align = 0.5,
+        legend.key.height = unit(0.1, "in"),
+        legend.key.width = unit(0.25, "in"),
+        legend.box.margin = margin(0, 0, -5, 0),
+        plot.margin = unit(c(0, 0.1, 0.01, 0), "in"))
+
+map_RA <- trawl_station_df %>%
+  ggplot() +
+  # Bathymetry
+  geom_raster(data = bathy_laea, aes(x = xc, y = yc, fill = depth_d),
+              alpha = 0.8) + 
+  scale_fill_grey("Depth (m)", start = 0.9, end = 0.3) +
+  guides(fill = "none") + 
+  new_scale_fill() + 
+  # LME 
+  geom_polygon(data = LME, aes(x = xc, y = yc, group = group), 
+               col = "black", fill = NA, lwd = 0.3, alpha = 1) + # LME
+  # Coastlines
+  geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), 
+               fill = "grey25") + # Coast
+  # Abundance
+  geom_scatterpie(data = trawl_station_df, aes(x = xc_jit,  y = yc_jit),
+                  cols = c("Arctic cod", 
+                           "Snailfish",
+                           "Lanternfish",
+                           "Redfish",
+                           "Other"),
+                  alpha = 0.9, pie_scale = 1.5, legend_name = "Species", 
+                  colour = "white", size = 0.2) +
+  # geom_text(aes(x = xc_jit, y = yc_jit, label = row), size = 2,
+  # col = "green") +
+  scale_fill_manual(values = met.brewer("Johnson", n = 5, direction = -1)) +
+  coord_fixed(xlim = c(-2450, 650), ylim = c(-1500, 1850), expand = F) +
+  # geom_point(aes(x = 0, y = 0), size = 0.05) +
+  # Legend over 2 rows
+  guides(fill = guide_legend(nrow = 2, byrow = T)) +
+  theme(legend.position = "top", 
+        legend.title = element_blank(),
+        legend.key.height = unit(0.1, "in"), 
+        legend.key.width = unit(0.1, "in"), 
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        axis.title = element_blank(),
+        plot.margin = unit(c(0.01, 0, 0.29, 0), "in"))
+
+# Combine plots
+table1_RA <- plot_grid(heatmap_RA, map_RA, ncol = 2, rel_widths = c(1, 0.7),
+                       labels = "auto", label_size = 9)
+# Save and display plot
+ggsave("plots/Table1_RA_map.png", table1_RA, 
+       height = 3.25, width = 6.5, dpi = 600, units = "in")
+# table1_RA
+```
+
+## Figure 4. Linear regression latitude
+
+### Without map
+
+```{r LM-SA-latitude}
+col_pal <- c("#132B69", "#03739B", "#93AA43", "black")
+lm_SA_lat <- LM_area_res %>%
+  ggplot() + 
+  geom_point(data = SA_lm, aes(x = lat, y = SA_int, col = LME, shape = shape,
+                               size = shape),
+             alpha = 0.7) +
+  geom_line(aes(x = lat, y = .fitted, col = LME), size = 0.6) + 
+  geom_ribbon(aes(x = lat, ymin = .lower, ymax = .upper,
+                  group = LME, fill = LME),
+              alpha = 0.1) +
+  scale_x_continuous("Latitude (°N)", breaks = seq(0, 90, 2)) + 
+  # scale_y_continuous(expression("S"[A]*" (dB re 1 m"^2*" nmi"^-2*")")) + 
+  scale_y_continuous(
+    expression("S"[A]*" (dB re 1 m"^2*" nmi"^-2*")"),
+    position = "left",
+    sec.axis = 
+      sec_axis(trans = ~10^(./10), 
+               name = expression("s"[A]*" ( m"^2*" nmi"^-2*")"),
+               breaks = c(1, 5, 10, 50, 100, 500, 1000, 5000, 10000))) +
+  scale_shape_manual(values = c(17, 16)) +
+  scale_size_manual(values = c(1.5, 1)) +
+  scale_colour_manual("LME", values = col_pal) +
+  scale_fill_manual("LME", values = col_pal) +
+  coord_cartesian(ylim = c(-3, 42)) +
+  guides(fill = "none", shape = "none", size = "none") +
+  theme(legend.position = "right", 
+        legend.title = element_blank(),
+        legend.key.height = unit(0.15, "in"), 
+        legend.key.width = unit(0.15, "in"), 
+        panel.border = element_blank(),
+        axis.line = element_line())
+# Save and display plot
+ggsave("plots/Figure_LM_SA_lat.png", lm_SA_lat, 
+       height = 2.5, width = 6.5, dpi = 600, units = "in")
+lm_SA_lat
+```
+
+### With map
+
+```{r map-lm}
+# Map
+map_DSL <- SA_grid_laea %>% 
+  mutate(NASC_int_d = cut(NASC_int, c(0, 1, 10, 100, 500, 1000, Inf))) %>%
+  ggplot(aes(x = xc,  y = yc)) +
+  geom_raster(data = bathy_laea, aes(x = xc, y = yc, fill = depth_d), 
+              alpha = 0.8) + # bathy
+  scale_fill_grey("Depth (m)", start = 0.9, end = 0.3) +
+  guides(fill = "none") + 
+  new_scale_fill() + 
+  geom_polygon(data = LME, aes(x = xc, y = yc, group = group), 
+               col = "black", fill = NA, lwd = 0.3, alpha = 1) + # LME
+  geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), 
+               fill = "grey25") + # Coast
+  geom_tile(aes(fill = NASC_int_d), size = 0.2, col = "white") +
+  scale_fill_viridis_d(expression("s"[A]*" ( m"^2*" nmi"^-2*")"),
+                       option = "viridis",
+                       labels = c("< 1", "1-10", "11-100", "101-500",
+                                  "501-1000", "> 1000")) +
+  # geom_point(aes(x = 0, y = 0), size = 0.05) +
+  facet_wrap(~ year) +
+  coord_fixed(xlim = c(-2450, 650), ylim = c(-1500, 1850), expand = F) +
+  theme(legend.position = "right",
+        legend.key.height = unit(0.15, "in"),
+        legend.key.width = unit(0.15, "in"),
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        axis.title = element_blank())
+# LM
+col_pal <- c("#132B69", "#03739B", "#93AA43", "black")
+lm_SA_lat <- LM_area_res %>%
+  ggplot() + 
+  geom_point(data = SA_lm, aes(x = lat, y = SA_int, col = LME, shape = shape),
+             alpha = 0.7, size = 1) +
+  geom_line(aes(x = lat, y = .fitted, col = LME), size = 0.6) + 
+  geom_ribbon(aes(x = lat, ymin = .lower, ymax = .upper,
+                  group = LME, fill = LME),
+              alpha = 0.1) +
+  scale_x_continuous("Latitude (°N)", breaks = seq(0, 90, 2)) + 
+  # scale_y_continuous(expression("S"[A]*" (dB re 1 m"^2*" nmi"^-2*")")) + 
+  scale_y_continuous(
+    expression("S"[A]*" (dB re 1 m"^2*" nmi"^-2*")"),
+    position = "left",
+    sec.axis = 
+      sec_axis(trans = ~10^(./10), 
+               name = expression("s"[A]*" ( m"^2*" nmi"^-2*")"),
+               breaks = c(1, 10, 100, 1000, 10000))) +
+  scale_shape_manual(values = c(17, 16)) +
+  scale_colour_manual("LME", values = col_pal) +
+  scale_fill_manual("LME", values = col_pal) +
+  coord_cartesian(ylim = c(-3, 42)) +
+  guides(fill = "none", shape = "none") +
+  theme(legend.position = "top", 
+        legend.title = element_blank(),
+        legend.key.height = unit(0.15, "in"), 
+        legend.key.width = unit(0.15, "in"), 
+        panel.border = element_blank(),
+        axis.line = element_line())
+# Combine plots
+p_map_NASC_LM <- plot_grid(map_DSL, lm_SA_lat, rel_heights = c(1, 0.8),
+                           ncol = 1, align = "v", axis = "lr",
+                           labels = "auto", label_size = 9, 
+                           label_y = c(0.9, 1.05)) 
+# Save and display plot
+ggsave("plots/Fig3_map_LM_NASC.png", p_map_NASC_LM, 
+       height = 4, width = 6.5, dpi = 600, units = "in")
+p_map_NASC_LM
+```
+
+## Figure 5. HGAM
+
+```{r HGAM-plot}
+# GAM velocity
+GAMSAI_velo <- predSA_I %>%
+  filter(var == "v") %>%
+  ggplot() +
+  # geom_point(data = SA_df, aes(x = v, y = SA_int, col = LME), alpha = 0.5) +
+  geom_line(aes(x = v, y = fitted, col = LME, linetype = LME), 
+            size = 0.6) +
+  geom_ribbon(aes(x = v, ymin = lwr_ci, ymax = upr_ci, fill = LME), 
+              alpha = 0.1) +
+  scale_colour_manual(name = "LME",
+                      values = met.brewer("Johnson", n = 6, direction = -1)) +
+  scale_fill_manual(name = "LME",
+                    values = met.brewer("Johnson", n = 6, direction = -1)) +
+  coord_cartesian(xlim = c(-0.1, 4.3), ylim = c(-2, 32), expand = F) +
+  scale_x_continuous(breaks = seq(0, 10, 0.5)) +
+  scale_y_continuous(
+    expression("S"[A]*" (dB re 1 m"^2*" nmi"^-2*")"),
+    position = "left",
+    sec.axis = sec_axis(trans = ~10^(./10), 
+                        name = expression("s"[A]*" ( m"^2*" nmi"^-2*")"),
+                        breaks = c(1, 5, 10, 50, 100, 500, 1000, 5000, 10000))) +
+  scale_linetype_manual(name = "LME", values = c(1, 2, 1)) +
+  labs(x = expression("Mean velocity at 318 m (cm s"^-1*")"),
+       y = expression("S"[A]*" (dB re 1 m"^2*" nmi"^-2*")")) +
+  # guides(linetype = "none") +
+  theme(panel.border = element_blank(),
+        axis.line = element_line(),
+        legend.title = element_blank(),
+        legend.position = "top",
+        plot.margin = unit(c(0, 0, 0, 0), "in"))
+# Save and display plot
+ggsave("plots/Figure_HGAM_SAI3.png", GAMSAI_velo, 
+       height = 3, width = 6.5, dpi = 600, units = "in")
+GAMSAI_velo
+```
+
+# Supplementary data
+
+## Figure SX Map chlorophyll a and current velocity
+
+```{r map-chla-velo}
+# Map chlorophyll a
+map_chla <- chl_grid_laea_150 %>%
+  ggplot() +
+  # Bathymetry
+  geom_raster(data = bathy_laea, aes(x = xc, y = yc, fill = depth_d),
+              alpha = 0.8) +
+  scale_fill_grey("Depth (m)", start = 0.9, end = 0.3) +
+  guides(fill = "none") +
+  new_scale_fill() +
+  # Chlorophyll a
+  geom_tile(aes(x = xc, y = yc, fill = chl_mean)) + 
+  scale_fill_cmocean(expression("Chl a\n(mg m"^-3*")"),
+                       name = "tempo", limits = c(0, 2.5),
+                       na.value = "#151D44FF") +
+  # Coastlines
+  geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), 
+               fill = "grey25") + 
+  coord_fixed(xlim = c(-2450, 650), ylim = c(-1500, 1850), expand = F) +
+  # Coords 
+  geom_tile(data = SA_grid_laea, aes(x = xc, y = yc), fill = NA,
+            colour = "red", size = 0.25) + 
+  # North Pole
+  geom_point(aes(x = 0, y = 0), size = 0.05) +
+  # Facets
+  facet_wrap(~ year) + 
+  # Legend over 2 rows
+  theme(#legend.position = "right", 
+        legend.title = element_text(hjust = 0.5),
+        # legend.key.height = unit(0.1, "in"),
+        legend.key.width = unit(0.1, "in"),
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        axis.title = element_blank())
+
+# Map current velocity
+map_velo <- phy_grid_laea_150 %>%
+  filter(depth == 318) %>%
+  ggplot() +
+  # Bathymetry
+  geom_raster(data = bathy_laea, aes(x = xc, y = yc, fill = depth_d),
+              alpha = 0.8) +
+  scale_fill_grey("Depth (m)", start = 0.9, end = 0.3) +
+  guides(fill = "none") +
+  new_scale_fill() +
+  # Chlorophyll a
+  geom_tile(aes(x = xc, y = yc, fill = v_mean * 100)) + 
+  scale_fill_cmocean(expression("Velocity\n(cm s"^-1*")"),
+                       name = "speed", limits = c(0, 4.5), 
+                       na.value = "#172313FF") +
+  # Coastlines
+  geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), 
+               fill = "grey25") + 
+  coord_fixed(xlim = c(-2450, 650), ylim = c(-1500, 1850), expand = F) +
+  # North Pole
+  geom_point(aes(x = 0, y = 0), size = 0.05) +
+  # Coords 
+  geom_tile(data = SA_grid_laea, aes(x = xc, y = yc), fill = NA,
+            colour = "red", size = 0.25) + 
+  # Facets
+  facet_wrap(~ year) + 
+  # Legend over 2 rows
+  theme(#legend.position = "right", 
+        legend.title = element_text(hjust = 0.5),
+        # legend.key.height = unit(0.1, "in"),
+        legend.key.width = unit(0.1, "in"),
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        axis.title = element_blank())
+
+# Combine plots
+map_env <- plot_grid(map_chla, map_velo, ncol = 1, align = "hv", axis = "tblr",
+                     labels = "auto", label_size = 9)
+# Save and display plot
+ggsave("plots/Figure_map_chl_velo.png", map_env, 
+       height = 5, width = 6.5, dpi = 600, units = "in")
+```
+
+## Table S3. Acoustic settings
+
+```{r tableS3-acoustic-settings, echo=F, warning=F, message=F, fig.align='center'}
+summary_MVBS <- MVBS %>%
+  group_by(date,process_ID, filename, area, year) %>%
+  summarise() %>% # Remove depth component
+  ungroup() %>%
+  group_by(area,year) %>% # Summarise total amount of files and total number of hours of data
+  summarise(n_files=n(),
+            duration_min=n_files*10,
+            duration_h=round(duration_min/60))
+
+# Create data frame and table
+data.frame(year=c(rep(2015,3), rep(2016,3), rep(2017,3)),
+           Area=rep(c("Beaufort Sea","Baffin Bay","Svalbard"), 3),
+           area=rep(c("BF_CAA","BB","SV"),3),
+           Vessel=c("CCGV Amundsen","CCGV Amundsen","RV Polarstern", # 2015
+                    "CCGV Amundsen","CCGV Amundsen","RV Helmer Hanssen", # 2016
+                    "FV Frosti","CCGV Amundsen","RV Polarstern"), # 2017
+           Echosounder=c(rep("EK60",6), rep("EK80",1), rep("EK60",2)),
+           Transducer_depth=c(rep(7,2),11,rep(7,2),8,6,7,11),
+           Pulse_length=rep(1.024,9),
+           Power=c(rep(2000,2),1000,rep(2000,5),1000)) %>%
+  left_join(.,summary_MVBS, by=c("area", "year")) %>%
+  dplyr::select(year, Area, Vessel, Echosounder, Transducer_depth, Pulse_length,
+                Power, duration_h) %>%
+  rename("Year"=year,
+         "Transducers depth (m)"=Transducer_depth,
+         "Pulse length (msec)"=Pulse_length,
+         "Power (W)"=Power,
+         "Acoustic data duration (h)"=duration_h) %>%
+  mutate(Year="" ) %>% # remove year values for a more readable table
+  kbl(align=c("l", "l", "l", "c", "c","c","c","c")) %>%
+  kable_classic(full_width=F, html_font="Arial") %>%
+  pack_rows("2015", 1, 3) %>%
+  pack_rows("2016", 4, 6) %>%
+  pack_rows("2017", 7, 9)
+```
+
+
+# OLD PLOTS
+## OLD Figure 1. Bathy map with sampling locations
 
 Careful this map takes forever to compute (\> 18 h) when bathy has to be drawn.
 
@@ -484,7 +1193,7 @@ p_MVBS_laea <- MVBS_laea %>%
 p_MVBS_laea
 ```
 
-## Figure 2. Vertical S\~V\~ profiles
+## OLD Figure 2. Vertical S\~V\~ profiles
 
 ### Old plot
 
@@ -710,657 +1419,6 @@ ggsave("plots/Fig2_Sv_profiles_boxplots.png", p_Sv_prof_boxplot, height = 4.5, w
 p_Sv_prof_boxplot
 ```
 
-## Figure 3. Boxplot mesopelagic NASC & Map detections
-
-### Map and Boxplot
-
-```{r fig3-boxplot-NASC, fig.width=6, fig.height=5}
-# Map NASC
-map_DSL <- SA_grid_laea %>% 
-  mutate(NASC_int_d = cut(NASC_int, c(0, 1, 10, 100, 1000, 10000, Inf))) %>%
-  ggplot(aes(x = xc,  y = yc)) +
-  geom_raster(data = bathy_laea, aes(x = xc, y = yc, fill = depth_d),
-              alpha = 0.8) + # bathy
-  scale_fill_grey("Depth (m)", start = 0.9, end = 0.3) +
-  guides(fill = "none") + 
-  new_scale_fill() + 
-  geom_polygon(data = LME, aes(x = xc, y = yc, group = group), 
-               col = "black", fill = NA, lwd = 0.3, alpha = 1) + # LME
-  geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), 
-               fill = "grey25") + # Coast
-  # geom_point(aes(col = NASC_int_d), size = 0.6) +
-  # scale_color_viridis_d(option = "plasma", 
-  #                       labels = c("< 1", "1-10", "11-100", "101-1000", 
-  #                                  "1001-10000", "> 10000")) +
-  geom_tile(aes(fill = NASC_int_d), size = 0.2, alpha = 0.8, col = "white") +
-  scale_fill_viridis_d(option = "viridis", 
-                       labels = c("< 1", "1-10", "11-100", "101-1000", 
-                                  "1001-10000", "> 10000")) +
-  facet_wrap(~ year) +
-  coord_fixed(xlim = c(-2450, 650), ylim = c(-1500, 1850), expand = F) +
-  guides(fill = guide_legend(override.aes = list(size = 2), 
-                               nrow = 1)) + 
-  # guides(fill = "none",
-  #        colour = guide_legend(override.aes = list(size = 2), 
-  #                              nrow = 1)) + # Increase symbol size in legend
-  theme(legend.position = "top",
-        legend.title = element_blank(),
-        axis.text = element_blank(),
-        axis.ticks = element_blank(),
-        axis.title = element_blank())
-# Bxplot SA
-p_boxplot_SA <-
-  SA_grid_laea %>% # Boxplot of SA per region
-  mutate(LME = factor(case_when(LME == "BF" ~ "Beaufort Sea",
-                                LME == "NAR" ~ "Nares Strait",
-                                LME == "BB" ~ "Baffin Bay",
-                                LME == "SV" ~ "Barents Sea"),
-                      levels = c("Beaufort Sea", "Nares Strait", 
-                                 "Baffin Bay", "Barents Sea"))) %>%
-  ggplot(aes(x = LME, y = SA_int)) + 
-  geom_boxplot(position = position_dodge(preserve = "single")) +
-  scale_y_continuous(expression("S"[A]*" (dB re 1 m"^2*" nmi"^-2*")")) +
-  theme(panel.border = element_blank(),
-        axis.title.x = element_blank(),
-        axis.line = element_line(),
-        legend.title = element_blank(), 
-        # legend.position = "none",
-        plot.margin = unit(c(0.1, 0.1, 0, 0), "in"))
-# Combine plots
-p_map_SA_DSL <- plot_grid(map_DSL, p_boxplot_SA, 
-                          ncol = 1, align = "v", axis = "lr",
-                          labels = "auto", label_size = 9) 
-# Save and display plots
-ggsave("plots/Fig3_map_boxplot_SA.png", p_map_SA_DSL,
-       height = 5, width = 6, dpi = 600, units = "in")
-p_map_SA_DSL
-```
-
-### Map and Points
-
-```{r fig3-map-points}
-map_DSL <- SA_grid_laea %>% 
-  mutate(NASC_int_d = cut(NASC_int, c(0, 1, 10, 100, 500, 1000, Inf))) %>%
-  ggplot(aes(x = xc,  y = yc)) +
-  geom_raster(data = bathy_laea, aes(x = xc, y = yc, fill = depth_d), 
-              alpha = 0.8) + # bathy
-  scale_fill_grey("Depth (m)", start = 0.9, end = 0.3) +
-  guides(fill = "none") + 
-  new_scale_fill() + 
-  geom_polygon(data = LME, aes(x = xc, y = yc, group = group), 
-               col = "black", fill = NA, lwd = 0.3, alpha = 1) + # LME
-  geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), 
-               fill = "grey25") + # Coast
-  geom_tile(aes(fill = NASC_int_d), size = 0.2, col = "white") +
-  scale_fill_viridis_d(expression("s"[A]*" ( m"^2*" nmi"^-2*")"),
-                       option = "viridis",
-                       labels = c("< 1", "1-10", "11-100", "101-500",
-                                  "501-1000", "> 1000")) +
-  geom_point(aes(x = 0, y = 0), size = 0.05) +
-  facet_wrap(~ year) +
-  coord_fixed(xlim = c(-2450, 650), ylim = c(-1500, 1850), expand = F) +
-  theme(legend.position = "right",
-        legend.key.height = unit(0.15, "in"),
-        legend.key.width = unit(0.15, "in"),
-        axis.text = element_blank(),
-        axis.ticks = element_blank(),
-        axis.title = element_blank())
-
-pointrange_NASC <- SA_grid_laea %>% # Pointrange of SA per region
-  mutate(LME = factor(case_when(LME == "BF" ~ "Beaufort Sea",
-                                LME == "NAR" ~ "Nares Strait",
-                                LME == "BB" ~ "Baffin Bay",
-                                LME == "SV" ~ "Barents Sea"),
-                      levels = c("Beaufort Sea", "Nares Strait", 
-                                 "Baffin Bay", "Barents Sea"))) %>%
-  group_by(LME, year) %>% # Median per year
-  summarise(NASC_median = median(NASC_int, na.rm = T),
-            NASC_mean = mean(NASC_int, na.rm = T),
-            NASC_q025 = quantile(NASC_int, 0.025),
-            NASC_q975 = quantile(NASC_int, 0.975)) %>%
-  ungroup() %>%
-  group_by(LME) %>% # Mean per area
-  summarise(NASC_median = mean(NASC_median, na.rm = T),
-            NASC_mean = mean(NASC_mean, na.rm = T),
-            NASC_q025 = min(NASC_q025, na.rm = T),
-            NASC_q975 = max(NASC_q975, na.rm = T)) %>%
-  ungroup() %>%
-  ggplot(aes(x = LME)) +
-  geom_point(aes(y = 10 * log10(NASC_mean)), 
-             shape = 18, size = 4.5, col = "black") +
-  geom_pointrange(aes(y = 10 * log10(NASC_median),
-                      ymin = 10 * log10(NASC_q025), 
-                      ymax = 10 * log10(NASC_q975)),
-                  col = "black", fill = "white", shape = 21) +
-  scale_y_continuous(
-    expression("S"[A]*" (dB re 1 m"^2*" nmi"^-2*")"),
-    sec.axis = 
-      sec_axis(trans = ~10^(./10), 
-               name = expression("s"[A]*" ( m"^2*" nmi"^-2*")"),
-               breaks = c(1, 5, 10, 50, 100, 500, 1000, 5000, 10000, 50000))) +
-  theme(axis.title.x = element_blank(),
-        plot.margin = unit(c(0.1, 0.1, 0, 0), "in"))
-# Combine plots
-p_map_pointrange_NASC <- plot_grid(pointrange_NASC, map_DSL,
-                                   ncol = 1, align = "v", axis = "lr",
-                                   labels = "auto", label_size = 9) 
-# Save and display plot
-ggsave("plots/Fig3_map_pointrange_NASC.png", p_map_pointrange_NASC, 
-       height = 5, width = 6.5, dpi = 600, units = "in")
-p_map_pointrange_NASC
-```
-
-### Just boxplot
-
-```{r fig3-boxplot}
-boxplot_NASC <- SA_grid_laea %>% # Pointrange of SA per region
-  mutate(LME = factor(case_when(LME == "BF" ~ "Beaufort Sea",
-                                LME == "NAR" ~ "Nares Strait",
-                                LME == "BB" ~ "Baffin Bay",
-                                LME == "SV" ~ "Barents Sea"),
-                      levels = c("Beaufort Sea", "Nares Strait", 
-                                 "Baffin Bay", "Barents Sea")),
-    year = factor(year)) %>%
-  ggplot(aes(x = LME)) +
-  geom_boxplot(aes(y = SA_int, fill = year), size = 0.4, outlier.size = 0.7,
-               alpha = 0.8, position = position_dodge(preserve = "single")) +
-  scale_fill_manual(values = met.brewer("Johnson", n = 6, direction = -1)) + 
-                      # c("#0086a8", "#f6c200", "#d04e00")) +
-  scale_y_continuous(
-    expression("S"[A]*" (dB re 1 m"^2*" nmi"^-2*")"),
-    position = "left",
-    sec.axis = 
-      sec_axis(trans = ~10^(./10), 
-               name = expression("s"[A]*" ( m"^2*" nmi"^-2*")"),
-               breaks = c(1, 5, 10, 50, 100, 500, 1000, 5000, 10000))) +
-  theme(axis.title.x = element_blank(),
-        legend.title = element_blank(),
-        legend.key.width = unit(0.15, "in"),
-        legend.key.height = unit(0.15, "in"),
-        plot.margin = unit(c(0.1, 0.1, 0, 0), "in"))
-# Save and display plot
-ggsave("plots/Fig3_boxplot_NASC.png", boxplot_NASC, 
-       height = 2.5, width = 6.5, dpi = 600, units = "in")
-boxplot_NASC
-```
-
-### Just points
-
-```{r fig3-points}
-pointrange_NASC <- SA_grid_laea %>% # Pointrange of SA per region
-  mutate(LME = factor(case_when(LME == "BF" ~ "Beaufort Sea",
-                                LME == "NAR" ~ "Nares Strait",
-                                LME == "BB" ~ "Baffin Bay",
-                                LME == "SV" ~ "Barents Sea"),
-                      levels = c("Beaufort Sea", "Nares Strait", 
-                                 "Baffin Bay", "Barents Sea"))) %>%
-  group_by(LME, year) %>% # Median per year
-  summarise(NASC_median = median(NASC_int, na.rm = T),
-            NASC_mean = mean(NASC_int, na.rm = T),
-            NASC_q025 = quantile(NASC_int, 0.025),
-            NASC_q975 = quantile(NASC_int, 0.975)) %>%
-  ungroup() %>%
-  group_by(LME) %>% # Mean per area
-  summarise(NASC_median = mean(NASC_median, na.rm = T),
-            NASC_mean = mean(NASC_mean, na.rm = T),
-            NASC_q025 = min(NASC_q025, na.rm = T),
-            NASC_q975 = max(NASC_q975, na.rm = T)) %>%
-  ungroup() %>%
-  ggplot(aes(x = LME)) +
-  geom_point(aes(y = 10 * log10(NASC_mean)), 
-             shape = 18, size = 4.5, col = "black") +
-  geom_pointrange(aes(y = 10 * log10(NASC_median),
-                      ymin = 10 * log10(NASC_q025), 
-                      ymax = 10 * log10(NASC_q975)),
-                  col = "black", fill = "white", shape = 21) +
-  scale_y_continuous(
-    expression("S"[A]*" (dB re 1 m"^2*" nmi"^-2*")"),
-    position = "left",
-    sec.axis = 
-      sec_axis(trans = ~10^(./10), 
-               name = expression("s"[A]*" ( m"^2*" nmi"^-2*")"),
-               breaks = c(1, 5, 10, 50, 100, 500, 1000, 5000, 10000))) +
-  theme(axis.title.x = element_blank(),
-        plot.margin = unit(c(0.1, 0.1, 0, 0), "in"))
-# Save and display plot
-ggsave("plots/Fig3_pointrange_NASC.png", pointrange_NASC, 
-       height = 2.5, width = 3.5, dpi = 600, units = "in")
-pointrange_NASC
-```
-
-## Map/table 1. Abundance mesopelagic fish and map
-
-### Data preparation
-
-I prepare the datasets for the table (relative abundance per area) and the map (relative abundance per station).
-
-```{r relative-abundance-area}
-trawl_area_df <- trawl %>%
-  # Find IHO area for each trawl deployment
-  st_as_sf(coords = c("lon", "lat"), crs = st_crs(arctic_latlon), 
-           remove = F) %>%
-  st_join(., LME_sf_latlon, join = st_within) %>% # Append IHO region
-  st_drop_geometry() %>%
-  mutate(LME = if_else(LME == "CAO" & lon > 0, "SV",
-               if_else(LME == "CAO" & lon < 0, "BF", LME))) %>%
-  # Calculate number of individual for each species per IHO region
-  group_by(LME, fish_species) %>% 
-  summarise(number_fish = sum(number_fish)) %>%
-  ungroup() %>%
-  # Calculate total number of fish per IHO region
-  group_by(LME) %>%
-  mutate(total_fish = sum(number_fish)) %>% 
-  ungroup() %>%
-  # Calculate relative abundance per station
-  mutate(RA = (number_fish / total_fish) * 100) %>%
-  mutate(LME = factor(
-    case_when(
-      LME == "Barents Sea LME" ~ "Barents Sea\nn = 464",
-      LME == "Beaufort Sea LME" ~ "Beaufort Sea\nn = 923",
-      LME == "Baffin Bay LME" ~ "Baffin Bay\nn = 232"),
-    levels = c("Beaufort Sea\nn = 923",
-               "Baffin Bay\nn = 232",
-               "Barents Sea\nn = 464"))) %>%
-  # Format species name appropriately
-  mutate(fish_species = str_replace(fish_species, pattern = "_", 
-                                    replacement = " "),
-         fish_species = str_replace(fish_species, pattern = " sp",
-                                    replacement = " sp."),
-         fish_species = str_to_sentence(fish_species),
-         fish_species = if_else(fish_species == "Notolepis rissoi",
-                                "Arctozenus risso", fish_species),
-         fish_species = factor(fish_species, 
-                               levels = c("Icelus bicornis",
-                                          "Anarhichas lupus",
-                                          "Reinhardtius hippoglossoides",
-                                          "Arctozenus risso",
-                                          "Melanogrammus aeglefinus",
-                                          "Gadus morhua",
-                                          "Leptoclinus maculatus",
-                                          "Sebastes sp.",
-                                          "Myctophidae",
-                                          "Liparidae",
-                                          "Boreogadus saida")),
-         color_text = if_else(RA >= 40, "white", "black")) 
-```
-
-```{r realtive-abundance-station}
-trawl_station_df <- trawl %>%
-  # Find LME for each trawl deployment
-  st_as_sf(coords = c("lon", "lat"), crs = st_crs(arctic_latlon),
-           remove = F) %>%
-  st_join(., LME_sf_latlon, join = st_within) %>% # Append LME
-  st_transform(crs = st_crs(arctic_laea)) %>% # Change projection
-  mutate(xc = st_coordinates(.)[,1],
-         yc = st_coordinates(.)[,2]) %>%
-  st_drop_geometry() %>%
-  mutate(fish_species2 = case_when(
-    fish_species == "boreogadus_saida" ~ "Arctic cod",
-    fish_species == "liparidae" ~ "Snailfish",
-    fish_species == "myctophidae" ~ "Lanternfish",
-    fish_species == "sebastes_sp" ~ "Redfish",
-    !fish_species %in% c("boreogadus_saida", "liparidae", 
-                         "myctophidae", "sebastes_sp") ~ "Other")) %>%
-  # Calculate number of individual for each species per station
-  group_by(year, LME, date, station, deployment, lat,
-           lon, xc, yc, fish_species2) %>% 
-  summarise(number_fish = sum(number_fish)) %>%
-  ungroup() %>%
-  # Calculate total number of fish per station
-  group_by(year, LME, date, station, deployment, lat, lon, xc, yc) %>% 
-  mutate(total_fish = sum(number_fish)) %>% 
-  ungroup() %>%
-  # Calculate relative abundance per station
-  mutate(RA = (number_fish / total_fish) * 100) %>%
-  dplyr::select(year, LME, xc, yc, RA, fish_species2) %>% 
-  pivot_wider(names_from = fish_species2, values_from = RA, 
-              values_fill = 0) %>%
-  # Jitter coordinates to avoid overplotting
-  mutate(row = seq(1, 18, 1),
-         xc_jit = case_when(xc == xc[1] & yc == yc[1] ~ xc[1],
-                            xc == xc[2] & yc == yc[2] ~ xc[2],
-                            xc == xc[3] & yc == yc[3] ~ xc[3] - 25,
-                            xc == xc[4] & yc == yc[4] ~ xc[4],
-                            xc == xc[5] & yc == yc[5] ~ xc[5] + 25,
-                            xc == xc[6] & yc == yc[6] ~ xc[6],
-                            xc == xc[7] & yc == yc[7] ~ xc[7],
-                            xc == xc[8] & yc == yc[8] ~ xc[8],
-                            xc == xc[9] & yc == yc[9] ~ xc[9],
-                            xc == xc[10] & yc == yc[10] ~ xc[10],
-                            xc == xc[11] & yc == yc[11] ~ xc[11],
-                            xc == xc[12] & yc == yc[12] ~ xc[12] + 130,
-                            xc == xc[13] & yc == yc[13] ~ xc[13],
-                            xc == xc[14] & yc == yc[14] ~ xc[14] - 130,
-                            xc == xc[15] & yc == yc[15] ~ xc[15],
-                            xc == xc[16] & yc == yc[16] ~ xc[16] + 75,
-                            xc == xc[17] & yc == yc[17] ~ xc[17],
-                            xc == xc[18] & yc == yc[18] ~ xc[18]),
-         yc_jit = case_when(xc == xc[1] & yc == yc[1] ~ yc[1] - 25,
-                            xc == xc[2] & yc == yc[2] ~ yc[2] + 25,
-                            xc == xc[3] & yc == yc[3] ~ yc[3],
-                            xc == xc[4] & yc == yc[4] ~ yc[4] - 60,
-                            xc == xc[5] & yc == yc[5] ~ yc[5] - 25,
-                            xc == xc[6] & yc == yc[6] ~ yc[6],
-                            xc == xc[7] & yc == yc[7] ~ yc[7] + 25,
-                            xc == xc[8] & yc == yc[8] ~ yc[8] - 50,
-                            xc == xc[9] & yc == yc[9] ~ yc[9] + 25,
-                            xc == xc[10] & yc == yc[10] ~ yc[10] + 50,
-                            xc == xc[11] & yc == yc[11] ~ yc[11] + 60,
-                            xc == xc[12] & yc == yc[12] ~ yc[12] + 35,
-                            xc == xc[13] & yc == yc[13] ~ yc[13],
-                            xc == xc[14] & yc == yc[14] ~ yc[14] - 35,
-                            xc == xc[15] & yc == yc[15] ~ yc[15],
-                            xc == xc[16] & yc == yc[16] ~ yc[16] - 125,
-                            xc == xc[17] & yc == yc[17] ~ yc[17],
-                            xc == xc[18] & yc == yc[18] ~ yc[18] - 50))
-```
-
-### Plot
-
-Plot the the heatmap and map together.
-
-```{r heatmap-map-trawl}
-# Heatmap
-heatmap_RA <- trawl_area_df %>%
-  ggplot() +
-  geom_tile(aes(x = LME, y = fish_species, fill = RA),
-            color = "white", lwd = 0.6) +
-  geom_text(aes(x = LME, y = fish_species, 
-                label = sprintf("%0.1f", round(RA, 1)),
-                color = color_text), size = 3) +
-  scale_x_discrete(expand = c(0, 0)) +
-  scale_y_discrete(labels = c("Twohorn sculpin",
-                              "Atlantic wolffish",
-                              "Greenland halibut",
-                              "Spotted barracudina",
-                              "Haddock",
-                              "Atlantic cod",
-                              "Daubed shanny",
-                              "Redfish",
-                              "Lanternfish",
-                              "Snailfish",
-                              "Polar cod"),
-                   expand = c(0, 0)) +
-  scale_colour_identity() +
-  scale_fill_viridis_c("Relative\nabundance (%)  ", option = "mako",
-                       breaks = seq(0, 100, 20), limits = c(0, 100),
-                       direction = -1) +
-  guides(fill = guide_colorbar(label.position = "top")) +
-  theme(axis.title = element_blank(),
-        legend.position = "top",
-        legend.title = element_text(vjust = 0),
-        legend.title.align = 0.5,
-        legend.key.height = unit(0.1, "in"),
-        legend.key.width = unit(0.25, "in"),
-        legend.box.margin = margin(0, 0, -5, 0),
-        plot.margin = unit(c(0, 0.1, 0.01, 0), "in"))
-
-map_RA <- trawl_station_df %>%
-  ggplot() +
-  # Bathymetry
-  geom_raster(data = bathy_laea, aes(x = xc, y = yc, fill = depth_d),
-              alpha = 0.8) + 
-  scale_fill_grey("Depth (m)", start = 0.9, end = 0.3) +
-  guides(fill = "none") + 
-  new_scale_fill() + 
-  # LME 
-  geom_polygon(data = LME, aes(x = xc, y = yc, group = group), 
-               col = "black", fill = NA, lwd = 0.3, alpha = 1) + # LME
-  # Coastlines
-  geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), 
-               fill = "grey25") + # Coast
-  # Abundance
-  geom_scatterpie(data = trawl_station_df, aes(x = xc_jit,  y = yc_jit),
-                  cols = c("Arctic cod", 
-                           "Snailfish",
-                           "Lanternfish",
-                           "Redfish",
-                           "Other"),
-                  alpha = 0.9, pie_scale = 1.5, legend_name = "Species", 
-                  colour = "white", size = 0.2) +
-  # geom_text(aes(x = xc_jit, y = yc_jit, label = row), size = 2,
-  # col = "green") +
-  scale_fill_manual(values = met.brewer("Johnson", n = 5, direction = -1)) +
-  coord_fixed(xlim = c(-2450, 650), ylim = c(-1500, 1850), expand = F) +
-  geom_point(aes(x = 0, y = 0), size = 0.05) +
-  # Legend over 2 rows
-  guides(fill = guide_legend(nrow = 2, byrow = T)) +
-  theme(legend.position = "top", 
-        legend.title = element_blank(),
-        legend.key.height = unit(0.1, "in"), 
-        legend.key.width = unit(0.1, "in"), 
-        axis.text = element_blank(),
-        axis.ticks = element_blank(),
-        axis.title = element_blank(),
-        plot.margin = unit(c(0.01, 0, 0.29, 0), "in"))
-
-# Combine plots
-table1_RA <- plot_grid(heatmap_RA, map_RA, ncol = 2, rel_widths = c(1, 0.7),
-                       labels = "auto", label_size = 9)
-# Save and display plot
-ggsave("plots/Table1_RA_map.png", table1_RA, 
-       height = 3.25, width = 6.5, dpi = 600, units = "in")
-# table1_RA
-```
-
-## Figure 4. Linear regression latitude
-
-### Without map
-
-```{r LM-SA-latitude}
-col_pal <- c("#132B69", "#03739B", "#93AA43", "black")
-lm_SA_lat <- LM_area_res %>%
-  ggplot() + 
-  geom_point(data = SA_lm, aes(x = lat, y = SA_int, col = LME, shape = shape),
-             alpha = 0.7, size = 1) +
-  geom_line(aes(x = lat, y = .fitted, col = LME), size = 0.6) + 
-  geom_ribbon(aes(x = lat, ymin = .lower, ymax = .upper,
-                  group = LME, fill = LME),
-              alpha = 0.1) +
-  scale_x_continuous("Latitude (°N)", breaks = seq(0, 90, 2)) + 
-  scale_y_continuous(expression("S"[A]*" (dB re 1 m"^2*" nmi"^-2*")")) + 
-  scale_shape_manual(values = c(17, 16)) +
-  scale_colour_manual("LME", values = col_pal) +
-  scale_fill_manual("LME", values = col_pal) +
-  coord_cartesian(ylim = c(-5, 45)) +
-  guides(fill = "none", shape = "none") +
-  theme(legend.position = "top", 
-        legend.title = element_blank(),
-        legend.key.height = unit(0.15, "in"), 
-        legend.key.width = unit(0.15, "in"), 
-        panel.border = element_blank(),
-        axis.line = element_line())
-# Save and display plot
-ggsave("plots/Figure_LM_SA_lat.png", lm_SA_lat, 
-       height = 2.25, width = 4.5, dpi = 600, units = "in")
-lm_SA_lat
-```
-
-### With map
-
-```{r map-lm}
-# Map
-map_DSL <- SA_grid_laea %>% 
-  mutate(NASC_int_d = cut(NASC_int, c(0, 1, 10, 100, 500, 1000, Inf))) %>%
-  ggplot(aes(x = xc,  y = yc)) +
-  geom_raster(data = bathy_laea, aes(x = xc, y = yc, fill = depth_d), 
-              alpha = 0.8) + # bathy
-  scale_fill_grey("Depth (m)", start = 0.9, end = 0.3) +
-  guides(fill = "none") + 
-  new_scale_fill() + 
-  geom_polygon(data = LME, aes(x = xc, y = yc, group = group), 
-               col = "black", fill = NA, lwd = 0.3, alpha = 1) + # LME
-  geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), 
-               fill = "grey25") + # Coast
-  geom_tile(aes(fill = NASC_int_d), size = 0.2, col = "white") +
-  scale_fill_viridis_d(expression("s"[A]*" ( m"^2*" nmi"^-2*")"),
-                       option = "viridis",
-                       labels = c("< 1", "1-10", "11-100", "101-500",
-                                  "501-1000", "> 1000")) +
-  # geom_point(aes(x = 0, y = 0), size = 0.05) +
-  facet_wrap(~ year) +
-  coord_fixed(xlim = c(-2450, 650), ylim = c(-1500, 1850), expand = F) +
-  theme(legend.position = "right",
-        legend.key.height = unit(0.15, "in"),
-        legend.key.width = unit(0.15, "in"),
-        axis.text = element_blank(),
-        axis.ticks = element_blank(),
-        axis.title = element_blank())
-# LM
-col_pal <- c("#132B69", "#03739B", "#93AA43", "black")
-lm_SA_lat <- LM_area_res %>%
-  ggplot() + 
-  geom_point(data = SA_lm, aes(x = lat, y = SA_int, col = LME, shape = shape),
-             alpha = 0.7, size = 1) +
-  geom_line(aes(x = lat, y = .fitted, col = LME), size = 0.6) + 
-  geom_ribbon(aes(x = lat, ymin = .lower, ymax = .upper,
-                  group = LME, fill = LME),
-              alpha = 0.1) +
-  scale_x_continuous("Latitude (°N)", breaks = seq(0, 90, 2)) + 
-  scale_y_continuous(expression("S"[A]*" (dB re 1 m"^2*" nmi"^-2*")")) + 
-  scale_shape_manual(values = c(17, 16)) +
-  scale_colour_manual("LME", values = col_pal) +
-  scale_fill_manual("LME", values = col_pal) +
-  coord_cartesian(ylim = c(-5, 45)) +
-  guides(fill = "none", shape = "none") +
-  theme(legend.position = "right", 
-        legend.title = element_blank(),
-        legend.key.height = unit(0.15, "in"), 
-        legend.key.width = unit(0.15, "in"), 
-        panel.border = element_blank(),
-        axis.line = element_line())
-# Combine plots
-p_map_NASC_LM <- plot_grid(map_DSL, lm_SA_lat, rel_heights = c(1, 0.8),
-                           ncol = 1, align = "v", axis = "lr",
-                           labels = "auto", label_size = 9, 
-                           label_y = c(0.9, 1.05)) 
-# Save and display plot
-ggsave("plots/Fig3_map_LM_NASC.png", p_map_NASC_LM, 
-       height = 4, width = 6.5, dpi = 600, units = "in")
-p_map_NASC_LM
-```
-
-## Figure 5. HGAM
-
-```{r HGAM-plot}
-# GAM velocity
-GAMSAI_velo <- predSA_I %>%
-  filter(var == "v") %>%
-  ggplot() +
-  # geom_point(data = SA_df, aes(x = v, y = SA_int, col = LME), alpha = 0.5) +
-  geom_line(aes(x = v, y = fitted, col = LME), size = 0.6) +
-  geom_ribbon(aes(x = v, ymin = lwr_ci, ymax = upr_ci, fill = LME), 
-              alpha = 0.1) +
-  scale_colour_manual(name = "LME",
-                      values = met.brewer("Johnson", n = 6, direction = -1)) +
-  scale_fill_manual(name = "LME",
-                    values = met.brewer("Johnson", n = 6, direction = -1)) +
-  coord_cartesian(xlim = c(-0.1, 4.1), ylim = c(-2, 32), expand = F) +
-  scale_x_continuous(breaks = seq(0, 10, 0.5)) +
-  scale_y_continuous(
-    expression("S"[A]*" (dB re 1 m"^2*" nmi"^-2*")"),
-    position = "left",
-    sec.axis = 
-      sec_axis(trans = ~10^(./10), 
-               name = expression("s"[A]*" ( m"^2*" nmi"^-2*")"),
-               breaks = c(1, 5, 10, 50, 100, 500, 1000, 5000, 10000))) +
-
-  labs(x = expression("Mean velocity at 318 m (cm s"^-1*")"),
-       y = expression("S"[A]*" (dB re 1 m"^2*" nmi"^-2*")")) +
-  guides(linetype = "none") +
-  theme(panel.border = element_blank(),
-        axis.line = element_line(),
-        legend.title = element_blank(), 
-        legend.position = "top",
-        plot.margin = unit(c(0, 0, 0, 0), "in"))
-# Save and display plot
-ggsave("plots/Figure_HGAM_SAI3.png", GAMSAI_velo, 
-       height = 3, width = 6.5, dpi = 600, units = "in")
-GAMSAI_velo
-```
-
-# Supplementary data
-
-## Figure SX Map chlorophyll a and current velocity
-
-```{r map-chla-velo}
-# Map chlorophyll a
-map_chla <- chl_grid_laea_150 %>%
-  ggplot() +
-  # Bathymetry
-  geom_raster(data = bathy_laea, aes(x = xc, y = yc, fill = depth_d),
-              alpha = 0.8) +
-  scale_fill_grey("Depth (m)", start = 0.9, end = 0.3) +
-  guides(fill = "none") +
-  new_scale_fill() +
-  # Chlorophyll a
-  geom_tile(aes(x = xc, y = yc, fill = chl_mean)) + 
-  scale_fill_cmocean(expression("Chl a\n(mg m"^-3*")"),
-                       name = "tempo", limits = c(0, 2.5),
-                       na.value = "#151D44FF") +
-  # Coastlines
-  geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), 
-               fill = "grey25") + 
-  coord_fixed(xlim = c(-2450, 650), ylim = c(-1500, 1850), expand = F) +
-  # Coords 
-  geom_tile(data = SA_grid_laea, aes(x = xc, y = yc), fill = NA,
-            colour = "red", size = 0.25) + 
-  # North Pole
-  geom_point(aes(x = 0, y = 0), size = 0.05) +
-  # Facets
-  facet_wrap(~ year) + 
-  # Legend over 2 rows
-  theme(#legend.position = "right", 
-        legend.title = element_text(hjust = 0.5),
-        # legend.key.height = unit(0.1, "in"),
-        legend.key.width = unit(0.1, "in"),
-        axis.text = element_blank(),
-        axis.ticks = element_blank(),
-        axis.title = element_blank())
-
-# Map current velocity
-map_velo <- phy_grid_laea_150 %>%
-  filter(depth == 318) %>%
-  ggplot() +
-  # Bathymetry
-  geom_raster(data = bathy_laea, aes(x = xc, y = yc, fill = depth_d),
-              alpha = 0.8) +
-  scale_fill_grey("Depth (m)", start = 0.9, end = 0.3) +
-  guides(fill = "none") +
-  new_scale_fill() +
-  # Chlorophyll a
-  geom_tile(aes(x = xc, y = yc, fill = v_mean * 100)) + 
-  scale_fill_cmocean(expression("Velocity\n(cm s"^-1*")"),
-                       name = "speed", limits = c(0, 4.5), 
-                       na.value = "#172313FF") +
-  # Coastlines
-  geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), 
-               fill = "grey25") + 
-  coord_fixed(xlim = c(-2450, 650), ylim = c(-1500, 1850), expand = F) +
-  # North Pole
-  geom_point(aes(x = 0, y = 0), size = 0.05) +
-  # Coords 
-  geom_tile(data = SA_grid_laea, aes(x = xc, y = yc), fill = NA,
-            colour = "red", size = 0.25) + 
-  # Facets
-  facet_wrap(~ year) + 
-  # Legend over 2 rows
-  theme(#legend.position = "right", 
-        legend.title = element_text(hjust = 0.5),
-        # legend.key.height = unit(0.1, "in"),
-        legend.key.width = unit(0.1, "in"),
-        axis.text = element_blank(),
-        axis.ticks = element_blank(),
-        axis.title = element_blank())
-
-# Combine plots
-map_env <- plot_grid(map_chla, map_velo, ncol = 1, align = "hv", axis = "tblr",
-                     labels = "auto", label_size = 9)
-# Save and display plot
-ggsave("plots/Figure_map_chl_velo.png", map_env, 
-       height = 5, width = 6.5, dpi = 600, units = "in")
-```
-
 
 
 ## OLD Figure 3. Map of mesopelagic backscatter hotspots
@@ -1448,41 +1506,3 @@ SA_grid_laea %>%
   theme(legend.position = "right", axis.text = element_blank(), axis.ticks = element_blank(), axis.title = element_blank())
 ```
 
-## Table S3. Acoustic settings
-
-```{r tableS3-acoustic-settings, echo=F, warning=F, message=F, fig.align='center'}
-summary_MVBS <- MVBS %>%
-  group_by(date,process_ID, filename, area, year) %>%
-  summarise() %>% # Remove depth component
-  ungroup() %>%
-  group_by(area,year) %>% # Summarise total amount of files and total number of hours of data
-  summarise(n_files=n(),
-            duration_min=n_files*10,
-            duration_h=round(duration_min/60))
-
-# Create data frame and table
-data.frame(year=c(rep(2015,3), rep(2016,3), rep(2017,3)),
-           Area=rep(c("Beaufort Sea","Baffin Bay","Svalbard"), 3),
-           area=rep(c("BF_CAA","BB","SV"),3),
-           Vessel=c("CCGV Amundsen","CCGV Amundsen","RV Polarstern", # 2015
-                    "CCGV Amundsen","CCGV Amundsen","RV Helmer Hanssen", # 2016
-                    "FV Frosti","CCGV Amundsen","RV Polarstern"), # 2017
-           Echosounder=c(rep("EK60",6), rep("EK80",1), rep("EK60",2)),
-           Transducer_depth=c(rep(7,2),11,rep(7,2),8,6,7,11),
-           Pulse_length=rep(1.024,9),
-           Power=c(rep(2000,2),1000,rep(2000,5),1000)) %>%
-  left_join(.,summary_MVBS, by=c("area", "year")) %>%
-  dplyr::select(year, Area, Vessel, Echosounder, Transducer_depth, Pulse_length,
-                Power, duration_h) %>%
-  rename("Year"=year,
-         "Transducers depth (m)"=Transducer_depth,
-         "Pulse length (msec)"=Pulse_length,
-         "Power (W)"=Power,
-         "Acoustic data duration (h)"=duration_h) %>%
-  mutate(Year="" ) %>% # remove year values for a more readable table
-  kbl(align=c("l", "l", "l", "c", "c","c","c","c")) %>%
-  kable_classic(full_width=F, html_font="Arial") %>%
-  pack_rows("2015", 1, 3) %>%
-  pack_rows("2016", 4, 6) %>%
-  pack_rows("2017", 7, 9)
-```
