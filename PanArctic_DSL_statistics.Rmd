@@ -15,9 +15,7 @@ output:
 
 # Goals
 
-The goal of the statistics are to investigate the potential effects of primary production and advection on mesopelagic backscatter for each Arctic region. Therefore, I gathered remote sensing data of sea ice concentration and ocean colour, and modelled advection from Copernicus.
-
-Since remote sensing of primary production (chlorophyll *a*) can be biased by high concentration of CDOM (chromophoric dissolved organic matter) and the photoadptation of Arctic phytoplankton (Lewis et al. 2016), I use to variables as proxy for primary production. First, I use the satellite-derived monthly averaged chlrophyll *a* concentration from CMEMS (doi: [10.48670/moi-00066](https://doi.org/10.48670/moi-00066)), and I calculate the open water days from sea ice concentration from the EUMETSAT OSI SAF remote sensing dataset (doi: [10.24381/cds.3cd8b812](https://doi.org/10.24381/cds.3cd8b812)) which I use as a proxy for primary production. For advection I use data from the Copernicus Marine Environmental Monitoring Service Arctic Ocean Physics Reanalysis product which gives monthly average of current velocity in the Arctic Ocean.
+The goal of the statistics are to investigate the potential effects of advection on mesopelagic backscatter for each Arctic region. I use data from the Copernicus Marine Environmental Monitoring Service Arctic Ocean Physics Reanalysis product which gives monthly average of current velocity in the Arctic Ocean.
 
 # Package loading
 
@@ -134,9 +132,7 @@ plot_grid(
   ncol = 1, align = "hv", axis = "tblr")
 ```
 
-There are two missing chl values, so this cell is excluded from further analyses.
-
-```{r exclude-NA-chl}
+```{r check-NA}
 stat_laea <- stat_laea %>%
   mutate(v = v_mean * 100,
          LME = 
@@ -154,7 +150,7 @@ stat_laea %>%
 ```
 Because we sampled at the border of the CAO and there is only a limited amount of data in this region we combine CAO data based on their proximity to other LME (Barents Sea and Beaufort Sea). I exclude data from Nares Strait because we do not have enough points for a regression
 
-```{r}
+```{r exclude-Nares-NA}
 stat_laea <- stat_laea %>%
   mutate(LME = as.character(LME),
          LME = factor(if_else(LME == "CAO" & yc <= 0, "SV",
@@ -170,7 +166,7 @@ stat_laea %>%
   summarise(n = n())
 ```
 
-```{r map-chl-NA, fig.width=8, fig.height=6}
+```{r map-NA2, fig.width=8, fig.height=6}
 plot_grid(
   stat_laea %>%
     filter(depth == 318) %>%
@@ -682,7 +678,7 @@ plot_grid(GAM_I2_resid %>%
 
 ## Model predictions
 
-I predict the model to get the smooths in the response scale (NASC). I need to create a specific data frame for this with the factors of interest `LME` and `year`, and covariates `v` and `chl`.
+I predict the model to get the smooths in the response scale (NASC). I need to create a specific data frame for this with the factors of interest `LME` and `year`, and covariate `v`.
 
 ```{r data-frame-pred}
 # Find median, min, and max of SA_df
@@ -1170,7 +1166,7 @@ plot_grid(GAMSA_I3_resid %>%
 
 ## Model predictions
 
-I predict the model to get the smooths in the response scale (NASC). I need to create a specific data frame for this with the factors of interest `LME` and `year`, and covariates `v` and `chl`.
+I predict the model to get the smooths in the response scale (NASC). I need to create a specific data frame for this with the factors of interest `LME` and `year`, and covariate `v`.
 
 ```{r data-frame-predSA}
 # Find median, min, and max of SA_df
