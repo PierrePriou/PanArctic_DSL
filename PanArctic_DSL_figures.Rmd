@@ -113,9 +113,16 @@ trawl_latlon <- trawl_station %>% # Location of trawls
 
 # Remote sensing data
 load(paste0("data/remote_sensing/physics_grids_", cell_res, "km.RData"))
-phy_grid_laea_150 <- phy_grid_laea
-load(paste0("data/remote_sensing/physics_grids_", "50", "km.RData"))
-phy_grid_laea_hd <- phy_grid_laea
+phy_grid_laea_150 <- phy_grid_laea %>%
+  st_as_sf(coords = c("xc", "yc"), crs = st_crs(arctic_laea), remove = F) %>% 
+  st_join(., LME_sf_laea, join = st_within) %>% # Append LME 
+  st_drop_geometry()
+ 
+load(paste0("data/remote_sensing/physics_grids_", "25", "km.RData"))
+phy_grid_laea_hd <- phy_grid_laea %>% 
+  st_as_sf(coords = c("xc", "yc"), crs = st_crs(arctic_laea), remove = F) %>% 
+  st_join(., LME_sf_laea, join = st_within) %>% # Append LME 
+  st_drop_geometry()
 load(paste0("data/remote_sensing/chl_grids_", cell_res, "km.RData"))
 chl_grid_laea_150 <- chl_grid_laea
 load(paste0("data/remote_sensing/chl_grids_", "50", "km.RData"))
@@ -1004,84 +1011,49 @@ GAMSAI_velo
 
 # Supplementary data
 
-## Figure SX Map chlorophyll a and current velocity
+## Figure SX Map current velocity
 
-```{r map-chla-velo}
-# Map chlorophyll a
-map_chla <- chl_grid_laea_150 %>%
-  ggplot() +
-  # Bathymetry
-  geom_raster(data = bathy_laea, aes(x = xc, y = yc, fill = depth_d),
-              alpha = 0.8) +
-  scale_fill_grey("Depth (m)", start = 0.9, end = 0.3) +
-  guides(fill = "none") +
-  new_scale_fill() +
-  # Chlorophyll a
-  geom_tile(aes(x = xc, y = yc, fill = chl_mean)) + 
-  scale_fill_cmocean(expression("Chl a\n(mg m"^-3*")"),
-                       name = "tempo", limits = c(0, 2.5),
-                       na.value = "#151D44FF") +
-  # Coastlines
-  geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), 
-               fill = "grey25") + 
-  coord_fixed(xlim = c(-2450, 650), ylim = c(-1500, 1850), expand = F) +
-  # Coords 
-  geom_tile(data = SA_grid_laea, aes(x = xc, y = yc), fill = NA,
-            colour = "red", size = 0.25) + 
-  # North Pole
-  geom_point(aes(x = 0, y = 0), size = 0.05) +
-  # Facets
-  facet_wrap(~ year) + 
-  # Legend over 2 rows
-  theme(#legend.position = "right", 
-        legend.title = element_text(hjust = 0.5),
-        # legend.key.height = unit(0.1, "in"),
-        legend.key.width = unit(0.1, "in"),
-        axis.text = element_blank(),
-        axis.ticks = element_blank(),
-        axis.title = element_blank())
-
+```{r map-velo}
 # Map current velocity
-map_velo <- phy_grid_laea_150 %>%
+map_velo <- phy_grid_laea_hd %>%
   filter(depth == 318) %>%
   ggplot() +
   # Bathymetry
-  geom_raster(data = bathy_laea, aes(x = xc, y = yc, fill = depth_d),
-              alpha = 0.8) +
-  scale_fill_grey("Depth (m)", start = 0.9, end = 0.3) +
-  guides(fill = "none") +
-  new_scale_fill() +
-  # Chlorophyll a
+  # geom_raster(data = bathy_laea, aes(x = xc, y = yc, fill = depth_d),
+  #             alpha = 0.8) +
+  # scale_fill_grey("Depth (m)", start = 0.9, end = 0.3) +
+  # guides(fill = "none") +
+  # new_scale_fill() +
+  # Velocity
   geom_tile(aes(x = xc, y = yc, fill = v_mean * 100)) + 
   scale_fill_cmocean(expression("Velocity\n(cm s"^-1*")"),
                        name = "speed", limits = c(0, 4.5), 
                        na.value = "#172313FF") +
+  # LME
+  geom_polygon(data = LME, aes(x = xc, y = yc, group = group), 
+               col = "black", fill = NA, lwd = 0.3) + 
   # Coastlines
   geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), 
                fill = "grey25") + 
   coord_fixed(xlim = c(-2450, 650), ylim = c(-1500, 1850), expand = F) +
   # North Pole
-  geom_point(aes(x = 0, y = 0), size = 0.05) +
+  # geom_point(aes(x = 0, y = 0), size = 0.05) +
   # Coords 
-  geom_tile(data = SA_grid_laea, aes(x = xc, y = yc), fill = NA,
+  geom_tile(data = SA_df, aes(x = xc, y = yc), fill = NA,
             colour = "red", size = 0.25) + 
   # Facets
-  facet_wrap(~ year) + 
+  facet_wrap(~ year) +
   # Legend over 2 rows
-  theme(#legend.position = "right", 
-        legend.title = element_text(hjust = 0.5),
-        # legend.key.height = unit(0.1, "in"),
+  theme(legend.title = element_text(hjust = 0.5),
         legend.key.width = unit(0.1, "in"),
         axis.text = element_blank(),
         axis.ticks = element_blank(),
         axis.title = element_blank())
 
-# Combine plots
-map_env <- plot_grid(map_chla, map_velo, ncol = 1, align = "hv", axis = "tblr",
-                     labels = "auto", label_size = 9)
 # Save and display plot
-ggsave("plots/Figure_map_chl_velo.png", map_env, 
-       height = 5, width = 6.5, dpi = 600, units = "in")
+ggsave("plots/Figure_map_velo.png", map_velo, 
+       height = 2.5, width = 6.5, dpi = 600, units = "in")
+# map_velo
 ```
 
 ## Table S3. Acoustic settings
