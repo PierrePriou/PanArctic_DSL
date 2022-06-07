@@ -78,12 +78,6 @@ bathy_df <- getNOAA.ice.bathy(lon1 = -180, lon2 = 180, lat1 = 50, lat2 = 90,
 # Arctic circle and areas of interest
 arctic_circle_latlon <- data.frame(lon = seq(-180, 180, 0.1)) %>%
   mutate(lat = 66.5)
-area_BF_CAA_latlon <- data.frame(lon = c(-158, -158, -93, -93, -158), 
-                                 lat = c(79, 68.5, 68.5, 79, 79))
-area_BB_latlon <- data.frame(lon = c(-86, -65, -51.5, -51.5, -86), 
-                             lat = c(72, 65.5, 65.5, 83, 83))
-area_SV_latlon <- data.frame(lon = c(46, 46, 0, 0, 46),
-                             lat = c(85, 76, 76, 85, 85))
 
 # Acoustic data
 load("data/acoustics/MVBS_2015_2017.RData")
@@ -108,10 +102,6 @@ SA_grid_laea <- SA_grid_laea %>%
                       if_else(LME == "NAR", "BB", LME))),
                       levels = c("BF", "NAR", "BB", "SV"))) %>%
   droplevels()
-
-# CTD data
-# load("data/CTD/CTD_2015_2019.RData")
-# load("data/CTD/CTD_grids.RData")
 
 # Trawl data
 load("data/nets/trawl_mwt_2015_2017.RData")
@@ -185,75 +175,61 @@ arctic_circle_laea <- SpatialPoints(cbind(arctic_circle_latlon$lon,
   spTransform(., CRSobj = crs(arctic_laea)) %>% # Change projection to EPSG:6931
   as.data.frame() %>%
   rename(xc = coords.x1, yc = coords.x2) # Rename variables
-area_BF_CAA_laea <- SpatialPoints(cbind(c(-152, -152, -140, -122.5, -93, -93),
-                                        c(78, 73, 68, 68, 68, 78)), 
-                                  proj4string = CRS("EPSG:4326")) %>%
-  spTransform(., CRSobj = crs(arctic_laea)) %>% # Change projection to EPSG:6931
-  as.data.frame() %>%
-  rename(xc = coords.x1, yc = coords.x2)
-area_BB_laea <- SpatialPoints(cbind(area_BB_latlon$lon, area_BB_latlon$lat), 
-                              proj4string = CRS("EPSG:4326")) %>%
-  spTransform(., CRSobj = crs(arctic_laea)) %>% # Change projection to EPSG:6931
-  as.data.frame() %>%
-  rename(xc = coords.x1, yc = coords.x2)
-area_SV_laea <- SpatialPoints(cbind(c(40, 40, 0, 0), c(85, 78, 78, 85)), 
-                              proj4string = CRS("EPSG:4326")) %>%
-  spTransform(., CRSobj = crs(arctic_laea)) %>% # Change projection to EPSG:6931
-  as.data.frame() %>%
-  rename(xc = coords.x1, yc = coords.x2)
 
 # IHO regions
-IHO_EAO <- readOGR("data/arctic_regions/IHO/iho_eastern_arctic_ocean.shp",
-                   verbose = F) %>% # Eastern Arctic Ocean
-  spTransform(CRSobj = crs(arctic_latlon)) %>% 
-  spTransform(CRSobj = crs(arctic_laea)) %>% # Project shapefile in laea
-  fortify() %>% # Convert to dataframe for ggplot
-  rename(xc = long, yc = lat)
-IHO_WAO <- readOGR("data/arctic_regions/IHO/iho_western_arctic_ocean.shp",
-                   verbose = F) %>% # Western Arctic Ocean
-  spTransform(CRSobj = crs(arctic_latlon)) %>% 
-  spTransform(CRSobj = crs(arctic_laea)) %>% # Project shapefile in laea
-  fortify() %>% # Convert to dataframe for ggplot
-  rename(xc = long, yc = lat)
-IHO_BF <- readOGR("data/arctic_regions/IHO/iho_beaufort_sea.shp",
-                  verbose = F) %>% # Beaufort Sea
-  spTransform(CRSobj = crs(arctic_latlon)) %>% 
-  spTransform(CRSobj = crs(arctic_laea)) %>% # Project shapefile in laea
-  fortify() %>% # Convert to dataframe for ggplot
-  rename(xc = long, yc = lat)
-IHO_CAA <- readOGR("data/arctic_regions/IHO/iho_northwestern_passages.shp",
-                   verbose = F) %>% # Canadian Arctic Archipelago
-  spTransform(CRSobj = crs(arctic_latlon)) %>% 
-  spTransform(CRSobj = crs(arctic_laea)) %>% # Project shapefile in laea
-  fortify() %>% # Convert to dataframe for ggplot
-  rename(xc = long, yc = lat)
-IHO_BB <- readOGR("data/arctic_regions/IHO/iho_baffin_bay.shp",
-                  verbose = F) %>% # Baffin Bay
-  spTransform(CRSobj = crs(arctic_latlon)) %>% 
-  spTransform(CRSobj = crs(arctic_laea)) %>% # Project shapefile in laea
-  fortify() %>% # Convert to dataframe for ggplot
-  rename(xc = long, yc = lat)
-IHO_DS <- readOGR("data/arctic_regions/IHO/iho_davis_strait.shp", 
-                  verbose = F) %>% # Davis Strait
-  spTransform(CRSobj = crs(arctic_latlon)) %>% 
-  spTransform(CRSobj = crs(arctic_laea)) %>% # Project shapefile in laea
-  fortify() %>% # Convert to dataframe for ggplot
-  rename(xc = long, yc = lat)
-# Combine IHO areas
-IHO_regions <- bind_rows(IHO_EAO, IHO_WAO, IHO_BF, IHO_CAA, IHO_BB, IHO_DS) 
-rm(IHO_EAO, IHO_WAO, IHO_BF, IHO_CAA, IHO_BB, IHO_DS)
-# IHO areas
-IHO_sf_latlon <- dir_ls("data/arctic_regions/IHO", glob = "*.shp") %>% 
-  tibble(fname = .) %>%
-  mutate(data = map(fname, read_sf)) %>%
-  unnest(data) %>%
-  st_as_sf() %>%
-  st_transform(crs = crs(arctic_latlon)) %>%
-  st_make_valid()
+# IHO_EAO <- readOGR("data/arctic_regions/IHO/iho_eastern_arctic_ocean.shp",
+#                    verbose = F) %>% # Eastern Arctic Ocean
+#   spTransform(CRSobj = crs(arctic_latlon)) %>% 
+#   spTransform(CRSobj = crs(arctic_laea)) %>% # Project shapefile in laea
+#   fortify() %>% # Convert to dataframe for ggplot
+#   rename(xc = long, yc = lat)
+# IHO_WAO <- readOGR("data/arctic_regions/IHO/iho_western_arctic_ocean.shp",
+#                    verbose = F) %>% # Western Arctic Ocean
+#   spTransform(CRSobj = crs(arctic_latlon)) %>% 
+#   spTransform(CRSobj = crs(arctic_laea)) %>% # Project shapefile in laea
+#   fortify() %>% # Convert to dataframe for ggplot
+#   rename(xc = long, yc = lat)
+# IHO_BF <- readOGR("data/arctic_regions/IHO/iho_beaufort_sea.shp",
+#                   verbose = F) %>% # Beaufort Sea
+#   spTransform(CRSobj = crs(arctic_latlon)) %>% 
+#   spTransform(CRSobj = crs(arctic_laea)) %>% # Project shapefile in laea
+#   fortify() %>% # Convert to dataframe for ggplot
+#   rename(xc = long, yc = lat)
+# IHO_CAA <- readOGR("data/arctic_regions/IHO/iho_northwestern_passages.shp",
+#                    verbose = F) %>% # Canadian Arctic Archipelago
+#   spTransform(CRSobj = crs(arctic_latlon)) %>% 
+#   spTransform(CRSobj = crs(arctic_laea)) %>% # Project shapefile in laea
+#   fortify() %>% # Convert to dataframe for ggplot
+#   rename(xc = long, yc = lat)
+# IHO_BB <- readOGR("data/arctic_regions/IHO/iho_baffin_bay.shp",
+#                   verbose = F) %>% # Baffin Bay
+#   spTransform(CRSobj = crs(arctic_latlon)) %>% 
+#   spTransform(CRSobj = crs(arctic_laea)) %>% # Project shapefile in laea
+#   fortify() %>% # Convert to dataframe for ggplot
+#   rename(xc = long, yc = lat)
+# IHO_DS <- readOGR("data/arctic_regions/IHO/iho_davis_strait.shp", 
+#                   verbose = F) %>% # Davis Strait
+#   spTransform(CRSobj = crs(arctic_latlon)) %>% 
+#   spTransform(CRSobj = crs(arctic_laea)) %>% # Project shapefile in laea
+#   fortify() %>% # Convert to dataframe for ggplot
+#   rename(xc = long, yc = lat)
+# # Combine IHO areas
+# IHO_regions <- bind_rows(IHO_EAO, IHO_WAO, IHO_BF, IHO_CAA, IHO_BB, IHO_DS) 
+# rm(IHO_EAO, IHO_WAO, IHO_BF, IHO_CAA, IHO_BB, IHO_DS)
+# # IHO areas
+# IHO_sf_latlon <- dir_ls("data/arctic_regions/IHO", glob = "*.shp") %>% 
+#   tibble(fname = .) %>%
+#   mutate(data = map(fname, read_sf)) %>%
+#   unnest(data) %>%
+#   st_as_sf() %>%
+#   st_transform(crs = crs(arctic_latlon)) %>%
+#   st_make_valid()
 
 # LME regions
-LME_sf <- read_sf("data/arctic_regions/LME/LME_2013_polygon.shp") %>%
+LME_sf_laea <- read_sf("data/arctic_regions/LME/LME_2013_polygon.shp") %>%
     st_transform(crs = crs(arctic_laea))
+LME_sf_latlon <- read_sf("data/arctic_regions/LME/LME_2013_polygon.shp") %>%
+    st_transform(crs = crs(arctic_latlon))
 LME <- readOGR("data/arctic_regions/LME/LME_2013_polygon.shp",
                verbose = F) %>% 
   spTransform(CRSobj = crs(arctic_laea)) %>% # Project shapefile in laea
@@ -271,7 +247,7 @@ trawl_laea <- SpatialPointsDataFrame(
   as.data.frame() %>%
   rename(xc = coords.x1, yc = coords.x2) %>%
   st_as_sf(coords = c("xc", "yc"), crs = st_crs(arctic_laea), remove = F) %>%
-  st_join(., LME_sf, join = st_within) %>% # Append IHO region
+  st_join(., LME_sf_laea, join = st_within) %>% # Append IHO region
   st_drop_geometry() %>%
   # mutate(name = if_else(name == "The Northwestern Passages" & coords.x2 < 0,
   #                       "Baffin Bay",
@@ -965,40 +941,34 @@ I prepare the datasets for the table (relative abundance per area) and the map (
 ```{r relative-abundance-area}
 trawl_area_df <- trawl %>%
   # Find IHO area for each trawl deployment
-  st_as_sf(coords = c("lon", "lat"), crs = st_crs(arctic_latlon), remove = F) %>%
-  st_join(., IHO_sf_latlon, join = st_within) %>% # Append IHO region
+  st_as_sf(coords = c("lon", "lat"), crs = st_crs(arctic_latlon), 
+           remove = F) %>%
+  st_join(., LME_sf_latlon, join = st_within) %>% # Append IHO region
   st_drop_geometry() %>%
-  mutate(name = if_else(name == "The Northwestern Passages" & lon > -90, "Baffin Bay",
-                if_else(name == "Arctic Ocean" & name_3 == "West Arctic Ocean", "West Arctic Ocean",
-                if_else(name == "Arctic Ocean" & name_3 == "East Arctic Ocean", "East Arctic Ocean", name)))) %>%
-  rename(IHO_area = name, area = area.x) %>%
-  dplyr::select(-fname, -id, -longitude, -latitude, -min_x, -min_y, -max_x, 
-                -max_y, -area.y, -mrgid, -bearings, -name_1, -mrgid_1, -name_2,
-                -mrgid_2, -name_3, -mrgid_3) %>%
+  mutate(LME = if_else(LME == "CAO" & lon > 0, "SV",
+               if_else(LME == "CAO" & lon < 0, "BF", LME))) %>%
+  # rename(IHO_area = name, area = area.x) %>%
+  # dplyr::select(-fname, -id, -longitude, -latitude, -min_x, -min_y, -max_x, 
+  #               -max_y, -area.y, -mrgid, -bearings, -name_1, -mrgid_1, -name_2,
+  #               -mrgid_2, -name_3, -mrgid_3) %>%
   # Calculate number of individual for each species per IHO region
-  group_by(IHO_area, fish_species) %>% 
+  group_by(LME, fish_species) %>% 
   summarise(number_fish = sum(number_fish)) %>%
   ungroup() %>%
   # Calculate total number of fish per IHO region
-  group_by(IHO_area) %>%
+  group_by(LME) %>%
   mutate(total_fish = sum(number_fish)) %>% 
   ungroup() %>%
   # Calculate relative abundance per station
   mutate(RA = (number_fish / total_fish) * 100) %>%
-  mutate(IHO_area = factor(
+  mutate(LME = factor(
     case_when(
-      IHO_area == "East Arctic Ocean" ~ "East Arctic\nOcean\nn = 464",
-      IHO_area == "West Arctic Ocean" ~ "West Arctic\nOcean",
-      IHO_area == "Beaufort Sea" ~ "Beaufort Sea\nn = 54",
-      IHO_area == "The Northwestern Passages" ~ "Can. Arctic\nArchipelago\nn = 889",
-      IHO_area == "Baffin Bay" ~ "Baffin Bay\nn = 211",
-      IHO_area == "Davis Strait" ~ "Davis Strait\nn = 21"),
-    levels = c("West Arctic\nOcean",
-               "Beaufort Sea\nn = 54",
-               "Can. Arctic\nArchipelago\nn = 889", 
-               "Baffin Bay\nn = 211", 
-               "Davis Strait\nn = 21", 
-               "East Arctic\nOcean\nn = 464"))) %>%
+      LME == "Barents Sea LME" ~ "Barents Sea\nn = 464",
+      LME == "Beaufort Sea LME" ~ "Beaufort Sea\nn = 923",
+      LME == "Baffin Bay LME" ~ "Baffin Bay\nn = 232"),
+    levels = c("Beaufort Sea\nn = 923",
+               "Baffin Bay\nn = 232",
+               "Barents Sea\nn = 464"))) %>%
   # Format species name appropriately
   mutate(fish_species = str_replace(fish_species, pattern = "_", 
                                     replacement = " "),
@@ -1025,76 +995,77 @@ trawl_area_df <- trawl %>%
 ```{r realtive-abundance-station}
 trawl_station_df <- trawl %>%
   # Find IHO area for each trawl deployment
-  st_as_sf(coords = c("lon", "lat"), crs = st_crs(arctic_latlon), remove = F) %>%
-  st_join(., IHO_sf_latlon, join = st_within) %>% # Append IHO region
+  st_as_sf(coords = c("lon", "lat"), crs = st_crs(arctic_latlon),
+           remove = F) %>%
+  st_join(., LME_sf_latlon, join = st_within) %>% # Append IHO region
   st_transform(crs = st_crs(arctic_laea)) %>% # Change projection
   mutate(xc = st_coordinates(.)[,1],
          yc = st_coordinates(.)[,2]) %>%
   st_drop_geometry() %>%
-  mutate(name = if_else(name == "The Northwestern Passages" & lon > -90, "Baffin Bay",
-                if_else(name == "Arctic Ocean" & name_3 == "West Arctic Ocean", "West Arctic Ocean",
-                if_else(name == "Arctic Ocean" & name_3 == "East Arctic Ocean", "East Arctic Ocean", name))),
-         IHO_area = case_when(name == "East Arctic Ocean" ~ "EAO",
-                              name == "West Arctic Ocean" ~ "WAO",
-                              name == "Beaufort Sea" ~ "BF",
-                              name == "The Northwestern Passages" ~ "CAA",
-                              name == "Baffin Bay" ~ "BB",
-                              name == "Davis Strait" ~ "DS"),
+  mutate(#name = if_else(name == "The Northwestern Passages" & lon > -90, "Baffin Bay",
+  #               if_else(name == "Arctic Ocean" & name_3 == "West Arctic Ocean", "West Arctic Ocean",
+  #               if_else(name == "Arctic Ocean" & name_3 == "East Arctic Ocean", "East Arctic Ocean", name))),
+  #        IHO_area = case_when(name == "East Arctic Ocean" ~ "EAO",
+  #                             name == "West Arctic Ocean" ~ "WAO",
+  #                             name == "Beaufort Sea" ~ "BF",
+  #                             name == "The Northwestern Passages" ~ "CAA",
+  #                             name == "Baffin Bay" ~ "BB",
+  #                             name == "Davis Strait" ~ "DS"),
          fish_species2 = case_when(
            fish_species == "boreogadus_saida" ~ "Arctic cod",
            fish_species == "liparidae" ~ "Snailfish",
            fish_species == "myctophidae" ~ "Lanternfish",
            fish_species == "sebastes_sp" ~ "Redfish",
            !fish_species %in% c("boreogadus_saida", "liparidae", "myctophidae", "sebastes_sp") ~ "Other")) %>%
-  dplyr::select(-name, -fname, -id, -longitude, -latitude, -min_x, -min_y,
-                -max_x, -max_y, -area.y, -mrgid, -bearings, -name_1, -mrgid_1, 
-                -name_2,-mrgid_2, -name_3, -mrgid_3) %>%
+  # dplyr::select(-name, -fname, -id, -longitude, -latitude, -min_x, -min_y,
+  #               -max_x, -max_y, -area.y, -mrgid, -bearings, -name_1, -mrgid_1, 
+  #               -name_2,-mrgid_2, -name_3, -mrgid_3) %>%
   # Calculate number of individual for each species per station
-  group_by(year, date, IHO_area, station, deployment, lat, lon, xc, yc, fish_species2) %>% 
+  group_by(year, LME, date, station, deployment, lat, lon, xc, yc, fish_species2) %>% 
   summarise(number_fish = sum(number_fish)) %>%
   ungroup() %>%
-  # Calculate total number of fish per IHO region
-  group_by(year, date, IHO_area, station, deployment, lat, lon, xc, yc) %>% 
+  # Calculate total number of fish per station
+  group_by(year, LME, date, station, deployment, lat, lon, xc, yc) %>% 
   mutate(total_fish = sum(number_fish)) %>% 
   ungroup() %>%
   # Calculate relative abundance per station
   mutate(RA = (number_fish / total_fish) * 100) %>%
-  dplyr::select(year, IHO_area, xc, yc, RA, fish_species2) %>% 
+  dplyr::select(year, LME, xc, yc, RA, fish_species2) %>% 
   pivot_wider(names_from = fish_species2, values_from = RA, values_fill = 0) %>%
   # Jitter coordinates to avoid overplotting
   mutate(row = seq(1, 18, 1),
-         xc_jit = case_when(xc == xc[1] & yc == yc[1] ~ xc[1] - 50,
+         xc_jit = case_when(xc == xc[1] & yc == yc[1] ~ xc[1],
                             xc == xc[2] & yc == yc[2] ~ xc[2],
-                            xc == xc[3] & yc == yc[3] ~ xc[3] - 50,
+                            xc == xc[3] & yc == yc[3] ~ xc[3] - 25,
                             xc == xc[4] & yc == yc[4] ~ xc[4],
                             xc == xc[5] & yc == yc[5] ~ xc[5] + 25,
-                            xc == xc[6] & yc == yc[6] ~ xc[6] + 25,
-                            xc == xc[7] & yc == yc[7] ~ xc[7] + 25,
-                            xc == xc[8] & yc == yc[8] ~ xc[8] - 50,
+                            xc == xc[6] & yc == yc[6] ~ xc[6],
+                            xc == xc[7] & yc == yc[7] ~ xc[7],
+                            xc == xc[8] & yc == yc[8] ~ xc[8],
                             xc == xc[9] & yc == yc[9] ~ xc[9],
                             xc == xc[10] & yc == yc[10] ~ xc[10],
-                            xc == xc[11] & yc == yc[11] ~ xc[11] + 140,
-                            xc == xc[12] & yc == yc[12] ~ xc[12],
-                            xc == xc[13] & yc == yc[13] ~ xc[13] - 140,
-                            xc == xc[14] & yc == yc[14] ~ xc[14] + 25,
+                            xc == xc[11] & yc == yc[11] ~ xc[11],
+                            xc == xc[12] & yc == yc[12] ~ xc[12] + 130,
+                            xc == xc[13] & yc == yc[13] ~ xc[13],
+                            xc == xc[14] & yc == yc[14] ~ xc[14] - 130,
                             xc == xc[15] & yc == yc[15] ~ xc[15],
                             xc == xc[16] & yc == yc[16] ~ xc[16] + 75,
                             xc == xc[17] & yc == yc[17] ~ xc[17],
                             xc == xc[18] & yc == yc[18] ~ xc[18]),
-         yc_jit = case_when(xc == xc[1] & yc == yc[1] ~ yc[1] - 75,
+         yc_jit = case_when(xc == xc[1] & yc == yc[1] ~ yc[1] - 25,
                             xc == xc[2] & yc == yc[2] ~ yc[2] + 25,
                             xc == xc[3] & yc == yc[3] ~ yc[3],
-                            xc == xc[4] & yc == yc[4] ~ yc[4] - 100,
-                            xc == xc[5] & yc == yc[5] ~ yc[5] - 75,
+                            xc == xc[4] & yc == yc[4] ~ yc[4] - 60,
+                            xc == xc[5] & yc == yc[5] ~ yc[5] - 25,
                             xc == xc[6] & yc == yc[6] ~ yc[6],
-                            xc == xc[7] & yc == yc[7] ~ yc[7],
-                            xc == xc[8] & yc == yc[8] ~ yc[8] - 100,
-                            xc == xc[9] & yc == yc[9] ~ yc[9],
-                            xc == xc[10] & yc == yc[10] ~ yc[10] + 75,
-                            xc == xc[11] & yc == yc[11] ~ yc[11],
-                            xc == xc[12] & yc == yc[12] ~ yc[12],
+                            xc == xc[7] & yc == yc[7] ~ yc[7] + 25,
+                            xc == xc[8] & yc == yc[8] ~ yc[8] - 50,
+                            xc == xc[9] & yc == yc[9] ~ yc[9] + 25,
+                            xc == xc[10] & yc == yc[10] ~ yc[10] + 50,
+                            xc == xc[11] & yc == yc[11] ~ yc[11] + 60,
+                            xc == xc[12] & yc == yc[12] ~ yc[12] + 35,
                             xc == xc[13] & yc == yc[13] ~ yc[13],
-                            xc == xc[14] & yc == yc[14] ~ yc[14] + 50,
+                            xc == xc[14] & yc == yc[14] ~ yc[14] - 35,
                             xc == xc[15] & yc == yc[15] ~ yc[15],
                             xc == xc[16] & yc == yc[16] ~ yc[16] - 125,
                             xc == xc[17] & yc == yc[17] ~ yc[17],
@@ -1109,17 +1080,12 @@ Plot the the heatmap and map together.
 # Heatmap
 heatmap_RA <- trawl_area_df %>%
   ggplot() +
-  geom_tile(aes(x = IHO_area, y = fish_species, fill = RA),
+  geom_tile(aes(x = LME, y = fish_species, fill = RA),
             color = "white", lwd = 0.6) +
-  geom_text(aes(x = IHO_area, y = fish_species, 
+  geom_text(aes(x = LME, y = fish_species, 
                 label = sprintf("%0.1f", round(RA, 1)),
                 color = color_text), size = 3) +
-  scale_x_discrete(expand = c(0, 0), 
-                   labels = c("BF\nn = 54",
-                              "CAA\nn = 889",
-                              "BB\nn = 211",
-                              "DS\nn = 21",
-                              "EAO\nn = 464")) +
+  scale_x_discrete(expand = c(0, 0)) +
   scale_y_discrete(labels = c("Twohorn sculpin",
                               "Atlantic wolffish",
                               "Greenland halibut",
@@ -1190,7 +1156,7 @@ table1_RA <- plot_grid(heatmap_RA, map_RA, ncol = 2, rel_widths = c(1, 0.7),
 # Save and display plot
 ggsave("plots/Table1_RA_map.png", table1_RA, 
        height = 3.25, width = 6.5, dpi = 600, units = "in")
-table1_RA
+# table1_RA
 ```
 
 ## Figure 4. Linear regression latitude
