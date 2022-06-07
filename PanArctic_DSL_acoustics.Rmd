@@ -154,7 +154,7 @@ MVBS <- MVBS_raw %>%
              if_else(is.na(dawn) & is.na(dusk) & month < 4 | month > 10, "night", 
              if_else(date >= dawn & date <= dusk, "day", "night"))),
              levels = c("day", "night"))) %>%
-  filter(layer_depth_min <= 995 & bottom_depth > 200 & lat != 999 & lon != 999 & Sv_mean < -30) %>% # Tidy data
+  filter(layer_depth_min <= 995 & bottom_depth > 400 & lat != 999 & lon != 999 & Sv_mean < -30) %>% # Tidy data
   dplyr::select(year, area, date, day_night, lat, lon, layer_depth_min, 
                 Sv_mean, NASC, bottom_depth, frequency) 
 ```

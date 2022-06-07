@@ -1,7 +1,7 @@
 ---
 title: "PanArctic DSL - Acoustic gridding"
 author: "[Pierre Priou](mailto:pierre.priou@mi.mun.ca)"
-date: "2022/06/06 at 19:01"
+date: "2022/06/07 at 15:11"
 output: 
   html_document:
     keep_md: yes
@@ -50,7 +50,7 @@ I use the area definitions from IHO Sea Areas (International Hydrographic Organi
 ```r
 # Projections
 arctic_latlon <- raster(extent(-155, 35, 66, 85), crs = "EPSG:4326")
-cell_res <- 100 # Cell resolution in km
+cell_res <- 150 # Cell resolution in km
 arctic_laea <- raster(extent(-2700, 2700, -2700, 2700), crs = "EPSG:6931")
 projection(arctic_laea) <- gsub("units=m",
                                 "units=km",
@@ -167,7 +167,7 @@ MVBS <- MVBS_raw %>%
              if_else(is.na(dawn) & is.na(dusk) & month < 4 | month > 10, "night", 
              if_else(date >= dawn & date <= dusk, "day", "night"))),
              levels = c("day", "night"))) %>%
-  filter(layer_depth_min <= 995 & bottom_depth > 200 & lat != 999 & lon != 999 & Sv_mean < -30) %>% # Tidy data
+  filter(layer_depth_min <= 995 & bottom_depth > 400 & lat != 999 & lon != 999 & Sv_mean < -30) %>% # Tidy data
   dplyr::select(year, area, date, day_night, lat, lon, layer_depth_min, 
                 Sv_mean, NASC, bottom_depth, frequency) 
 ```
