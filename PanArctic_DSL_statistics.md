@@ -1,7 +1,7 @@
 ---
 title: "PanArctic DSL - Statistics"
 author: "[Pierre Priou](mailto:pierre.priou@mi.mun.ca)"
-date: "2022/06/06 at 19:11"
+date: "2022/06/07 at 10:48"
 output: 
   html_document:
     code_folding: show
@@ -124,7 +124,7 @@ plot_grid(
           axis.ticks = element_blank(),
           axis.title = element_blank()),
   stat_laea %>% 
-    filter(depth == 380) %>%
+    filter(depth == 318) %>%
     ggplot(aes(x = xc,  y = yc)) +
     geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group),
                  fill = "grey80") +
@@ -139,6 +139,7 @@ plot_grid(
 ```
 
 ![](PanArctic_DSL_statistics_files/figure-html/map-NA-1.png)<!-- -->
+
 There are two missing chl values, so this cell is excluded from further analyses.
 
 
@@ -154,7 +155,7 @@ stat_laea <- stat_laea %>%
                   levels = c("CAO", "BF", "NAR", "BB", "SV")))
 
 stat_laea %>%
-  filter(depth == 380) %>%
+  filter(depth == 318) %>%
   group_by(LME) %>% 
   summarise(n = n())
 ```
@@ -169,21 +170,21 @@ stat_laea %>%
 ## 4 BB       32
 ## 5 SV       12
 ```
-Because we sampled at the border of the CAO and there is only a limited amount of data in this region we combine CAO data based on their proximity to other LME (Barents Sea and Beaufort Sea). 
+Because we sampled at the border of the CAO and there is only a limited amount of data in this region we combine CAO data based on their proximity to other LME (Barents Sea and Beaufort Sea). I exclude data from Nares Strait because we do not have enough points for a regression
 
 
 ```r
 stat_laea <- stat_laea %>%
   mutate(LME = as.character(LME),
          LME = factor(if_else(LME == "CAO" & yc <= 0, "SV",
-                      if_else(LME == "CAO" & yc > 0, "BF",
-                      if_else(LME == "NAR", "BB", LME))),
+                      if_else(LME == "CAO" & yc > 0, "BF", LME)),
+                      # if_else(LME == "NAR", "BB", LME))),
                       levels = c("BF", "BB", "SV", "NAR"))) %>%
-  filter(is.na(v) == F) %>%
+  filter(is.na(v) == F & LME != "NAR") %>%
   droplevels()
 
 stat_laea %>%
-  filter(depth == 380) %>%
+  filter(depth == 318) %>%
   group_by(LME) %>% 
   summarise(n = n())
 ```
@@ -192,8 +193,8 @@ stat_laea %>%
 ## # A tibble: 3 × 2
 ##   LME       n
 ##   <fct> <int>
-## 1 BF       24
-## 2 BB       34
+## 1 BF       26
+## 2 BB       31
 ## 3 SV       14
 ```
 
@@ -201,7 +202,7 @@ stat_laea %>%
 ```r
 plot_grid(
   stat_laea %>%
-    filter(depth == 380) %>%
+    filter(depth == 318) %>%
     ggplot(aes(x = xc,  y = yc)) +
     geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group),
                  fill = "grey80") +
@@ -212,7 +213,7 @@ plot_grid(
           axis.ticks = element_blank(),
           axis.title = element_blank()),
   stat_laea %>% 
-    filter(depth == 380) %>%
+    filter(depth == 318) %>%
     ggplot(aes(x = xc,  y = yc)) +
     geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group),
                  fill = "grey80") +
@@ -227,10 +228,6 @@ plot_grid(
 ```
 
 ![](PanArctic_DSL_statistics_files/figure-html/map-chl-NA-1.png)<!-- -->
-
-Check the total number of observations per group.
-
-
 
 # Data exploration
 
@@ -264,7 +261,7 @@ phy_grid_laea %>%
   geom_tile(aes(fill = v_mean * 100)) +
   geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group),
                fill = "grey80") +
-  scale_fill_cmocean("velo (cm/s)", name = "speed", limits = c(0, 10)) +
+  scale_fill_cmocean("velo (cm/s)", name = "speed", limits = c(0, 8)) +
   facet_wrap(~ year, ncol = 3) +
   ggtitle("Velocity at 318 m depth") +
   coord_fixed(xlim = c(-2600, 1100), ylim = c(-1800, 1900), expand = F) + 
@@ -275,27 +272,6 @@ phy_grid_laea %>%
 ```
 
 ![](PanArctic_DSL_statistics_files/figure-html/map-velocity318-1.png)<!-- -->
-
-
-```r
-# Velocity
-phy_grid_laea %>% 
-  filter(depth == 380) %>%
-  ggplot(aes(x = xc,  y = yc)) +
-  geom_tile(aes(fill = v_mean * 100)) +
-  geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group),
-               fill = "grey80") +
-  scale_fill_cmocean("velo (cm/s)", name = "speed", limits = c(0, 10)) +
-  facet_wrap(~ year, ncol = 3) +
-  ggtitle("Velocity at 380 m depth") +
-  coord_fixed(xlim = c(-2600, 1100), ylim = c(-1800, 1900), expand = F) + 
-  theme(legend.position = "top",
-        axis.text = element_blank(),
-        axis.ticks = element_blank(), 
-        axis.title = element_blank())
-```
-
-![](PanArctic_DSL_statistics_files/figure-html/map-velocity380-1.png)<!-- -->
 
 # Spatial and interannual variability
 
@@ -309,8 +285,7 @@ SA_diff <- SA_grid_laea %>%
                          LME == "Northern Canadian Archipelago LME" ~
                            "NAR"),
          LME = factor(if_else(LME == "CAO" & yc <= 0, "SV",
-                      if_else(LME == "CAO" & yc > 0, "BF",
-                      if_else(LME == "NAR", "BB", LME))),
+                      if_else(LME == "CAO" & yc > 0, "BF", LME)),
                       levels = c("BF", "NAR", "BB", "SV")),
          year = factor(year)) %>%
   dplyr::select(year, LME, NASC_int, SA_int, CM)
@@ -358,12 +333,12 @@ bind_rows(kruskal_test(SA_diff, NASC_int ~ LME),
 
 ```
 ## # A tibble: 4 × 7
-##   .y.          n statistic    df       p method         var  
-##   <chr>    <int>     <dbl> <int>   <dbl> <chr>          <chr>
-## 1 NASC_int    74      5.54     2 0.0627  Kruskal-Wallis LME  
-## 2 NASC_int    74     12.2      2 0.00224 Kruskal-Wallis year 
-## 3 CM          74      8.90     2 0.0117  Kruskal-Wallis LME  
-## 4 CM          74      3.74     2 0.154   Kruskal-Wallis year
+##   .y.          n statistic    df        p method         var  
+##   <chr>    <int>     <dbl> <int>    <dbl> <chr>          <chr>
+## 1 NASC_int    74     16.5      3 0.000884 Kruskal-Wallis LME  
+## 2 NASC_int    74     12.2      2 0.00224  Kruskal-Wallis year 
+## 3 CM          74      9.93     3 0.0191   Kruskal-Wallis LME  
+## 4 CM          74      3.74     2 0.154    Kruskal-Wallis year
 ```
 
 Mesopelagic backscatter S\~A\~ varied significantly between areas (*H* = 29.792952, *p* \< 0.001) and years (*H* = 29.792952, *p* = 0.011). The center of mass varied significantly between areas (*H* = 61.185994, *p* \< 0.001) but not between years (*H* = 4.164743, *p* = 0.125).
@@ -380,12 +355,13 @@ SA_diff %>% # Kruskal wallis interannual difference SA within group
 ```
 
 ```
-## # A tibble: 3 × 7
+## # A tibble: 4 × 7
 ##   LME   .y.          n statistic    df       p method        
 ## * <fct> <chr>    <int>     <dbl> <int>   <dbl> <chr>         
 ## 1 BF    NASC_int    25     14.6      2 0.00066 Kruskal-Wallis
-## 2 BB    NASC_int    35      2.13     2 0.344   Kruskal-Wallis
-## 3 SV    NASC_int    14      3.14     2 0.208   Kruskal-Wallis
+## 2 NAR   NASC_int     3      0        1 1       Kruskal-Wallis
+## 3 BB    NASC_int    32      4.49     2 0.106   Kruskal-Wallis
+## 4 SV    NASC_int    14      3.14     2 0.208   Kruskal-Wallis
 ```
 
 There were some interannual differences in SA within some region (WAO_BF - H = 6.4670868, *p* = 0.0394; CAA - H = 11.8260406, *p* = 0.0027; BB - H = 5.0981791, *p* = 0.0782; DS - H = 0.3282051, *p* = 0.8490; EAO - H = 4.9779498, *p* = 0.0830).
@@ -408,8 +384,7 @@ SA_lm <- SA_grid_laea %>%
                          LME == "Northern Canadian Archipelago LME" ~
                            "NAR"),
          LME = factor(if_else(LME == "CAO" & yc <= 0, "SV",
-                      if_else(LME == "CAO" & yc > 0, "BF",
-                      if_else(LME == "NAR", "BB", LME))),
+                      if_else(LME == "CAO" & yc > 0, "BF", LME)),
                       levels = c("BF", "NAR", "BB", "SV")))
 ```
 
@@ -480,6 +455,7 @@ Fit linear regression for each Arctic region.
 ```r
 # Fit models
 LM_area <- SA_lm %>%
+  filter(LME != "NAR") %>%
   nest_by(LME) %>%
   # Fit linear model for each arctic region
   mutate(mod = list(lm(SA_int ~ lat, data = data))) %>%
@@ -518,7 +494,7 @@ Plot regressions. We can see that mesopelagic backscatter decreases with increas
 ```r
 LM_area_res %>%
   ggplot() + 
-  geom_point(aes(x = lat, y = SA_int, col = LME)) +
+  geom_point(data = SA_lm, aes(x = lat, y = SA_int, col = LME)) +
   geom_line(aes(x = lat, y = .fitted, col = LME), size = 0.8) + 
   geom_ribbon(aes(x = lat, ymin = .lower, ymax = .upper, group = LME), 
               alpha = 0.1)
@@ -544,7 +520,7 @@ I select data at 318 m depth because it fits well with the DSL diurnal centre of
 
 ```r
 SA_df <- stat_laea %>%
-  filter(depth == 380) %>%
+  filter(depth == 318) %>%
   dplyr::select(year, xc, yc, LME, NASC_int, SA_int, v, depth) %>%
   mutate(year = factor(year))
 ```
@@ -636,8 +612,8 @@ data.frame(model = c("GAM_G",
 ```
 
 ```{=html}
-<div id="htmlwidget-f783d5cb8c98f9c22d29" style="width:100%;height:auto;" class="datatables html-widget"></div>
-<script type="application/json" data-for="htmlwidget-f783d5cb8c98f9c22d29">{"x":{"filter":"none","vertical":false,"data":[["GAM_I","GAM_S","GAM_G"],[13.606,15.622,9.143],[68.64,68.41,57.97],[0.14,0.12,0.09],[417.44,420.74,423.97],[824.296,829.389,840.511],[0,5.09,16.21],[0.92708,0.07264,0.00028]],"container":"<table class=\"cell-border stribe\">\n  <thead>\n    <tr>\n      <th>model<\/th>\n      <th>df<\/th>\n      <th>dev_expl<\/th>\n      <th>r2<\/th>\n      <th>reml<\/th>\n      <th>AIC<\/th>\n      <th>dAIC<\/th>\n      <th>w_AIC<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[1,2,3,4,5,6,7]}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
+<div id="htmlwidget-2dd9540d2e9e250240a0" style="width:100%;height:auto;" class="datatables html-widget"></div>
+<script type="application/json" data-for="htmlwidget-2dd9540d2e9e250240a0">{"x":{"filter":"none","vertical":false,"data":[["GAM_I","GAM_S","GAM_G"],[11.573,14.61,8.83],[68.72,68.64,57.71],[0.15,0.12,0.07],[415.75,420.94,426.16],[825.074,831.885,845.165],[0,6.81,20.09],[0.96784,0.03212,4e-05]],"container":"<table class=\"cell-border stribe\">\n  <thead>\n    <tr>\n      <th>model<\/th>\n      <th>df<\/th>\n      <th>dev_expl<\/th>\n      <th>r2<\/th>\n      <th>reml<\/th>\n      <th>AIC<\/th>\n      <th>dAIC<\/th>\n      <th>w_AIC<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[1,2,3,4,5,6,7]}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
 ```
 
 Model G summary.
@@ -658,20 +634,20 @@ summary(GAM_G)
 ## 
 ## Parametric coefficients:
 ##             Estimate Std. Error t value Pr(>|t|)    
-## (Intercept)   4.9944     0.9945   5.022 4.28e-06 ***
+## (Intercept)    5.056      1.080    4.68 1.54e-05 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
 ## Approximate significance of smooth terms:
 ##           edf Ref.df      F  p-value    
-## s(v)    2.653  3.175  6.752 0.000425 ***
-## s(LME)  1.889  2.000 16.345 1.34e-05 ***
-## s(year) 1.794  2.000 10.069 0.000662 ***
+## s(v)    2.367  2.855  3.820 0.018500 *  
+## s(LME)  1.886  2.000 13.706 5.59e-05 ***
+## s(year) 1.833  2.000  9.581 0.000421 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
-## R-sq.(adj) =  0.0878   Deviance explained =   58%
-## -ML = 423.97  Scale est. = 2.1958    n = 72
+## R-sq.(adj) =  0.0667   Deviance explained = 57.7%
+## -ML = 426.16  Scale est. = 2.4255    n = 71
 ```
 
 Model S summary.
@@ -692,20 +668,20 @@ summary(GAM_S)
 ## 
 ## Parametric coefficients:
 ##             Estimate Std. Error t value Pr(>|t|)    
-## (Intercept)   4.7756     0.7384   6.467 2.09e-08 ***
+## (Intercept)   4.8567     0.6547   7.418 5.11e-10 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
 ## Approximate significance of smooth terms:
-##            edf Ref.df      F  p-value    
-## s(year)  1.739      2  8.041  0.00108 ** 
-## s(LME)   1.845      2 13.010 4.76e-05 ***
-## s(v,LME) 8.008     14 12.036  < 2e-16 ***
+##            edf Ref.df     F  p-value    
+## s(year)  1.777      2 9.200 0.000282 ***
+## s(LME)   1.756      2 7.650 0.001249 ** 
+## s(v,LME) 7.060     14 6.298  3.9e-05 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
-## R-sq.(adj) =  0.116   Deviance explained = 68.4%
-## -ML = 420.74  Scale est. = 1.5144    n = 72
+## R-sq.(adj) =   0.12   Deviance explained = 68.6%
+## -ML = 420.94  Scale est. = 1.421     n = 71
 ```
 
 Model I summary.
@@ -726,22 +702,22 @@ summary(GAM_I)
 ## 
 ## Parametric coefficients:
 ##             Estimate Std. Error t value Pr(>|t|)    
-## (Intercept)   4.7222     0.8078   5.846 2.16e-07 ***
+## (Intercept)   4.8948     0.7407   6.609 1.07e-08 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
 ## Approximate significance of smooth terms:
-##              edf Ref.df      F  p-value    
-## s(year)    1.758  2.000  9.285 0.000663 ***
-## s(LME)     1.878  2.000 16.070 1.76e-05 ***
-## s(v):LMEBF 1.000  1.000 10.254 0.002168 ** 
-## s(v):LMEBB 2.477  2.915  5.272 0.003215 ** 
-## s(v):LMESV 3.305  3.736 16.132  < 2e-16 ***
+##              edf Ref.df     F  p-value    
+## s(year)    1.803  2.000 13.49 7.95e-05 ***
+## s(LME)     1.866  2.000 15.75 2.45e-05 ***
+## s(v):LMEBF 1.000  1.000 11.49  0.00123 ** 
+## s(v):LMEBB 1.000  1.000  0.27  0.60538    
+## s(v):LMESV 3.165  3.607 19.69  < 2e-16 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
-## R-sq.(adj) =  0.137   Deviance explained = 68.6%
-## -ML = 417.44  Scale est. = 1.512     n = 72
+## R-sq.(adj) =  0.149   Deviance explained = 68.7%
+## -ML = 415.75  Scale est. = 1.2965    n = 71
 ```
 
 ## Model checking
@@ -762,10 +738,10 @@ k.check(GAM_S)
 ```
 
 ```
-##          k'      edf  k-index p-value
-## s(year)   3 1.738795       NA      NA
-## s(LME)    3 1.845495       NA      NA
-## s(v,LME) 15 8.007890 0.939657    0.68
+##          k'      edf   k-index p-value
+## s(year)   3 1.776671        NA      NA
+## s(LME)    3 1.756296        NA      NA
+## s(v,LME) 15 7.060311 0.8473252   0.315
 ```
 
 
@@ -780,12 +756,12 @@ k.check(GAM_I)
 ```
 
 ```
-##            k'      edf  k-index p-value
-## s(year)     3 1.757820       NA      NA
-## s(LME)      3 1.877991       NA      NA
-## s(v):LMEBF  4 1.000089 0.953206  0.6750
-## s(v):LMEBB  4 2.476970 0.953206  0.7225
-## s(v):LMESV  4 3.305120 0.953206  0.7025
+##            k'      edf   k-index p-value
+## s(year)     3 1.802700        NA      NA
+## s(LME)      3 1.866103        NA      NA
+## s(v):LMEBF  4 1.000026 0.8366323  0.2975
+## s(v):LMEBB  4 1.000014 0.8366323  0.2525
+## s(v):LMESV  4 3.165307 0.8366323  0.2675
 ```
 
 ### Resiudals against covariates
@@ -895,20 +871,20 @@ summary(GAM_S_p)
 ## 
 ## Parametric coefficients:
 ##             Estimate Std. Error t value Pr(>|t|)    
-## (Intercept)   4.7780     0.8383     5.7 3.99e-07 ***
+## (Intercept)   4.8597     0.7409   6.559 1.46e-08 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
 ## Approximate significance of smooth terms:
-##            edf Ref.df      F  p-value    
-## s(year)  1.777      2  8.445 0.000998 ***
-## s(LME)   1.886      2 13.620 4.51e-05 ***
-## s(v,LME) 8.008     14 14.591  < 2e-16 ***
+##            edf Ref.df     F  p-value    
+## s(year)  1.823      2 9.842 0.000232 ***
+## s(LME)   1.813      2 8.149 0.001285 ** 
+## s(v,LME) 7.008     14 6.694 0.000110 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
-## R-sq.(adj) =  0.122   Deviance explained = 68.5%
-## -REML = 420.09  Scale est. = 1.4856    n = 72
+## R-sq.(adj) =  0.123   Deviance explained = 68.6%
+## -REML = 420.42  Scale est. = 1.3967    n = 71
 ```
 
 No terms can be dropped, so I refit model with REML
@@ -942,20 +918,20 @@ summary(GAM_S2)
 ## 
 ## Parametric coefficients:
 ##             Estimate Std. Error t value Pr(>|t|)    
-## (Intercept)   4.7780     0.8383     5.7 3.99e-07 ***
+## (Intercept)   4.8597     0.7409   6.559 1.46e-08 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
 ## Approximate significance of smooth terms:
-##            edf Ref.df      F  p-value    
-## s(year)  1.777      2  8.445 0.000998 ***
-## s(LME)   1.886      2 13.620 4.51e-05 ***
-## s(v,LME) 8.008     14 14.591  < 2e-16 ***
+##            edf Ref.df     F  p-value    
+## s(year)  1.823      2 9.842 0.000232 ***
+## s(LME)   1.813      2 8.149 0.001285 ** 
+## s(v,LME) 7.008     14 6.694 0.000110 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
-## R-sq.(adj) =  0.122   Deviance explained = 68.5%
-## -REML = 420.09  Scale est. = 1.4856    n = 72
+## R-sq.(adj) =  0.123   Deviance explained = 68.6%
+## -REML = 420.42  Scale est. = 1.3967    n = 71
 ```
 
 Check residuals.
@@ -1015,22 +991,22 @@ summary(GAM_I_p)
 ## 
 ## Parametric coefficients:
 ##             Estimate Std. Error t value Pr(>|t|)    
-## (Intercept)   4.8254     0.8605   5.608 5.12e-07 ***
+## (Intercept)   4.8785     0.8334   5.854 1.93e-07 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
 ## Approximate significance of smooth terms:
-##               edf Ref.df      F  p-value    
-## s(year)    1.7863      2 11.433 0.000386 ***
-## s(LME)     1.8988      2 15.203 3.59e-05 ***
-## s(v):LMEBF 0.8941      4  3.290 0.003118 ** 
-## s(v):LMEBB 1.5791      4  1.982 0.037814 *  
-## s(v):LMESV 3.0665      4 38.772  < 2e-16 ***
+##                  edf Ref.df     F  p-value    
+## s(year)    1.8458786      2 17.75 6.04e-05 ***
+## s(LME)     1.8943522      2 15.69 5.66e-05 ***
+## s(v):LMEBF 0.8992212      4  3.81  0.00205 ** 
+## s(v):LMEBB 0.0002099      4  0.00  0.73580    
+## s(v):LMESV 2.9307155      4 35.25  < 2e-16 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
-## R-sq.(adj) =  0.174   Deviance explained = 66.2%
-## -REML = 420.17  Scale est. = 1.4814    n = 72
+## R-sq.(adj) =  0.202   Deviance explained = 68.3%
+## -REML = 417.97  Scale est. = 1.2924    n = 71
 ```
 
 No terms can be dropped, so I refit model with REML.
@@ -1056,22 +1032,22 @@ summary(GAM_I2)
 ## 
 ## Parametric coefficients:
 ##             Estimate Std. Error t value Pr(>|t|)    
-## (Intercept)   4.7017     0.9233   5.092 3.74e-06 ***
+## (Intercept)   4.8980     0.8237   5.946 1.43e-07 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
 ## Approximate significance of smooth terms:
 ##              edf Ref.df      F  p-value    
-## s(year)    1.790  2.000  9.732 0.000557 ***
-## s(LME)     1.911  2.000 17.452 1.28e-05 ***
-## s(v):LMEBF 1.001  1.001 10.361 0.002075 ** 
-## s(v):LMEBB 2.725  3.157  5.986 0.001056 ** 
-## s(v):LMESV 3.331  3.754 16.481  < 2e-16 ***
+## s(year)    1.829  2.000 14.560 7.46e-05 ***
+## s(LME)     1.897  2.000 16.287 2.91e-05 ***
+## s(v):LMEBF 1.000  1.000 11.533  0.00121 ** 
+## s(v):LMEBB 1.000  1.000  0.275  0.60205    
+## s(v):LMESV 3.201  3.637 19.954  < 2e-16 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
-## R-sq.(adj) =  0.137   Deviance explained = 69.1%
-## -REML = 414.76  Scale est. = 1.4779    n = 72
+## R-sq.(adj) =  0.149   Deviance explained = 68.8%
+## -REML = 414.83  Scale est. = 1.2756    n = 71
 ```
 
 Check residuals.
@@ -1267,7 +1243,7 @@ I select data at 318 m depth because it fits well with the DSL diurnal centre of
 
 ```r
 SA_df <- stat_laea %>%
-  filter(depth == 380) %>%
+  filter(depth == 318) %>%
   dplyr::select(year, xc, yc, LME, NASC_int, SA_int, v, depth) %>%
   mutate(year = factor(year))
 ```
@@ -1345,8 +1321,8 @@ data.frame(model = c("GAMSA_G",
 ```
 
 ```{=html}
-<div id="htmlwidget-e9f4f862c84a8c0a6300" style="width:100%;height:auto;" class="datatables html-widget"></div>
-<script type="application/json" data-for="htmlwidget-e9f4f862c84a8c0a6300">{"x":{"filter":"none","vertical":false,"data":[["GAMSA_I","GAMSA_S","GAMSA_G"],[11.225,12.768,8.403],[45.68,46.21,32.36],[0.39,0.39,0.27],[241.51,244.29,247.2],[483.682,486.071,493.834],[0,2.39,10.15],[0.76388,0.23135,0.00477]],"container":"<table class=\"cell-border stribe\">\n  <thead>\n    <tr>\n      <th>model<\/th>\n      <th>df<\/th>\n      <th>dev_expl<\/th>\n      <th>r2<\/th>\n      <th>reml<\/th>\n      <th>AIC<\/th>\n      <th>dAIC<\/th>\n      <th>w_AIC<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[1,2,3,4,5,6,7]}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
+<div id="htmlwidget-e929fa7a35099e8b2863" style="width:100%;height:auto;" class="datatables html-widget"></div>
+<script type="application/json" data-for="htmlwidget-e929fa7a35099e8b2863">{"x":{"filter":"none","vertical":false,"data":[["GAMSA_I","GAMSA_S","GAMSA_G"],[10.374,11.551,7.866],[44.8,44.12,30.9],[0.38,0.38,0.26],[233.73,236.64,239.79],[468.943,472.17,479.871],[0,3.23,10.93],[0.83096,0.16552,0.00352]],"container":"<table class=\"cell-border stribe\">\n  <thead>\n    <tr>\n      <th>model<\/th>\n      <th>df<\/th>\n      <th>dev_expl<\/th>\n      <th>r2<\/th>\n      <th>reml<\/th>\n      <th>AIC<\/th>\n      <th>dAIC<\/th>\n      <th>w_AIC<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[1,2,3,4,5,6,7]}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
 ```
 
 Model G summary.
@@ -1367,20 +1343,20 @@ summary(GAMSA_G)
 ## 
 ## Parametric coefficients:
 ##             Estimate Std. Error t value Pr(>|t|)    
-## (Intercept)   16.377      1.731   9.462 6.72e-14 ***
+## (Intercept)   16.900      2.144   7.882 4.59e-11 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
 ## Approximate significance of smooth terms:
-##            edf Ref.df     F p-value   
-## s(v)    3.0009  3.499 3.822 0.00776 **
-## s(LME)  0.6445  2.000 0.593 0.17302   
-## s(year) 1.4500  2.000 3.684 0.00934 **
+##           edf Ref.df     F p-value   
+## s(v)    1.927  2.354 1.822 0.25448   
+## s(LME)  1.111  2.000 1.839 0.05150 . 
+## s(year) 1.636  2.000 6.171 0.00139 **
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
-## R-sq.(adj) =  0.271   Deviance explained = 32.4%
-## -ML =  247.2  Scale est. = 48.23     n = 72
+## R-sq.(adj) =   0.26   Deviance explained = 30.9%
+## -ML = 239.79  Scale est. = 43.928    n = 71
 ```
 
 Model S summary.
@@ -1401,20 +1377,20 @@ summary(GAMSA_S)
 ## 
 ## Parametric coefficients:
 ##             Estimate Std. Error t value Pr(>|t|)    
-## (Intercept)   16.099      1.737   9.269 2.34e-13 ***
+## (Intercept)   16.899      2.016   8.383  7.9e-12 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
 ## Approximate significance of smooth terms:
 ##             edf Ref.df     F  p-value    
-## s(year)  1.5420      2 4.728 0.003714 ** 
-## s(LME)   0.5607      2 0.474 0.193777    
-## s(v,LME) 6.2653     14 2.318 0.000156 ***
+## s(year)  1.6603      2 6.700 0.000826 ***
+## s(LME)   0.9267      2 1.271 0.078511 .  
+## s(v,LME) 4.6862     14 1.464 0.003067 ** 
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
-## R-sq.(adj) =   0.39   Deviance explained = 46.2%
-## -ML = 244.29  Scale est. = 40.36     n = 72
+## R-sq.(adj) =  0.376   Deviance explained = 44.1%
+## -ML = 236.64  Scale est. = 37        n = 71
 ```
 
 Model I summary.
@@ -1435,22 +1411,22 @@ summary(GAMSA_I)
 ## 
 ## Parametric coefficients:
 ##             Estimate Std. Error t value Pr(>|t|)    
-## (Intercept)   15.647      1.779   8.797 1.39e-12 ***
+## (Intercept)    16.99       2.32   7.324 5.58e-10 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
 ## Approximate significance of smooth terms:
-##               edf Ref.df     F p-value   
-## s(year)    1.5578  2.000 4.884 0.00373 **
-## s(LME)     0.6841  2.000 0.623 0.18150   
-## s(v):LMEBF 1.0000  1.000 5.557 0.02152 * 
-## s(v):LMEBB 2.3860  2.821 6.203 0.00129 **
-## s(v):LMESV 2.0124  2.400 3.597 0.03671 * 
+##              edf Ref.df     F  p-value    
+## s(year)    1.695    2.0 7.626 0.000648 ***
+## s(LME)     1.436    2.0 4.319 0.007884 ** 
+## s(v):LMEBF 1.000    1.0 6.347 0.014304 *  
+## s(v):LMEBB 1.000    1.0 1.042 0.311365    
+## s(v):LMESV 2.195    2.6 3.896 0.013557 *  
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
-## R-sq.(adj) =  0.391   Deviance explained = 45.7%
-## -ML = 241.51  Scale est. = 40.285    n = 72
+## R-sq.(adj) =  0.383   Deviance explained = 44.8%
+## -ML = 233.73  Scale est. = 36.578    n = 71
 ```
 
 ## Model checking
@@ -1472,9 +1448,9 @@ k.check(GAMSA_S)
 
 ```
 ##          k'       edf  k-index p-value
-## s(year)   3 1.5420335       NA      NA
-## s(LME)    3 0.5606755       NA      NA
-## s(v,LME) 15 6.2653111 1.106975    0.79
+## s(year)   3 1.6602742       NA      NA
+## s(LME)    3 0.9267226       NA      NA
+## s(v,LME) 15 4.6862150 0.973814   0.375
 ```
 
 
@@ -1489,12 +1465,12 @@ k.check(GAMSA_I)
 ```
 
 ```
-##            k'       edf k-index p-value
-## s(year)     3 1.5577669      NA      NA
-## s(LME)      3 0.6840837      NA      NA
-## s(v):LMEBF  4 1.0000310 1.10725  0.7850
-## s(v):LMEBB  4 2.3859926 1.10725  0.7625
-## s(v):LMESV  4 2.0123517 1.10725  0.8250
+##            k'      edf   k-index p-value
+## s(year)     3 1.694756        NA      NA
+## s(LME)      3 1.435914        NA      NA
+## s(v):LMEBF  4 1.000038 0.9756523   0.365
+## s(v):LMEBB  4 1.000001 0.9756523   0.375
+## s(v):LMESV  4 2.194893 0.9756523   0.390
 ```
 
 ### Resiudals against covariates
@@ -1604,20 +1580,20 @@ summary(GAMSA_S_p)
 ## 
 ## Parametric coefficients:
 ##             Estimate Std. Error t value Pr(>|t|)    
-## (Intercept)   16.094      2.092   7.691 1.32e-10 ***
+## (Intercept)   16.874      2.371   7.118 1.29e-09 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
 ## Approximate significance of smooth terms:
-##             edf Ref.df     F  p-value    
-## s(year)  1.6844      2 5.221 0.003764 ** 
-## s(LME)   0.7297      2 0.604 0.210499    
-## s(v,LME) 6.2535     14 2.383 0.000208 ***
+##            edf Ref.df     F  p-value    
+## s(year)  1.760      2 7.137 0.000847 ***
+## s(LME)   1.028      2 1.411 0.084673 .  
+## s(v,LME) 4.649     14 1.486 0.004109 ** 
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
-## R-sq.(adj) =  0.394   Deviance explained = 46.8%
-## -REML = 242.73  Scale est. = 40.135    n = 72
+## R-sq.(adj) =  0.378   Deviance explained = 44.4%
+## -REML = 234.95  Scale est. = 36.93     n = 71
 ```
 
 `s(LME)` can be dropped. Refit the model without those terms.
@@ -1643,19 +1619,19 @@ summary(GAMSA_S2)
 ## 
 ## Parametric coefficients:
 ##             Estimate Std. Error t value Pr(>|t|)    
-## (Intercept)   16.079      1.725   9.321  1.9e-13 ***
+## (Intercept)   16.888      1.977   8.545 4.13e-12 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
 ## Approximate significance of smooth terms:
 ##            edf Ref.df     F  p-value    
-## s(year)  1.541      2 4.634 0.003497 ** 
-## s(v,LME) 6.778     14 2.387 0.000133 ***
+## s(year)  1.657      2 6.579 0.000697 ***
+## s(v,LME) 5.607     14 1.766 0.000820 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
-## R-sq.(adj) =  0.389   Deviance explained = 46.1%
-## -ML = 244.31  Scale est. = 40.416    n = 72
+## R-sq.(adj) =  0.375   Deviance explained =   44%
+## -ML = 236.78  Scale est. = 37.101    n = 71
 ```
 
 Compare models.
@@ -1689,8 +1665,8 @@ data.frame(model = c("GAMSA_S", "GAMSA_S2"),
 ```
 
 ```{=html}
-<div id="htmlwidget-5a7ccb0d1ac917c01fc5" style="width:100%;height:auto;" class="datatables html-widget"></div>
-<script type="application/json" data-for="htmlwidget-5a7ccb0d1ac917c01fc5">{"x":{"filter":"none","vertical":false,"data":[["GAMSA_S","GAMSA_S2"],[12.768,12.696],[46.21,46.09],[0.39,0.39],[244.29,244.31],[486.071,486.083],[0,0.01],[0.5015,0.4985]],"container":"<table class=\"cell-border stribe\">\n  <thead>\n    <tr>\n      <th>model<\/th>\n      <th>df<\/th>\n      <th>dev_expl<\/th>\n      <th>r2<\/th>\n      <th>reml<\/th>\n      <th>AIC<\/th>\n      <th>dAIC<\/th>\n      <th>w_AIC<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[1,2,3,4,5,6,7]}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
+<div id="htmlwidget-695e9ab5d491e06e3306" style="width:100%;height:auto;" class="datatables html-widget"></div>
+<script type="application/json" data-for="htmlwidget-695e9ab5d491e06e3306">{"x":{"filter":"none","vertical":false,"data":[["GAMSA_S","GAMSA_S2"],[11.551,11.517],[44.12,43.96],[0.38,0.37],[236.64,236.78],[472.17,472.307],[0,0.14],[0.51712,0.48288]],"container":"<table class=\"cell-border stribe\">\n  <thead>\n    <tr>\n      <th>model<\/th>\n      <th>df<\/th>\n      <th>dev_expl<\/th>\n      <th>r2<\/th>\n      <th>reml<\/th>\n      <th>AIC<\/th>\n      <th>dAIC<\/th>\n      <th>w_AIC<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[1,2,3,4,5,6,7]}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
 ```
 
 Refit model with REML
@@ -1699,9 +1675,17 @@ Refit model with REML
 ```r
 GAMSA_S3 <- gam(SA_int ~ 
                   s(year, bs = "re") +
-                  # s(LME, bs = "re") +
+                  s(LME, bs = "re") +
                   s(v, LME, bs = "fs", k = 5),
                 data = SA_df, family = "gaussian", method = "REML")
+```
+
+```
+## Warning in gam.side(sm, X, tol = .Machine$double.eps^0.5): model has repeated 1-
+## d smooths of same variable.
+```
+
+```r
 summary(GAMSA_S3)
 ```
 
@@ -1711,23 +1695,25 @@ summary(GAMSA_S3)
 ## Link function: identity 
 ## 
 ## Formula:
-## SA_int ~ s(year, bs = "re") + s(v, LME, bs = "fs", k = 5)
+## SA_int ~ s(year, bs = "re") + s(LME, bs = "re") + s(v, LME, bs = "fs", 
+##     k = 5)
 ## 
 ## Parametric coefficients:
 ##             Estimate Std. Error t value Pr(>|t|)    
-## (Intercept)   16.066      2.082   7.717 1.18e-10 ***
+## (Intercept)   16.874      2.371   7.118 1.29e-09 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
 ## Approximate significance of smooth terms:
-##            edf Ref.df     F p-value    
-## s(year)  1.685      2 5.063 0.00350 ** 
-## s(v,LME) 6.929     14 2.474 0.00018 ***
+##            edf Ref.df     F  p-value    
+## s(year)  1.760      2 7.137 0.000847 ***
+## s(LME)   1.028      2 1.411 0.084673 .  
+## s(v,LME) 4.649     14 1.486 0.004109 ** 
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
-## R-sq.(adj) =  0.393   Deviance explained = 46.6%
-## -REML = 242.75  Scale est. = 40.192    n = 72
+## R-sq.(adj) =  0.378   Deviance explained = 44.4%
+## -REML = 234.95  Scale est. = 36.93     n = 71
 ```
 
 Check residuals.
@@ -1787,22 +1773,22 @@ summary(GAMSA_I_p)
 ## 
 ## Parametric coefficients:
 ##             Estimate Std. Error t value Pr(>|t|)    
-## (Intercept)   15.788      2.088   7.561 1.94e-10 ***
+## (Intercept)   16.881      2.566   6.577 1.02e-08 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
 ## Approximate significance of smooth terms:
 ##               edf Ref.df     F  p-value    
-## s(year)    1.6760      2 5.170 0.004267 ** 
-## s(LME)     0.8685      2 0.816 0.187609    
-## s(v):LMEBF 0.8152      4 1.368 0.023201 *  
-## s(v):LMEBB 2.0852      4 4.616 0.000353 ***
-## s(v):LMESV 1.7142      4 2.088 0.014377 *  
+## s(year)    1.7659      2 8.070 0.000639 ***
+## s(LME)     1.4578      2 4.083 0.013047 *  
+## s(v):LMEBF 0.8390      4 1.879 0.015328 *  
+## s(v):LMEBB 0.1118      4 0.031 0.303192    
+## s(v):LMESV 1.8582      4 3.112 0.006975 ** 
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
-## R-sq.(adj) =  0.385   Deviance explained = 44.7%
-## -REML = 242.27  Scale est. = 40.675    n = 72
+## R-sq.(adj) =  0.382   Deviance explained = 43.5%
+## -REML = 234.32  Scale est. = 36.672    n = 71
 ```
 
 I remove `s(LME)` from the model.
@@ -1828,21 +1814,21 @@ summary(GAMSA_I2)
 ## 
 ## Parametric coefficients:
 ##             Estimate Std. Error t value Pr(>|t|)    
-## (Intercept)   15.547      1.668   9.322 1.54e-13 ***
+## (Intercept)   16.505      1.877   8.794 1.37e-12 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
 ## Approximate significance of smooth terms:
 ##              edf Ref.df     F  p-value    
-## s(year)    1.556  2.000 4.882 0.003108 ** 
-## s(v):LMEBF 1.000  1.000 5.187 0.026105 *  
-## s(v):LMEBB 2.414  2.860 6.363 0.000944 ***
-## s(v):LMESV 1.947  2.331 3.355 0.044310 *  
+## s(year)    1.648  2.000 6.534 0.000772 ***
+## s(v):LMEBF 1.000  1.000 5.671 0.020234 *  
+## s(v):LMEBB 1.705  2.131 1.379 0.248742    
+## s(v):LMESV 2.071  2.466 3.976 0.021490 *  
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
-## R-sq.(adj) =  0.378   Deviance explained = 43.9%
-## -ML = 241.62  Scale est. = 41.16     n = 72
+## R-sq.(adj) =  0.336   Deviance explained = 39.7%
+## -ML = 236.07  Scale est. = 39.371    n = 71
 ```
 
 Compare models
@@ -1876,8 +1862,8 @@ data.frame(model = c("GAMSA_I", "GAMSA_I2"),
 ```
 
 ```{=html}
-<div id="htmlwidget-5a1e2a857f6b265bc474" style="width:100%;height:auto;" class="datatables html-widget"></div>
-<script type="application/json" data-for="htmlwidget-5a1e2a857f6b265bc474">{"x":{"filter":"none","vertical":false,"data":[["GAMSA_I","GAMSA_I2"],[11.225,10.089],[45.68,43.87],[0.39,0.38],[241.51,241.62],[483.682,483.776],[0,0.09],[0.51175,0.48825]],"container":"<table class=\"cell-border stribe\">\n  <thead>\n    <tr>\n      <th>model<\/th>\n      <th>df<\/th>\n      <th>dev_expl<\/th>\n      <th>r2<\/th>\n      <th>reml<\/th>\n      <th>AIC<\/th>\n      <th>dAIC<\/th>\n      <th>w_AIC<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[1,2,3,4,5,6,7]}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
+<div id="htmlwidget-b0b38f49361588bd9917" style="width:100%;height:auto;" class="datatables html-widget"></div>
+<script type="application/json" data-for="htmlwidget-b0b38f49361588bd9917">{"x":{"filter":"none","vertical":false,"data":[["GAMSA_I","GAMSA_I2"],[10.374,9.531],[44.8,39.73],[0.38,0.34],[233.73,236.07],[468.943,473.495],[0,4.55],[0.90687,0.09313]],"container":"<table class=\"cell-border stribe\">\n  <thead>\n    <tr>\n      <th>model<\/th>\n      <th>df<\/th>\n      <th>dev_expl<\/th>\n      <th>r2<\/th>\n      <th>reml<\/th>\n      <th>AIC<\/th>\n      <th>dAIC<\/th>\n      <th>w_AIC<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[1,2,3,4,5,6,7]}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
 ```
 
 Refit model with REML
@@ -1886,7 +1872,7 @@ Refit model with REML
 ```r
 GAMSA_I3 <- gam(SA_int ~
                   s(year, bs = "re") +
-                  # s(LME, bs = "re") +
+                  s(LME, bs = "re") +
                   s(v, by = LME, k = 5, bs = "tp"),
                 data = SA_df, family = "gaussian", method = "REML")
 summary(GAMSA_I3)
@@ -1898,25 +1884,27 @@ summary(GAMSA_I3)
 ## Link function: identity 
 ## 
 ## Formula:
-## SA_int ~ s(year, bs = "re") + s(v, by = LME, k = 5, bs = "tp")
+## SA_int ~ s(year, bs = "re") + s(LME, bs = "re") + s(v, by = LME, 
+##     k = 5, bs = "tp")
 ## 
 ## Parametric coefficients:
 ##             Estimate Std. Error t value Pr(>|t|)    
-## (Intercept)   15.530      2.018   7.695 1.16e-10 ***
+## (Intercept)    17.04       2.62   6.505 1.51e-08 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
 ## Approximate significance of smooth terms:
 ##              edf Ref.df     F  p-value    
-## s(year)    1.698  2.000 5.349 0.003020 ** 
-## s(v):LMEBF 1.000  1.000 5.047 0.028110 *  
-## s(v):LMEBB 2.571  3.021 6.288 0.000815 ***
-## s(v):LMESV 2.208  2.630 3.398 0.040791 *  
+## s(year)    1.767  2.000 8.208 0.000597 ***
+## s(LME)     1.507  2.000 4.625 0.008796 ** 
+## s(v):LMEBF 1.000  1.000 6.260 0.014996 *  
+## s(v):LMEBB 1.000  1.000 1.084 0.301791    
+## s(v):LMESV 2.483  2.926 3.880 0.011625 *  
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
-## R-sq.(adj) =  0.383   Deviance explained = 44.8%
-## -REML = 234.18  Scale est. = 40.854    n = 72
+## R-sq.(adj) =   0.39   Deviance explained = 45.8%
+## -REML = 227.29  Scale est. = 36.194    n = 71
 ```
 
 Check residuals.

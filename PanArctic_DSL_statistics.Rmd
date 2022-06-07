@@ -120,7 +120,7 @@ plot_grid(
           axis.ticks = element_blank(),
           axis.title = element_blank()),
   stat_laea %>% 
-    filter(depth == 380) %>%
+    filter(depth == 318) %>%
     ggplot(aes(x = xc,  y = yc)) +
     geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group),
                  fill = "grey80") +
@@ -133,6 +133,7 @@ plot_grid(
           axis.title = element_blank()),
   ncol = 1, align = "hv", axis = "tblr")
 ```
+
 There are two missing chl values, so this cell is excluded from further analyses.
 
 ```{r exclude-NA-chl}
@@ -147,24 +148,24 @@ stat_laea <- stat_laea %>%
                   levels = c("CAO", "BF", "NAR", "BB", "SV")))
 
 stat_laea %>%
-  filter(depth == 380) %>%
+  filter(depth == 318) %>%
   group_by(LME) %>% 
   summarise(n = n())
 ```
-Because we sampled at the border of the CAO and there is only a limited amount of data in this region we combine CAO data based on their proximity to other LME (Barents Sea and Beaufort Sea). 
+Because we sampled at the border of the CAO and there is only a limited amount of data in this region we combine CAO data based on their proximity to other LME (Barents Sea and Beaufort Sea). I exclude data from Nares Strait because we do not have enough points for a regression
 
 ```{r}
 stat_laea <- stat_laea %>%
   mutate(LME = as.character(LME),
          LME = factor(if_else(LME == "CAO" & yc <= 0, "SV",
-                      if_else(LME == "CAO" & yc > 0, "BF",
-                      if_else(LME == "NAR", "BB", LME))),
+                      if_else(LME == "CAO" & yc > 0, "BF", LME)),
+                      # if_else(LME == "NAR", "BB", LME))),
                       levels = c("BF", "BB", "SV", "NAR"))) %>%
-  filter(is.na(v) == F) %>%
+  filter(is.na(v) == F & LME != "NAR") %>%
   droplevels()
 
 stat_laea %>%
-  filter(depth == 380) %>%
+  filter(depth == 318) %>%
   group_by(LME) %>% 
   summarise(n = n())
 ```
@@ -172,7 +173,7 @@ stat_laea %>%
 ```{r map-chl-NA, fig.width=8, fig.height=6}
 plot_grid(
   stat_laea %>%
-    filter(depth == 380) %>%
+    filter(depth == 318) %>%
     ggplot(aes(x = xc,  y = yc)) +
     geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group),
                  fill = "grey80") +
@@ -183,7 +184,7 @@ plot_grid(
           axis.ticks = element_blank(),
           axis.title = element_blank()),
   stat_laea %>% 
-    filter(depth == 380) %>%
+    filter(depth == 318) %>%
     ggplot(aes(x = xc,  y = yc)) +
     geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group),
                  fill = "grey80") +
@@ -196,10 +197,6 @@ plot_grid(
           axis.title = element_blank()),
   ncol = 1, align = "hv", axis = "tblr")
 ```
-
-Check the total number of observations per group.
-
-
 
 # Data exploration
 
@@ -229,27 +226,9 @@ phy_grid_laea %>%
   geom_tile(aes(fill = v_mean * 100)) +
   geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group),
                fill = "grey80") +
-  scale_fill_cmocean("velo (cm/s)", name = "speed", limits = c(0, 10)) +
+  scale_fill_cmocean("velo (cm/s)", name = "speed", limits = c(0, 8)) +
   facet_wrap(~ year, ncol = 3) +
   ggtitle("Velocity at 318 m depth") +
-  coord_fixed(xlim = c(-2600, 1100), ylim = c(-1800, 1900), expand = F) + 
-  theme(legend.position = "top",
-        axis.text = element_blank(),
-        axis.ticks = element_blank(), 
-        axis.title = element_blank())
-```
-
-```{r map-velocity380, fig.height=3.5, fig.width=6}
-# Velocity
-phy_grid_laea %>% 
-  filter(depth == 380) %>%
-  ggplot(aes(x = xc,  y = yc)) +
-  geom_tile(aes(fill = v_mean * 100)) +
-  geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group),
-               fill = "grey80") +
-  scale_fill_cmocean("velo (cm/s)", name = "speed", limits = c(0, 10)) +
-  facet_wrap(~ year, ncol = 3) +
-  ggtitle("Velocity at 380 m depth") +
   coord_fixed(xlim = c(-2600, 1100), ylim = c(-1800, 1900), expand = F) + 
   theme(legend.position = "top",
         axis.text = element_blank(),
@@ -268,8 +247,7 @@ SA_diff <- SA_grid_laea %>%
                          LME == "Northern Canadian Archipelago LME" ~
                            "NAR"),
          LME = factor(if_else(LME == "CAO" & yc <= 0, "SV",
-                      if_else(LME == "CAO" & yc > 0, "BF",
-                      if_else(LME == "NAR", "BB", LME))),
+                      if_else(LME == "CAO" & yc > 0, "BF", LME)),
                       levels = c("BF", "NAR", "BB", "SV")),
          year = factor(year)) %>%
   dplyr::select(year, LME, NASC_int, SA_int, CM)
@@ -339,8 +317,7 @@ SA_lm <- SA_grid_laea %>%
                          LME == "Northern Canadian Archipelago LME" ~
                            "NAR"),
          LME = factor(if_else(LME == "CAO" & yc <= 0, "SV",
-                      if_else(LME == "CAO" & yc > 0, "BF",
-                      if_else(LME == "NAR", "BB", LME))),
+                      if_else(LME == "CAO" & yc > 0, "BF", LME)),
                       levels = c("BF", "NAR", "BB", "SV")))
 ```
 
@@ -377,6 +354,7 @@ Fit linear regression for each Arctic region.
 ```{r lm-lat-sa-area}
 # Fit models
 LM_area <- SA_lm %>%
+  filter(LME != "NAR") %>%
   nest_by(LME) %>%
   # Fit linear model for each arctic region
   mutate(mod = list(lm(SA_int ~ lat, data = data))) %>%
@@ -410,7 +388,7 @@ Plot regressions. We can see that mesopelagic backscatter decreases with increas
 ```{r lm-plot-area}
 LM_area_res %>%
   ggplot() + 
-  geom_point(aes(x = lat, y = SA_int, col = LME)) +
+  geom_point(data = SA_lm, aes(x = lat, y = SA_int, col = LME)) +
   geom_line(aes(x = lat, y = .fitted, col = LME), size = 0.8) + 
   geom_ribbon(aes(x = lat, ymin = .lower, ymax = .upper, group = LME), 
               alpha = 0.1)
@@ -420,7 +398,7 @@ Save data
 
 ```{r save-lm}
 # Save data
-save(LM_area_coefs, LM_area_fit, LM_area_res, 
+save(LM_area_coefs, LM_area_fit, LM_area_res, SA_lm, 
      file = "data/statistics/LM_results.RData")
 ```
 
@@ -432,7 +410,7 @@ I select data at 318 m depth because it fits well with the DSL diurnal centre of
 
 ```{r GAM-prep}
 SA_df <- stat_laea %>%
-  filter(depth == 380) %>%
+  filter(depth == 318) %>%
   dplyr::select(year, xc, yc, LME, NASC_int, SA_int, v, depth) %>%
   mutate(year = factor(year))
 ```
@@ -849,7 +827,7 @@ I select data at 318 m depth because it fits well with the DSL diurnal centre of
 
 ```{r GAMSA-prep}
 SA_df <- stat_laea %>%
-  filter(depth == 380) %>%
+  filter(depth == 318) %>%
   dplyr::select(year, xc, yc, LME, NASC_int, SA_int, v, depth) %>%
   mutate(year = factor(year))
 ```
@@ -1071,7 +1049,7 @@ Refit model with REML
 ```{r fit-GAMSAS3-reml}
 GAMSA_S3 <- gam(SA_int ~ 
                   s(year, bs = "re") +
-                  # s(LME, bs = "re") +
+                  s(LME, bs = "re") +
                   s(v, LME, bs = "fs", k = 5),
                 data = SA_df, family = "gaussian", method = "REML")
 summary(GAMSA_S3)
@@ -1160,7 +1138,7 @@ Refit model with REML
 ```{r fit-GAMSAI3-reml}
 GAMSA_I3 <- gam(SA_int ~
                   s(year, bs = "re") +
-                  # s(LME, bs = "re") +
+                  s(LME, bs = "re") +
                   s(v, by = LME, k = 5, bs = "tp"),
                 data = SA_df, family = "gaussian", method = "REML")
 summary(GAMSA_I3)
