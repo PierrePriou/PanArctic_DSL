@@ -390,7 +390,60 @@ LM_area_res %>%
               alpha = 0.1)
 ```
 
-Save data
+## Baffin Bay only
+
+There was no poleward decrease in Baffin Bay. Thus, I want to make sure that this pattern is still valid if I remove data from eastern Baffin Bay where myctophid dominated the mesopelagic layer.
+
+```{r map-BB-station}
+load("data/nets/trawl_BB.RData")
+
+SA_grid_laea %>%
+  mutate(exclude = if_else(xc == -2025 & yc == -1275, T, 
+                   if_else(xc == -2025 & yc == -1125, T, 
+                   if_else(xc == -1875 & yc == -1125, T, 
+                   if_else(xc == -1725 & yc == -825, T, F))))) %>%
+  ggplot() +
+  # Coastlines
+  geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), 
+               fill = "grey25") + # Coast
+  geom_tile(aes(x = xc, y = yc, fill = exclude), col = "white") +
+  scale_fill_viridis_d() + 
+  # Stations with myctophid
+  geom_point(data = trawl_BB, aes(x = xc, y = yc, col = mycto)) +
+  # Exclusion line
+  geom_segment(aes(x = -2200, xend = -1700, 
+                   y = -1400, yend = -600)) + 
+  scale_x_continuous(breaks = seq(-10000, 0, 200)) +
+  scale_y_continuous(breaks = seq(-10000, 0, 200)) +
+  coord_fixed(xlim = c(-2450, -1000), ylim = c(-1500, 0), expand = F)
+```
+
+
+```{r lm-BB}
+# Remove data where myctophid occur
+SA_BB <- SA_lm %>%
+  filter(LME == "BB") %>%
+  mutate(exclude = if_else(xc == -2025 & yc == -1275, T, 
+                   if_else(xc == -2025 & yc == -1125, T, 
+                   if_else(xc == -1875 & yc == -1125, T, 
+                   if_else(xc == -1725 & yc == -825, T, F))))) %>%
+  filter(exclude == F) 
+# Fit LM
+LM_BB <- lm(SA_int ~ lat, data = SA_BB)
+summary(LM_BB)
+```
+There are still no decrease of mesopelagic backscatter when we remove cells with myctophids.
+
+```{r plot-LM-BB}
+SA_BB %>%
+  ggplot(aes(x = lat, y = SA_int)) +
+  geom_point() +
+  geom_smooth(method = "lm") + 
+  geom_abline(intercept = 24.57759, slope = -0.05946)
+```
+
+
+## Save data
 
 ```{r save-lm}
 # Save data
