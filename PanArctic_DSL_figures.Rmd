@@ -70,6 +70,17 @@ coast_10m_latlon <- readOGR("data/bathy/ne_10m_land.shp", verbose = F) %>%
   fortify() %>% # Convert to a dataframe for ggplot
   rename(lon = long)
 
+# LME regions
+LME_sf_laea <- read_sf("data/arctic_regions/LME/LME_2013_polygon.shp") %>%
+    st_transform(crs = crs(arctic_laea))
+LME_sf_latlon <- read_sf("data/arctic_regions/LME/LME_2013_polygon.shp") %>%
+    st_transform(crs = crs(arctic_latlon))
+LME <- readOGR("data/arctic_regions/LME/LME_2013_polygon.shp",
+               verbose = F) %>% 
+  spTransform(CRSobj = crs(arctic_laea)) %>% # Project shapefile in laea
+  fortify() %>% # Convert to dataframe for ggplot
+  rename(xc = long, yc = lat)
+
 # Bathy data
 bathy_df <- getNOAA.ice.bathy(lon1 = -180, lon2 = 180, lat1 = 50, lat2 = 90,
                               resolution = 2, keep = T, path = "data/bathy/") %>%
@@ -259,16 +270,6 @@ arctic_circle_laea <- SpatialPoints(cbind(arctic_circle_latlon$lon,
 #   st_transform(crs = crs(arctic_latlon)) %>%
 #   st_make_valid()
 
-# LME regions
-LME_sf_laea <- read_sf("data/arctic_regions/LME/LME_2013_polygon.shp") %>%
-    st_transform(crs = crs(arctic_laea))
-LME_sf_latlon <- read_sf("data/arctic_regions/LME/LME_2013_polygon.shp") %>%
-    st_transform(crs = crs(arctic_latlon))
-LME <- readOGR("data/arctic_regions/LME/LME_2013_polygon.shp",
-               verbose = F) %>% 
-  spTransform(CRSobj = crs(arctic_laea)) %>% # Project shapefile in laea
-  fortify() %>% # Convert to dataframe for ggplot
-  rename(xc = long, yc = lat)
 
 # Location of trawls
 trawl_laea <- SpatialPointsDataFrame(
@@ -836,8 +837,8 @@ map_RA <- trawl_station_df %>%
   # col = "green") +
   scale_fill_manual(values = met.brewer("Johnson", n = 5, direction = -1)) +
   coord_fixed(xlim = c(-2450, 650), ylim = c(-1500, 1850), expand = F) +
-  # geom_point(aes(x = 0, y = 0), size = 0.05) +
-  # Legend over 2 rows
+  geom_point(aes(x = 0, y = 0), shape = 23, stroke = 0.2, col = "white",
+             fill = "#C26744") +  # Legend over 2 rows
   guides(fill = guide_legend(nrow = 2, byrow = T)) +
   theme(legend.position = "top", 
         legend.title = element_blank(),
@@ -871,7 +872,7 @@ lm_SA_lat <- LM_area_res %>%
   geom_line(aes(x = lat, y = .fitted, col = LME), size = 0.6) + 
   geom_ribbon(aes(x = lat, ymin = .lower, ymax = .upper,
                   group = LME, fill = LME),
-              alpha = 0.1) +
+              alpha = 0.15) +
   scale_x_continuous("Latitude (°N)", breaks = seq(0, 90, 2)) + 
   # scale_y_continuous(expression("S"[A]*" (dB re 1 m"^2*" nmi"^-2*")")) + 
   scale_y_continuous(
@@ -903,7 +904,7 @@ lm_SA_lat
 
 ```{r map-lm}
 # Map
-map_DSL <- SA_grid_laea %>% 
+map_DSL <- SA_grid_laea %>%
   mutate(NASC_int_d = cut(NASC_int, c(0, 1, 10, 100, 500, 1000, Inf))) %>%
   ggplot(aes(x = xc,  y = yc)) +
   geom_raster(data = bathy_laea, aes(x = xc, y = yc, fill = depth_d), 
@@ -920,7 +921,8 @@ map_DSL <- SA_grid_laea %>%
                        option = "viridis",
                        labels = c("< 1", "1-10", "11-100", "101-500",
                                   "501-1000", "> 1000")) +
-  # geom_point(aes(x = 0, y = 0), size = 0.05) +
+  geom_point(aes(x = 0, y = 0), shape = 23, stroke = 0.2, col = "white",
+             fill = "#C26744") +
   facet_wrap(~ year) +
   coord_fixed(xlim = c(-2450, 650), ylim = c(-1500, 1850), expand = F) +
   theme(legend.position = "right",
@@ -938,7 +940,7 @@ lm_SA_lat <- LM_area_res %>%
   geom_line(aes(x = lat, y = .fitted, col = LME), size = 0.6) + 
   geom_ribbon(aes(x = lat, ymin = .lower, ymax = .upper,
                   group = LME, fill = LME),
-              alpha = 0.1) +
+              alpha = 0.15) +
   scale_x_continuous("Latitude (°N)", breaks = seq(0, 90, 2)) + 
   # scale_y_continuous(expression("S"[A]*" (dB re 1 m"^2*" nmi"^-2*")")) + 
   scale_y_continuous(
@@ -981,7 +983,7 @@ GAMSAI_velo <- predSA_I %>%
   geom_line(aes(x = v, y = fitted, col = LME, linetype = LME), 
             size = 0.6) +
   geom_ribbon(aes(x = v, ymin = lwr_ci, ymax = upr_ci, fill = LME), 
-              alpha = 0.1) +
+              alpha = 0.15) +
   scale_colour_manual(name = "LME",
                       values = met.brewer("Johnson", n = 6, direction = -1)) +
   scale_fill_manual(name = "LME",
