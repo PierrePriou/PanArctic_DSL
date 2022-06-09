@@ -439,7 +439,7 @@ SA_BB %>%
   ggplot(aes(x = lat, y = SA_int)) +
   geom_point() +
   geom_smooth(method = "lm") + 
-  geom_abline(intercept = 24.57759, slope = -0.05946)
+  geom_abline(intercept = 21.01544, slope = -0.01895)
 ```
 
 
@@ -1098,7 +1098,7 @@ Refit model with REML
 ```{r fit-GAMSAS3-reml}
 GAMSA_S3 <- gam(SA_int ~ 
                   s(year, bs = "re") +
-                  s(LME, bs = "re") +
+                  # s(LME, bs = "re") +
                   s(v, LME, bs = "fs", k = 5),
                 data = SA_df, family = "gaussian", method = "REML")
 summary(GAMSA_S3)
@@ -1187,7 +1187,7 @@ Refit model with REML
 ```{r fit-GAMSAI3-reml}
 GAMSA_I3 <- gam(SA_int ~
                   s(year, bs = "re") +
-                  s(LME, bs = "re") +
+                  # s(LME, bs = "re") +
                   s(v, by = LME, k = 5, bs = "tp"),
                 data = SA_df, family = "gaussian", method = "REML")
 summary(GAMSA_I3)
