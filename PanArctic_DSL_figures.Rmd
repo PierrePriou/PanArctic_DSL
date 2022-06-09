@@ -102,7 +102,7 @@ MVBS_latlon <- MVBS %>% # Location of acoustic data
   summarise(lat = mean(lat), 
             lon = mean(lon)) %>%
   ungroup() 
-SA_grid_laea <- SA_grid_laea %>%
+SA_grid_laea <- left_join(SA_grid_laea, weights, by = c("year", "LME")) %>%
   mutate(LME = case_when(LME == "Beaufort Sea LME" ~ "BF",
                          LME == "Central Arctic LME" ~ "CAO",
                          LME == "Baffin Bay LME" ~ "BB",
@@ -147,29 +147,29 @@ SA_lm <- SA_lm %>%
          LME = factor(case_when(LME == "BF" ~ "Beaufort Sea",
                                 LME == "NAR" ~ "Nares Strait",
                                 LME == "BB" ~ "Baffin Bay",
-                                LME == "SV" ~ "Barents Sea"),
+                                LME == "SV" ~ "North. Barents Sea"),
                       levels = c("Beaufort Sea", "Baffin Bay",
-                                 "Barents Sea", "Nares Strait")))
+                                 "North. Barents Sea", "Nares Strait")))
 LM_area_res <- LM_area_res %>%
     mutate(LME = factor(case_when(LME == "BF" ~ "Beaufort Sea",
                                 LME == "NAR" ~ "Nares Strait",
                                 LME == "BB" ~ "Baffin Bay",
-                                LME == "SV" ~ "Barents Sea"),
+                                LME == "SV" ~ "North. Barents Sea"),
                       levels = c("Beaufort Sea", "Baffin Bay",
-                                 "Barents Sea", "Nares Strait")))
+                                 "North. Barents Sea", "Nares Strait")))
 load("data/statistics/GAMSA_results.RData")
 predSA_I <- predSA_I %>%
   mutate(LME = factor(case_when(LME == "BF" ~ "Beaufort Sea",
                                 LME == "BB" ~ "Baffin Bay",
-                                LME == "SV" ~ "Barents Sea"),
+                                LME == "SV" ~ "North. Barents Sea"),
                       levels = c("Beaufort Sea", "Baffin Bay", 
-                                 "Barents Sea")))
+                                 "North. Barents Sea")))
 SA_df <- SA_df %>%
   mutate(LME = factor(case_when(LME == "BF" ~ "Beaufort Sea",
                                 LME == "BB" ~ "Baffin Bay",
-                                LME == "SV" ~ "Barents Sea"),
+                                LME == "SV" ~ "North. Barents Sea"),
                       levels = c("Beaufort Sea", "Baffin Bay", 
-                                 "Barents Sea")))
+                                 "North. Barents Sea")))
 ```
 
 I re-project data from the WGS84 projection to the EASE-Grid 2.0 North projection.
@@ -307,7 +307,7 @@ MVBS_laea <- SpatialPoints(cbind(MVBS_latlon$lon, MVBS_latlon$lat),
 # Calculate median and mean SA across all areas
 SA_all_area <- SA_grid_laea %>%
   # filter(empty_clean == F) %>%
-  group_by(year) %>% # per year
+  # group_by(year) %>% # per year
   summarise(n = n(),
             NASC_int_median = median(NASC_int, na.rm = T),
             NASC_int_mad = mad(NASC_int, na.rm = T), 
@@ -319,24 +319,24 @@ SA_all_area <- SA_grid_laea %>%
             CM_mad = mad(CM, na.rm = T),
             CM_mean = mean(CM, na.rm = T),
             CM_sd = sd(CM, na.rm = T)) %>%
-  ungroup() %>%
-  summarise(n = sum(n), # Mean across all areas and years
-            NASC_int_median = round(mean(NASC_int_median, na.rm = T), 1),
-            NASC_int_mad = round(mean(NASC_int_mad, na.rm = T), 1),
-            NASC_int_mean = round(mean(NASC_int_mean, na.rm = T), 1),
-            NASC_int_sd = round(mean(NASC_int_sd, na.rm = T), 1),
-            NASC_mean2 = round(mean(NASC_mean2, na.rm = T), 3),
-            NASC_sd2 = round(mean(NASC_sd2, na.rm = T), 3),
-            CM_median = round(mean(CM_median, na.rm = T)),
-            CM_mad = round(mean(CM_mad, na.rm = T)),
-            CM_mean = round(mean(CM_mean, na.rm = T)),
-            CM_sd = round(mean(CM_sd, na.rm = T))) %>%
+  # ungroup() %>%
+  # summarise(n = sum(n), # Mean across all areas and years
+  #           NASC_int_median = round(mean(NASC_int_median, na.rm = T), 1),
+  #           NASC_int_mad = round(mean(NASC_int_mad, na.rm = T), 1),
+  #           NASC_int_mean = round(mean(NASC_int_mean, na.rm = T), 1),
+  #           NASC_int_sd = round(mean(NASC_int_sd, na.rm = T), 1),
+  #           NASC_mean2 = round(mean(NASC_mean2, na.rm = T), 3),
+  #           NASC_sd2 = round(mean(NASC_sd2, na.rm = T), 3),
+  #           CM_median = round(mean(CM_median, na.rm = T)),
+  #           CM_mad = round(mean(CM_mad, na.rm = T)),
+  #           CM_mean = round(mean(CM_mean, na.rm = T)),
+  #           CM_sd = round(mean(CM_sd, na.rm = T))) %>%
   mutate(LME = "All areas")
 
 # Calculate median SA within each area
 SA_grid_laea %>%
   mutate(LME == as.character(LME)) %>%
-  group_by(LME, year) %>% # median per year
+  group_by(LME) %>% # median per year
   summarise(n = n(),
             NASC_int_median = median(NASC_int, na.rm = T),
             NASC_int_mad = mad(NASC_int, na.rm = T), 
@@ -349,26 +349,24 @@ SA_grid_laea %>%
             CM_mean = mean(CM, na.rm = T),
             CM_sd = sd(CM, na.rm = T)) %>%
   ungroup() %>%
-  group_by(LME) %>% # Mean per area
-  summarise(n = sum(n), # Mean across all areas and years
-            NASC_int_median = round(mean(NASC_int_median, na.rm = T), 1),
-            NASC_int_mad = round(mean(NASC_int_mad, na.rm = T), 1),
-            NASC_int_mean = round(mean(NASC_int_mean, na.rm = T), 1),
-            NASC_int_sd = round(mean(NASC_int_sd, na.rm = T), 1),
-            NASC_mean2 = round(mean(NASC_mean2, na.rm = T), 3),
-            NASC_sd2 = round(mean(NASC_sd2, na.rm = T), 3),
-            CM_median = round(mean(CM_median, na.rm = T)),
-            CM_mad = round(mean(CM_mad, na.rm = T)),
-            CM_mean = round(mean(CM_mean, na.rm = T)),
-            CM_sd = round(mean(CM_sd, na.rm = T))) %>%
-  ungroup() %>% 
+  # group_by(LME) %>% # Mean per area
+  # summarise(n = sum(n), # Mean across all areas and years
+  #           NASC_int_median = round(mean(NASC_int_median, na.rm = T), 1),
+  #           NASC_int_mad = round(mean(NASC_int_mad, na.rm = T), 1),
+  #           NASC_int_mean = round(mean(NASC_int_mean, na.rm = T), 1),
+  #           NASC_int_sd = round(mean(NASC_int_sd, na.rm = T), 1),
+  #           NASC_mean2 = round(mean(NASC_mean2, na.rm = T), 3),
+  #           NASC_sd2 = round(mean(NASC_sd2, na.rm = T), 3),
+  #           CM_median = round(mean(CM_median, na.rm = T)),
+  #           CM_mad = round(mean(CM_mad, na.rm = T)),
+  #           CM_mean = round(mean(CM_mean, na.rm = T)),
+  #           CM_sd = round(mean(CM_sd, na.rm = T))) %>%
+  # ungroup() %>% 
   bind_rows(., SA_all_area) %>%
   mutate(LME = factor(LME, levels = c("BF", "BB", "SV", "All areas"))) %>%
   kbl() %>%
   kable_classic()
 ```
-
-
 
 # Plots
 
@@ -568,34 +566,38 @@ p_map_pointrange_NASC
 ### Just boxplot
 
 ```{r fig3-boxplot}
-boxplot_NASC <- SA_grid_laea %>% # Pointrange of SA per region
-  mutate(LME = factor(case_when(LME == "BF" ~ "Beaufort Sea",
-                                LME == "NAR" ~ "Nares Strait",
-                                LME == "BB" ~ "Baffin Bay",
-                                LME == "SV" ~ "Barents Sea"),
-                      levels = c("Beaufort Sea", "Nares Strait", 
-                                 "Baffin Bay", "Barents Sea")),
+boxplot_NASC <- bind_rows(SA_grid_laea) %>%
+  mutate(LME = factor(case_when(LME == "BF" ~ "Beaufort\nSea",
+                                LME == "NAR" ~ "Nares\nStrait",
+                                LME == "BB" ~ "Baffin\nBay",
+                                LME == "SV" ~ "Northern\nBarents Sea",
+                                LME == "All areas" ~ "All\nareas",),
+                      levels = c("Beaufort\nSea", "Nares\nStrait", 
+                                 "Baffin\nBay", "Northern\nBarents Sea",
+                                 "All\nareas")),
     year = factor(year)) %>%
   ggplot(aes(x = LME)) +
-  geom_boxplot(aes(y = SA_int, fill = year), size = 0.4, outlier.size = 0.7,
+  geom_boxplot(aes(y = 10*log10(NASC_int), col = LME),
+               size = 0.4, outlier.size = 0.7,
                alpha = 0.8, position = position_dodge(preserve = "single")) +
-  scale_fill_manual(values = met.brewer("Johnson", n = 6, direction = -1)) + 
-                      # c("#0086a8", "#f6c200", "#d04e00")) +
   scale_y_continuous(
     expression("S"[A]*" (dB re 1 m"^2*" nmi"^-2*")"),
     position = "left",
-    sec.axis = 
-      sec_axis(trans = ~10^(./10), 
+    sec.axis =
+      sec_axis(trans = ~10^(./10),
                name = expression("s"[A]*" ( m"^2*" nmi"^-2*")"),
                breaks = c(1, 5, 10, 50, 100, 500, 1000, 5000, 10000))) +
-  theme(axis.title.x = element_blank(),
+  scale_colour_manual(values =  c("#132B69", "black", "#03739B",
+                                  "#93AA43", "grey50")) +
+  theme(legend.position = "none",
+        axis.title.x = element_blank(),
         legend.title = element_blank(),
         legend.key.width = unit(0.15, "in"),
         legend.key.height = unit(0.15, "in"),
         plot.margin = unit(c(0.1, 0.1, 0, 0), "in"))
 # Save and display plot
-ggsave("plots/Fig3_boxplot_NASC.png", boxplot_NASC, 
-       height = 2.5, width = 6.5, dpi = 600, units = "in")
+ggsave("plots/Fig3_boxplot_SA.png", boxplot_NASC,
+       height = 2.5, width = 3.5, dpi = 600, units = "in")
 boxplot_NASC
 ```
 
@@ -603,12 +605,14 @@ boxplot_NASC
 
 ```{r fig3-points}
 pointrange_NASC <- SA_grid_laea %>% # Pointrange of SA per region
+  dplyr::select(year, LME, NASC_int) %>%
   mutate(LME = factor(case_when(LME == "BF" ~ "Beaufort Sea",
                                 LME == "NAR" ~ "Nares Strait",
                                 LME == "BB" ~ "Baffin Bay",
-                                LME == "SV" ~ "Barents Sea"),
-                      levels = c("Beaufort Sea", "Nares Strait", 
-                                 "Baffin Bay", "Barents Sea"))) %>%
+                                LME == "SV" ~ "Northern\nBarents Sea"),
+                      levels = c("Beaufort Sea", "Nares Strait",
+                                 "Baffin Bay", "Northern\nBarents Sea")),
+         year = factor(year)) %>%
   group_by(LME, year) %>% # Median per year
   summarise(NASC_median = median(NASC_int, na.rm = T),
             NASC_mean = mean(NASC_int, na.rm = T),
@@ -622,12 +626,13 @@ pointrange_NASC <- SA_grid_laea %>% # Pointrange of SA per region
             NASC_q975 = max(NASC_q975, na.rm = T)) %>%
   ungroup() %>%
   ggplot(aes(x = LME)) +
-  geom_point(aes(y = 10 * log10(NASC_mean)), 
-             shape = 18, size = 4.5, col = "black") +
+  geom_point(aes(y = 10 * log10(NASC_mean), col = LME),
+             shape = 18, size = 4.5) +
   geom_pointrange(aes(y = 10 * log10(NASC_median),
-                      ymin = 10 * log10(NASC_q025), 
-                      ymax = 10 * log10(NASC_q975)),
-                  col = "black", fill = "white", shape = 21) +
+                      ymin = 10 * log10(NASC_q025),
+                      ymax = 10 * log10(NASC_q975), 
+                      col = LME),
+                  fill = "white", shape = 21) +
   scale_y_continuous(
     expression("S"[A]*" (dB re 1 m"^2*" nmi"^-2*")"),
     position = "left",
@@ -635,11 +640,13 @@ pointrange_NASC <- SA_grid_laea %>% # Pointrange of SA per region
       sec_axis(trans = ~10^(./10), 
                name = expression("s"[A]*" ( m"^2*" nmi"^-2*")"),
                breaks = c(1, 5, 10, 50, 100, 500, 1000, 5000, 10000))) +
-  theme(axis.title.x = element_blank(),
+  scale_colour_manual(values =  c("#132B69", "black", "#03739B", "#93AA43")) +
+  theme(legend.position = "none",
+        axis.title.x = element_blank(),
         plot.margin = unit(c(0.1, 0.1, 0, 0), "in"))
 # Save and display plot
-ggsave("plots/Fig3_pointrange_NASC.png", pointrange_NASC, 
-       height = 2.5, width = 6.5, dpi = 600, units = "in")
+ggsave("plots/Fig3_pointrange_NASC.png", pointrange_NASC,
+       height = 2.5, width = 4.5, dpi = 600, units = "in")
 pointrange_NASC
 ```
 
@@ -670,12 +677,12 @@ trawl_area_df <- trawl %>%
   mutate(RA = (number_fish / total_fish) * 100) %>%
   mutate(LME = factor(
     case_when(
-      LME == "Barents Sea LME" ~ "Barents Sea\nn = 464",
+      LME == "Barents Sea LME" ~ "N. Barents Sea\nn = 464",
       LME == "Beaufort Sea LME" ~ "Beaufort Sea\nn = 923",
       LME == "Baffin Bay LME" ~ "Baffin Bay\nn = 232"),
     levels = c("Beaufort Sea\nn = 923",
                "Baffin Bay\nn = 232",
-               "Barents Sea\nn = 464"))) %>%
+               "N. Barents Sea\nn = 464"))) %>%
   # Format species name appropriately
   mutate(fish_species = str_replace(fish_species, pattern = "_", 
                                     replacement = " "),
@@ -855,7 +862,7 @@ table1_RA <- plot_grid(heatmap_RA, map_RA, ncol = 2, rel_widths = c(1, 0.7),
 # Save and display plot
 ggsave("plots/Table1_RA_map.png", table1_RA, 
        height = 3.25, width = 6.5, dpi = 600, units = "in")
-# table1_RA
+table1_RA
 ```
 
 ## Figure 4. Linear regression latitude
@@ -962,13 +969,13 @@ lm_SA_lat <- LM_area_res %>%
         panel.border = element_blank(),
         axis.line = element_line())
 # Combine plots
-p_map_NASC_LM <- plot_grid(map_DSL, lm_SA_lat, rel_heights = c(1, 0.8),
+p_map_NASC_LM <- plot_grid(map_DSL, lm_SA_lat, rel_heights = c(1, 1),
                            ncol = 1, align = "v", axis = "lr",
                            labels = "auto", label_size = 9, 
-                           label_y = c(0.9, 1.05)) 
+                           label_y = c(0.9, 0.975)) 
 # Save and display plot
 ggsave("plots/Fig3_map_LM_NASC.png", p_map_NASC_LM, 
-       height = 4, width = 6.5, dpi = 600, units = "in")
+       height = 5, width = 6.5, dpi = 600, units = "in")
 p_map_NASC_LM
 ```
 
@@ -988,7 +995,7 @@ GAMSAI_velo <- predSA_I %>%
                       values = met.brewer("Johnson", n = 6, direction = -1)) +
   scale_fill_manual(name = "LME",
                     values = met.brewer("Johnson", n = 6, direction = -1)) +
-  coord_cartesian(xlim = c(-0.1, 4.3), ylim = c(-2, 32), expand = F) +
+  coord_cartesian(xlim = c(-0.05, 4.55), ylim = c(-2, 32), expand = F) +
   scale_x_continuous(breaks = seq(0, 10, 0.5)) +
   scale_y_continuous(
     expression("S"[A]*" (dB re 1 m"^2*" nmi"^-2*")"),
@@ -996,10 +1003,11 @@ GAMSAI_velo <- predSA_I %>%
     sec.axis = sec_axis(trans = ~10^(./10), 
                         name = expression("s"[A]*" ( m"^2*" nmi"^-2*")"),
                         breaks = c(1, 5, 10, 50, 100, 500, 1000, 5000, 10000))) +
-  scale_linetype_manual(name = "LME", values = c(1, 2, 1)) +
+  scale_linetype_manual(name = "LME", values = c(1, 1, 1)) +
   labs(x = expression("Mean velocity at 318 m (cm s"^-1*")"),
        y = expression("S"[A]*" (dB re 1 m"^2*" nmi"^-2*")")) +
-  # guides(linetype = "none") +
+  # facet_wrap(~ LME) +
+  guides(linetype = "none") +
   theme(panel.border = element_blank(),
         axis.line = element_line(),
         legend.title = element_blank(),
@@ -1038,14 +1046,15 @@ map_velo <- phy_grid_laea_hd %>%
   geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), 
                fill = "grey25") + 
   coord_fixed(xlim = c(-2450, 650), ylim = c(-1500, 1850), expand = F) +
-  # North Pole
-  # geom_point(aes(x = 0, y = 0), size = 0.05) +
+  # North pole
+  geom_point(aes(x = 0, y = 0), shape = 23, stroke = 0.2, col = "white",
+             fill = "#C26744") + 
   # Coords 
   geom_tile(data = SA_df, aes(x = xc, y = yc), fill = NA,
-            colour = "red", size = 0.25) + 
+            colour = "red", size = 0.3) + 
   # Facets
   facet_wrap(~ year) +
-  # Legend over 2 rows
+
   theme(legend.title = element_text(hjust = 0.5),
         legend.key.width = unit(0.1, "in"),
         axis.text = element_blank(),
