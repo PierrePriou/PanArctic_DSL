@@ -288,13 +288,21 @@ Mesopelagic backscatter S\~A\~ varied significantly between areas (*H* = 29.7929
 
 I check whether there are inter-annual variability in S\~A\~ across years within areas. This will be used to decide whether a random effect is needed in the GAM. I used a non parametric Kruskal-Wallis test to test for interannual variability within areas.
 
-```{r area-kruskal-wallis}
+### NASC
+
+```{r area-kruskal-wallis-NASC}
 SA_diff %>% # Kruskal wallis interannual difference SA within group
   group_by(LME) %>%
   kruskal_test(NASC_int ~ year)
 ```
 
-There were some interannual differences in SA within some region (WAO_BF - H = 6.4670868, *p* = 0.0394; CAA - H = 11.8260406, *p* = 0.0027; BB - H = 5.0981791, *p* = 0.0782; DS - H = 0.3282051, *p* = 0.8490; EAO - H = 4.9779498, *p* = 0.0830).
+### CM
+
+```{r area-kruskal-wallis-CM}
+SA_diff %>% # Kruskal wallis interannual difference SA within group
+  group_by(LME) %>%
+  kruskal_test(NASC_int ~ year)
+```
 
 # LM - Latitude - S\~A\~ int
 
@@ -1093,6 +1101,7 @@ data.frame(model = c("GAMSA_S", "GAMSA_S2"),
   datatable(class = "cell-border stribe", rownames = F)
 ```
 
+#### Final model 
 Refit model with REML
 
 ```{r fit-GAMSAS3-reml}
@@ -1181,6 +1190,8 @@ data.frame(model = c("GAMSA_I", "GAMSA_I2"),
   arrange(AIC) %>%
   datatable(class = "cell-border stribe", rownames = F)
 ```
+
+#### Final model 
 
 Refit model with REML
 
