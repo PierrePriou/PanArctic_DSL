@@ -93,8 +93,27 @@ arctic_circle_latlon <- data.frame(lon = seq(-180, 180, 0.1)) %>%
 
 # Acoustic data
 load("data/acoustics/MVBS_2015_2017.RData")
+load(paste0("data/acoustics/SA_grids_", "50", "km.RData")) 
+SA_grid_50 <- SA_grid_laea
 load(paste0("data/acoustics/SA_grids_", cell_res, "km.RData")) 
 load(paste0("data/acoustics/Sv_grids_", cell_res, "km.RData")) 
+SA_integrated <- SA_integrated %>%
+  st_as_sf(coords = c("lon", "lat"), crs = st_crs(arctic_latlon), 
+           remove = F) %>%
+  # Append LME 
+  st_join(., LME_sf_latlon, join = st_within) %>% 
+  st_drop_geometry()  %>%
+  mutate(LME = case_when(LME == "Beaufort Sea LME" ~ "BF",
+                         LME == "Central Arctic LME" ~ "CAO",
+                         LME == "Baffin Bay LME" ~ "BB",
+                         LME == "Barents Sea LME" ~ "SV",
+                         LME == "Northern Canadian Archipelago LME" ~
+                           "NAR"),
+         LME = factor(if_else(LME == "CAO" & lon >= 0, "SV",
+                              if_else(LME == "CAO" & lon < 0, "BF", LME)),
+                      levels = c("BF", "NAR", "BB", "SV"))) %>%
+  droplevels()
+
 MVBS_latlon <- MVBS %>% # Location of acoustic data
   mutate(lat = round(lat, 1),
          lon = round(lon, 1)) %>%
@@ -102,7 +121,7 @@ MVBS_latlon <- MVBS %>% # Location of acoustic data
   summarise(lat = mean(lat), 
             lon = mean(lon)) %>%
   ungroup() 
-SA_grid_laea <- left_join(SA_grid_laea, weights, by = c("year", "LME")) %>%
+SA_grid_laea <- SA_grid_laea %>%
   mutate(LME = case_when(LME == "Beaufort Sea LME" ~ "BF",
                          LME == "Central Arctic LME" ~ "CAO",
                          LME == "Baffin Bay LME" ~ "BB",
@@ -307,7 +326,7 @@ MVBS_laea <- SpatialPoints(cbind(MVBS_latlon$lon, MVBS_latlon$lat),
 # Calculate median and mean SA across all areas
 SA_all_area <- SA_grid_laea %>%
   # filter(empty_clean == F) %>%
-  # group_by(year) %>% # per year
+  group_by(year) %>% # per year
   summarise(n = n(),
             NASC_int_median = median(NASC_int, na.rm = T),
             NASC_int_mad = mad(NASC_int, na.rm = T), 
@@ -336,7 +355,7 @@ SA_all_area <- SA_grid_laea %>%
 # Calculate median SA within each area
 SA_grid_laea %>%
   mutate(LME == as.character(LME)) %>%
-  group_by(LME) %>% # median per year
+  group_by(LME, year) %>% # median per year
   summarise(n = n(),
             NASC_int_median = median(NASC_int, na.rm = T),
             NASC_int_mad = mad(NASC_int, na.rm = T), 
@@ -566,18 +585,22 @@ p_map_pointrange_NASC
 ### Just boxplot
 
 ```{r fig3-boxplot}
-boxplot_NASC <- bind_rows(SA_grid_laea) %>%
-  mutate(LME = factor(case_when(LME == "BF" ~ "Beaufort\nSea",
-                                LME == "NAR" ~ "Nares\nStrait",
-                                LME == "BB" ~ "Baffin\nBay",
+# NASC_all_year <- SA_grid_laea %>%
+#   mutate(year = 9999)
+# boxplot_NASC <- bind_rows(SA_grid_laea, NASC_all_year) %>%
+boxplot_NASC <- SA_grid_laea %>%
+  mutate(LME = factor(case_when(LME == "BF" ~ "Beaufort Sea",
+                                LME == "NAR" ~ "Nares Strait",
+                                LME == "BB" ~ "Baffin Bay",
                                 LME == "SV" ~ "Northern\nBarents Sea",
-                                LME == "All areas" ~ "All\nareas",),
-                      levels = c("Beaufort\nSea", "Nares\nStrait", 
-                                 "Baffin\nBay", "Northern\nBarents Sea",
-                                 "All\nareas")),
+                                LME == "All areas" ~ "All areas",),
+                      levels = c("Beaufort Sea", "Nares Strait", 
+                                 "Baffin Bay", "Northern\nBarents Sea",
+                                 "All areas")),
+    # year = factor(year, levels = c(2015, 2016, 2017, 9999))) %>%
     year = factor(year)) %>%
   ggplot(aes(x = LME)) +
-  geom_boxplot(aes(y = 10*log10(NASC_int), col = LME),
+  geom_boxplot(aes(y = 10*log10(NASC_int), col = year),
                size = 0.4, outlier.size = 0.7,
                alpha = 0.8, position = position_dodge(preserve = "single")) +
   scale_y_continuous(
@@ -587,9 +610,12 @@ boxplot_NASC <- bind_rows(SA_grid_laea) %>%
       sec_axis(trans = ~10^(./10),
                name = expression("s"[A]*" ( m"^2*" nmi"^-2*")"),
                breaks = c(1, 5, 10, 50, 100, 500, 1000, 5000, 10000))) +
-  scale_colour_manual(values =  c("#132B69", "black", "#03739B",
-                                  "#93AA43", "grey50")) +
-  theme(legend.position = "none",
+  # scale_colour_manual(values =  c("#132B69", "black", "#03739B",
+  #                                 "#93AA43", "grey50")) +
+  scale_colour_manual(values =  c("#132B69", "#03739B", 
+                                  "#93AA43", "grey50"),
+                      labels = c("2015", "2016", "2017", "All years")) +
+  theme(legend.position = "right",
         axis.title.x = element_blank(),
         legend.title = element_blank(),
         legend.key.width = unit(0.15, "in"),
@@ -597,7 +623,7 @@ boxplot_NASC <- bind_rows(SA_grid_laea) %>%
         plot.margin = unit(c(0.1, 0.1, 0, 0), "in"))
 # Save and display plot
 ggsave("plots/Fig3_boxplot_SA.png", boxplot_NASC,
-       height = 2.5, width = 3.5, dpi = 600, units = "in")
+       height = 2.5, width = 6.5, dpi = 600, units = "in")
 boxplot_NASC
 ```
 
@@ -907,6 +933,14 @@ ggsave("plots/Figure_LM_SA_lat.png", lm_SA_lat,
 lm_SA_lat
 ```
 
+```{r}
+SA_grid_50 %>%
+  ggplot(aes(x = lat, y = SA_int, col = LME)) + 
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "lm")
+```
+
+
 ### With map
 
 ```{r map-lm}
@@ -1020,6 +1054,92 @@ GAMSAI_velo
 ```
 
 # Supplementary data
+
+## Figure SX boxplot WMD
+
+```{r WMD-boxplot}
+WMD_all_year <- SA_grid_laea %>%
+  mutate(year = 9999)
+boxplot_WMD <- bind_rows(SA_grid_laea, NASC_all_year) %>%
+  mutate(LME = factor(case_when(LME == "BF" ~ "Beaufort Sea",
+                                LME == "NAR" ~ "Nares Strait",
+                                LME == "BB" ~ "Baffin Bay",
+                                LME == "SV" ~ "Northern\nBarents Sea",
+                                LME == "All areas" ~ "All areas",),
+                      levels = c("Beaufort Sea", "Nares Strait", 
+                                 "Baffin Bay", "Northern\nBarents Sea",
+                                 "All areas")),
+    year = factor(year, levels = c(2015, 2016, 2017, 9999))) %>%
+  ggplot(aes(x = LME)) +
+  geom_boxplot(aes(y = CM, col = year),
+               size = 0.4, outlier.size = 0.7,
+               alpha = 0.8, position = position_dodge(preserve = "single")) +
+  scale_y_reverse() +
+  scale_colour_manual(values =  c("#132B69", "#03739B", 
+                                  "#93AA43", "grey50"),
+                      labels = c("2015", "2016", "2017", "All years")) +
+  theme(legend.position = "right",
+        axis.title.x = element_blank(),
+        legend.title = element_blank(),
+        legend.key.width = unit(0.15, "in"),
+        legend.key.height = unit(0.15, "in"),
+        plot.margin = unit(c(0.1, 0.1, 0, 0), "in"))
+# Save and display plot
+ggsave("plots/boxplot_WMD.png", boxplot_WMD,
+       height = 2.5, width = 6.5, dpi = 600, units = "in")
+boxplot_WMD
+```
+
+## Map WMD
+
+```{r WMD-map}
+col_pal <- c("(250,300]" = "#F0F921FF",
+             "(300,350]" = "#FDB32FFF",
+             "(350,400]" = "#ED7953FF",
+             "(400,450]" = "#CC4678FF",
+             "(450,500]" = "#9C179EFF",
+             "(500,550]" = "#5D01A6FF",
+             "(550,600]" = "#0D0887FF")
+
+map_WMD <- SA_grid_laea %>%
+  mutate(CM_d = cut(CM, seq(250,600,50))) %>%
+  ggplot(aes(x = xc,  y = yc)) +
+  geom_raster(data = bathy_laea, aes(x = xc, y = yc, fill = depth_d), 
+              alpha = 0.8) + # bathy
+  scale_fill_grey("Depth (m)", start = 0.9, end = 0.3) +
+  guides(fill = "none") + 
+  new_scale_fill() + 
+  geom_polygon(data = LME, aes(x = xc, y = yc, group = group), 
+               col = "black", fill = NA, lwd = 0.3, alpha = 1) + # LME
+  geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), 
+               fill = "grey25") + # Coast
+  geom_tile(aes(fill = CM_d), size = 0.2, col = "white") +
+  # scale_fill_viridis_d("CM (m)", option = "plasma", direction = -1,
+  #                      labels = c("250-300", "301-350", "351-400", 
+  #                                 "401-450", "451-500", "501-550", 
+  #                                 "551-600")) +
+  scale_fill_manual("WMD (m)", 
+                    limits = c("(250,300]", "(300,350]", 
+                               "(350,400]", "(400,450]", 
+                               "(450,500]", "(500,550]", 
+                               "(550,600]"),
+                    values = col_pal,
+                    labels = c("251-300", "301-350", "351-400", 
+                                  "401-450", "451-500", "501-550", 
+                                  "551-600")) +
+  geom_point(aes(x = 0, y = 0), shape = 23, stroke = 0.2, col = "white",
+             fill = "#C26744") +
+  facet_wrap(~ year) +
+  coord_fixed(xlim = c(-2450, 650), ylim = c(-1500, 1850), expand = F) +
+  theme(legend.title = element_text(hjust = 0.5),
+        legend.key.width = unit(0.1, "in"),
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        axis.title = element_blank())
+# Save and display plot
+ggsave("plots/map_WMD.png", map_WMD,
+       height = 2.5, width = 6.5, dpi = 600, units = "in")
+```
 
 ## Figure SX Map current velocity
 
