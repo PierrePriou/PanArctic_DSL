@@ -1,7 +1,7 @@
 ---
 title: "PanArctic DSL - Statistics"
 author: "[Pierre Priou](mailto:pierre.priou@mi.mun.ca)"
-date: "2022/06/10 at 16:53"
+date: "2022/06/13 at 11:43"
 output: 
   html_document:
     code_folding: show
@@ -271,6 +271,8 @@ phy_grid_laea %>%
 
 # Spatial and interannual variability
 
+Nares Strait data is excluded because of the low number of data points from that region.
+
 
 ```r
 SA_diff <- SA_grid_laea %>%
@@ -284,6 +286,7 @@ SA_diff <- SA_grid_laea %>%
                       if_else(LME == "CAO" & yc > 0, "BF", LME)),
                       levels = c("BF", "NAR", "BB", "SV")),
          year = factor(year)) %>%
+  filter(LME != "NAR") %>%
   dplyr::select(year, LME, NASC_int, SA_int, CM)
 ```
 
@@ -324,20 +327,122 @@ bind_rows(kruskal_test(SA_diff, NASC_int ~ LME),
           kruskal_test(SA_diff, NASC_int ~ year),
           kruskal_test(SA_diff, CM ~ LME),
           kruskal_test(SA_diff, CM ~ year)) %>%
-  mutate(var = c("LME", "year", "LME", "year"))
+  mutate(var = c("LME", "year", "LME", "year")) %>%
+  kbl() %>%
+  kable_classic()
 ```
 
-```
-## # A tibble: 4 × 7
-##   .y.          n statistic    df       p method         var  
-##   <chr>    <int>     <dbl> <int>   <dbl> <chr>          <chr>
-## 1 NASC_int    72     13.0      3 0.00454 Kruskal-Wallis LME  
-## 2 NASC_int    72     12.3      2 0.00214 Kruskal-Wallis year 
-## 3 CM          72     16.0      3 0.00113 Kruskal-Wallis LME  
-## 4 CM          72      2.64     2 0.267   Kruskal-Wallis year
+<table class=" lightable-classic" style='font-family: "Arial Narrow", "Source Sans Pro", sans-serif; margin-left: auto; margin-right: auto;'>
+ <thead>
+  <tr>
+   <th style="text-align:left;"> .y. </th>
+   <th style="text-align:right;"> n </th>
+   <th style="text-align:right;"> statistic </th>
+   <th style="text-align:right;"> df </th>
+   <th style="text-align:right;"> p </th>
+   <th style="text-align:left;"> method </th>
+   <th style="text-align:left;"> var </th>
+  </tr>
+ </thead>
+<tbody>
+  <tr>
+   <td style="text-align:left;"> NASC_int </td>
+   <td style="text-align:right;"> 69 </td>
+   <td style="text-align:right;"> 6.326907 </td>
+   <td style="text-align:right;"> 2 </td>
+   <td style="text-align:right;"> 0.042300 </td>
+   <td style="text-align:left;"> Kruskal-Wallis </td>
+   <td style="text-align:left;"> LME </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> NASC_int </td>
+   <td style="text-align:right;"> 69 </td>
+   <td style="text-align:right;"> 16.455927 </td>
+   <td style="text-align:right;"> 2 </td>
+   <td style="text-align:right;"> 0.000267 </td>
+   <td style="text-align:left;"> Kruskal-Wallis </td>
+   <td style="text-align:left;"> year </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> CM </td>
+   <td style="text-align:right;"> 69 </td>
+   <td style="text-align:right;"> 12.863387 </td>
+   <td style="text-align:right;"> 2 </td>
+   <td style="text-align:right;"> 0.001610 </td>
+   <td style="text-align:left;"> Kruskal-Wallis </td>
+   <td style="text-align:left;"> LME </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> CM </td>
+   <td style="text-align:right;"> 69 </td>
+   <td style="text-align:right;"> 2.406373 </td>
+   <td style="text-align:right;"> 2 </td>
+   <td style="text-align:right;"> 0.300000 </td>
+   <td style="text-align:left;"> Kruskal-Wallis </td>
+   <td style="text-align:left;"> year </td>
+  </tr>
+</tbody>
+</table>
+
+I use Dunn's test to know which group are significantly different.
+
+
+```r
+dunn_test(SA_diff, NASC_int ~ LME) %>%
+  kbl() %>%
+  kable_classic()
 ```
 
-Mesopelagic backscatter S\~A\~ varied significantly between areas (*H* = 29.792952, *p* \< 0.001) and years (*H* = 29.792952, *p* = 0.011). The center of mass varied significantly between areas (*H* = 61.185994, *p* \< 0.001) but not between years (*H* = 4.164743, *p* = 0.125).
+<table class=" lightable-classic" style='font-family: "Arial Narrow", "Source Sans Pro", sans-serif; margin-left: auto; margin-right: auto;'>
+ <thead>
+  <tr>
+   <th style="text-align:left;"> .y. </th>
+   <th style="text-align:left;"> group1 </th>
+   <th style="text-align:left;"> group2 </th>
+   <th style="text-align:right;"> n1 </th>
+   <th style="text-align:right;"> n2 </th>
+   <th style="text-align:right;"> statistic </th>
+   <th style="text-align:right;"> p </th>
+   <th style="text-align:right;"> p.adj </th>
+   <th style="text-align:left;"> p.adj.signif </th>
+  </tr>
+ </thead>
+<tbody>
+  <tr>
+   <td style="text-align:left;"> NASC_int </td>
+   <td style="text-align:left;"> BF </td>
+   <td style="text-align:left;"> BB </td>
+   <td style="text-align:right;"> 21 </td>
+   <td style="text-align:right;"> 33 </td>
+   <td style="text-align:right;"> 2.3846793 </td>
+   <td style="text-align:right;"> 0.0170940 </td>
+   <td style="text-align:right;"> 0.0512820 </td>
+   <td style="text-align:left;"> ns </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> NASC_int </td>
+   <td style="text-align:left;"> BF </td>
+   <td style="text-align:left;"> SV </td>
+   <td style="text-align:right;"> 21 </td>
+   <td style="text-align:right;"> 15 </td>
+   <td style="text-align:right;"> 0.5125363 </td>
+   <td style="text-align:right;"> 0.6082757 </td>
+   <td style="text-align:right;"> 0.6082757 </td>
+   <td style="text-align:left;"> ns </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> NASC_int </td>
+   <td style="text-align:left;"> BB </td>
+   <td style="text-align:left;"> SV </td>
+   <td style="text-align:right;"> 33 </td>
+   <td style="text-align:right;"> 15 </td>
+   <td style="text-align:right;"> -1.5812579 </td>
+   <td style="text-align:right;"> 0.1138191 </td>
+   <td style="text-align:right;"> 0.2276382 </td>
+   <td style="text-align:left;"> ns </td>
+  </tr>
+</tbody>
+</table>
 
 ## Within areas
 
@@ -349,18 +454,114 @@ I check whether there are inter-annual variability in S\~A\~ across years within
 ```r
 SA_diff %>% # Kruskal wallis interannual difference SA within group
   group_by(LME) %>%
-  kruskal_test(NASC_int ~ year)
+  kruskal_test(NASC_int ~ year) %>%
+  kbl() %>%
+  kable_classic()
 ```
 
+<table class=" lightable-classic" style='font-family: "Arial Narrow", "Source Sans Pro", sans-serif; margin-left: auto; margin-right: auto;'>
+ <thead>
+  <tr>
+   <th style="text-align:left;"> LME </th>
+   <th style="text-align:left;"> .y. </th>
+   <th style="text-align:right;"> n </th>
+   <th style="text-align:right;"> statistic </th>
+   <th style="text-align:right;"> df </th>
+   <th style="text-align:right;"> p </th>
+   <th style="text-align:left;"> method </th>
+  </tr>
+ </thead>
+<tbody>
+  <tr>
+   <td style="text-align:left;"> BF </td>
+   <td style="text-align:left;"> NASC_int </td>
+   <td style="text-align:right;"> 21 </td>
+   <td style="text-align:right;"> 14.061595 </td>
+   <td style="text-align:right;"> 2 </td>
+   <td style="text-align:right;"> 0.000884 </td>
+   <td style="text-align:left;"> Kruskal-Wallis </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> BB </td>
+   <td style="text-align:left;"> NASC_int </td>
+   <td style="text-align:right;"> 33 </td>
+   <td style="text-align:right;"> 5.115669 </td>
+   <td style="text-align:right;"> 2 </td>
+   <td style="text-align:right;"> 0.077500 </td>
+   <td style="text-align:left;"> Kruskal-Wallis </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> SV </td>
+   <td style="text-align:left;"> NASC_int </td>
+   <td style="text-align:right;"> 15 </td>
+   <td style="text-align:right;"> 4.097143 </td>
+   <td style="text-align:right;"> 2 </td>
+   <td style="text-align:right;"> 0.129000 </td>
+   <td style="text-align:left;"> Kruskal-Wallis </td>
+  </tr>
+</tbody>
+</table>
+Dunn test for BF.
+
+
+```r
+SA_diff %>%
+  filter(LME == "BF") %>%
+  dunn_test(NASC_int ~ year) %>%
+  kbl() %>%
+  kable_classic()
 ```
-## # A tibble: 4 × 7
-##   LME   .y.          n statistic    df        p method        
-## * <fct> <chr>    <int>     <dbl> <int>    <dbl> <chr>         
-## 1 BF    NASC_int    21     14.1      2 0.000884 Kruskal-Wallis
-## 2 NAR   NASC_int     3      0        1 1        Kruskal-Wallis
-## 3 BB    NASC_int    33      5.12     2 0.0775   Kruskal-Wallis
-## 4 SV    NASC_int    15      4.10     2 0.129    Kruskal-Wallis
-```
+
+<table class=" lightable-classic" style='font-family: "Arial Narrow", "Source Sans Pro", sans-serif; margin-left: auto; margin-right: auto;'>
+ <thead>
+  <tr>
+   <th style="text-align:left;"> .y. </th>
+   <th style="text-align:left;"> group1 </th>
+   <th style="text-align:left;"> group2 </th>
+   <th style="text-align:right;"> n1 </th>
+   <th style="text-align:right;"> n2 </th>
+   <th style="text-align:right;"> statistic </th>
+   <th style="text-align:right;"> p </th>
+   <th style="text-align:right;"> p.adj </th>
+   <th style="text-align:left;"> p.adj.signif </th>
+  </tr>
+ </thead>
+<tbody>
+  <tr>
+   <td style="text-align:left;"> NASC_int </td>
+   <td style="text-align:left;"> 2015 </td>
+   <td style="text-align:left;"> 2016 </td>
+   <td style="text-align:right;"> 9 </td>
+   <td style="text-align:right;"> 5 </td>
+   <td style="text-align:right;"> 1.329137 </td>
+   <td style="text-align:right;"> 0.1838028 </td>
+   <td style="text-align:right;"> 0.1838028 </td>
+   <td style="text-align:left;"> ns </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> NASC_int </td>
+   <td style="text-align:left;"> 2015 </td>
+   <td style="text-align:left;"> 2017 </td>
+   <td style="text-align:right;"> 9 </td>
+   <td style="text-align:right;"> 7 </td>
+   <td style="text-align:right;"> 3.746241 </td>
+   <td style="text-align:right;"> 0.0001795 </td>
+   <td style="text-align:right;"> 0.0005385 </td>
+   <td style="text-align:left;"> *** </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> NASC_int </td>
+   <td style="text-align:left;"> 2016 </td>
+   <td style="text-align:left;"> 2017 </td>
+   <td style="text-align:right;"> 5 </td>
+   <td style="text-align:right;"> 7 </td>
+   <td style="text-align:right;"> 1.958143 </td>
+   <td style="text-align:right;"> 0.0502133 </td>
+   <td style="text-align:right;"> 0.1004265 </td>
+   <td style="text-align:left;"> ns </td>
+  </tr>
+</tbody>
+</table>
 
 ### CM
 
@@ -368,18 +569,53 @@ SA_diff %>% # Kruskal wallis interannual difference SA within group
 ```r
 SA_diff %>% # Kruskal wallis interannual difference SA within group
   group_by(LME) %>%
-  kruskal_test(NASC_int ~ year)
+  kruskal_test(CM ~ year) %>%
+  kbl() %>%
+  kable_classic()
 ```
 
-```
-## # A tibble: 4 × 7
-##   LME   .y.          n statistic    df        p method        
-## * <fct> <chr>    <int>     <dbl> <int>    <dbl> <chr>         
-## 1 BF    NASC_int    21     14.1      2 0.000884 Kruskal-Wallis
-## 2 NAR   NASC_int     3      0        1 1        Kruskal-Wallis
-## 3 BB    NASC_int    33      5.12     2 0.0775   Kruskal-Wallis
-## 4 SV    NASC_int    15      4.10     2 0.129    Kruskal-Wallis
-```
+<table class=" lightable-classic" style='font-family: "Arial Narrow", "Source Sans Pro", sans-serif; margin-left: auto; margin-right: auto;'>
+ <thead>
+  <tr>
+   <th style="text-align:left;"> LME </th>
+   <th style="text-align:left;"> .y. </th>
+   <th style="text-align:right;"> n </th>
+   <th style="text-align:right;"> statistic </th>
+   <th style="text-align:right;"> df </th>
+   <th style="text-align:right;"> p </th>
+   <th style="text-align:left;"> method </th>
+  </tr>
+ </thead>
+<tbody>
+  <tr>
+   <td style="text-align:left;"> BF </td>
+   <td style="text-align:left;"> CM </td>
+   <td style="text-align:right;"> 21 </td>
+   <td style="text-align:right;"> 5.051495 </td>
+   <td style="text-align:right;"> 2 </td>
+   <td style="text-align:right;"> 0.080 </td>
+   <td style="text-align:left;"> Kruskal-Wallis </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> BB </td>
+   <td style="text-align:left;"> CM </td>
+   <td style="text-align:right;"> 33 </td>
+   <td style="text-align:right;"> 1.078921 </td>
+   <td style="text-align:right;"> 2 </td>
+   <td style="text-align:right;"> 0.583 </td>
+   <td style="text-align:left;"> Kruskal-Wallis </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> SV </td>
+   <td style="text-align:left;"> CM </td>
+   <td style="text-align:right;"> 15 </td>
+   <td style="text-align:right;"> 2.640000 </td>
+   <td style="text-align:right;"> 2 </td>
+   <td style="text-align:right;"> 0.267 </td>
+   <td style="text-align:left;"> Kruskal-Wallis </td>
+  </tr>
+</tbody>
+</table>
 
 # LM - Latitude - S\~A\~ int
 
@@ -710,8 +946,8 @@ data.frame(model = c("GAM_G",
 ```
 
 ```{=html}
-<div id="htmlwidget-edca92fbb7deaff0f976" style="width:100%;height:auto;" class="datatables html-widget"></div>
-<script type="application/json" data-for="htmlwidget-edca92fbb7deaff0f976">{"x":{"filter":"none","vertical":false,"data":[["GAM_I","GAM_S","GAM_G"],[11.684,14.254,8.66],[64.99,64.68,54.76],[0.11,0.1,0.07],[409.69,414.38,417.69],[813.593,819.913,828.905],[0,6.32,15.31],[0.95887,0.04068,0.00045]],"container":"<table class=\"cell-border stribe\">\n  <thead>\n    <tr>\n      <th>model<\/th>\n      <th>df<\/th>\n      <th>dev_expl<\/th>\n      <th>r2<\/th>\n      <th>reml<\/th>\n      <th>AIC<\/th>\n      <th>dAIC<\/th>\n      <th>w_AIC<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[1,2,3,4,5,6,7]}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
+<div id="htmlwidget-ebb6949e4373ab16e80d" style="width:100%;height:auto;" class="datatables html-widget"></div>
+<script type="application/json" data-for="htmlwidget-ebb6949e4373ab16e80d">{"x":{"filter":"none","vertical":false,"data":[["GAM_I","GAM_S","GAM_G"],[11.684,14.254,8.66],[64.99,64.68,54.76],[0.11,0.1,0.07],[409.69,414.38,417.69],[813.593,819.913,828.905],[0,6.32,15.31],[0.95887,0.04068,0.00045]],"container":"<table class=\"cell-border stribe\">\n  <thead>\n    <tr>\n      <th>model<\/th>\n      <th>df<\/th>\n      <th>dev_expl<\/th>\n      <th>r2<\/th>\n      <th>reml<\/th>\n      <th>AIC<\/th>\n      <th>dAIC<\/th>\n      <th>w_AIC<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[1,2,3,4,5,6,7]}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
 ```
 
 Model G summary.
@@ -839,7 +1075,7 @@ k.check(GAM_S)
 ##          k'      edf   k-index p-value
 ## s(year)   3 1.771413        NA      NA
 ## s(LME)    3 1.713144        NA      NA
-## s(v,LME) 15 6.757841 0.8987912  0.5575
+## s(v,LME) 15 6.757841 0.8987912  0.5925
 ```
 
 
@@ -857,9 +1093,9 @@ k.check(GAM_I)
 ##            k'      edf   k-index p-value
 ## s(year)     3 1.796624        NA      NA
 ## s(LME)      3 1.806629        NA      NA
-## s(v):LMEBF  4 1.000014 0.8722884  0.4350
-## s(v):LMEBB  4 1.000018 0.8722884  0.4725
-## s(v):LMESV  4 3.290189 0.8722884  0.4550
+## s(v):LMEBF  4 1.000014 0.8722884  0.4575
+## s(v):LMEBB  4 1.000018 0.8722884  0.4250
+## s(v):LMESV  4 3.290189 0.8722884  0.4450
 ```
 
 ### Resiudals against covariates
@@ -1419,8 +1655,8 @@ data.frame(model = c("GAMSA_G",
 ```
 
 ```{=html}
-<div id="htmlwidget-c8e95c78ea54e43f1276" style="width:100%;height:auto;" class="datatables html-widget"></div>
-<script type="application/json" data-for="htmlwidget-c8e95c78ea54e43f1276">{"x":{"filter":"none","vertical":false,"data":[["GAMSA_I","GAMSA_S","GAMSA_G"],[9.987,10.734,7.428],[40.25,40.57,30.78],[0.34,0.34,0.26],[232.48,234.65,236.54],[467.81,468.933,472.842],[0,1.12,5.03],[0.60564,0.34543,0.04893]],"container":"<table class=\"cell-border stribe\">\n  <thead>\n    <tr>\n      <th>model<\/th>\n      <th>df<\/th>\n      <th>dev_expl<\/th>\n      <th>r2<\/th>\n      <th>reml<\/th>\n      <th>AIC<\/th>\n      <th>dAIC<\/th>\n      <th>w_AIC<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[1,2,3,4,5,6,7]}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
+<div id="htmlwidget-770da40a1a8eeff0787c" style="width:100%;height:auto;" class="datatables html-widget"></div>
+<script type="application/json" data-for="htmlwidget-770da40a1a8eeff0787c">{"x":{"filter":"none","vertical":false,"data":[["GAMSA_I","GAMSA_S","GAMSA_G"],[9.987,10.734,7.428],[40.25,40.57,30.78],[0.34,0.34,0.26],[232.48,234.65,236.54],[467.81,468.933,472.842],[0,1.12,5.03],[0.60564,0.34543,0.04893]],"container":"<table class=\"cell-border stribe\">\n  <thead>\n    <tr>\n      <th>model<\/th>\n      <th>df<\/th>\n      <th>dev_expl<\/th>\n      <th>r2<\/th>\n      <th>reml<\/th>\n      <th>AIC<\/th>\n      <th>dAIC<\/th>\n      <th>w_AIC<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[1,2,3,4,5,6,7]}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
 ```
 
 Model G summary.
@@ -1548,7 +1784,7 @@ k.check(GAMSA_S)
 ##          k'       edf  k-index p-value
 ## s(year)   3 1.6665136       NA      NA
 ## s(LME)    3 0.4664448       NA      NA
-## s(v,LME) 15 4.4366928 1.043272  0.5875
+## s(v,LME) 15 4.4366928 1.043272  0.5525
 ```
 
 
@@ -1566,8 +1802,8 @@ k.check(GAMSA_I)
 ##            k'      edf k-index p-value
 ## s(year)     3 1.693057      NA      NA
 ## s(LME)      3 1.218332      NA      NA
-## s(v):LMEBF  4 1.000028 1.01646  0.5150
-## s(v):LMEBB  4 1.000005 1.01646  0.4900
+## s(v):LMEBF  4 1.000028 1.01646  0.4875
+## s(v):LMEBB  4 1.000005 1.01646  0.5500
 ## s(v):LMESV  4 1.963541 1.01646  0.5125
 ```
 
@@ -1763,8 +1999,8 @@ data.frame(model = c("GAMSA_S", "GAMSA_S2"),
 ```
 
 ```{=html}
-<div id="htmlwidget-7598e9be962aa164be3b" style="width:100%;height:auto;" class="datatables html-widget"></div>
-<script type="application/json" data-for="htmlwidget-7598e9be962aa164be3b">{"x":{"filter":"none","vertical":false,"data":[["GAMSA_S2","GAMSA_S"],[10.544,10.734],[40.3,40.57],[0.34,0.34],[234.69,234.65],[468.861,468.933],[0,0.07],[0.509,0.491]],"container":"<table class=\"cell-border stribe\">\n  <thead>\n    <tr>\n      <th>model<\/th>\n      <th>df<\/th>\n      <th>dev_expl<\/th>\n      <th>r2<\/th>\n      <th>reml<\/th>\n      <th>AIC<\/th>\n      <th>dAIC<\/th>\n      <th>w_AIC<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[1,2,3,4,5,6,7]}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
+<div id="htmlwidget-7091951f0469f455a0f3" style="width:100%;height:auto;" class="datatables html-widget"></div>
+<script type="application/json" data-for="htmlwidget-7091951f0469f455a0f3">{"x":{"filter":"none","vertical":false,"data":[["GAMSA_S2","GAMSA_S"],[10.544,10.734],[40.3,40.57],[0.34,0.34],[234.69,234.65],[468.861,468.933],[0,0.07],[0.509,0.491]],"container":"<table class=\"cell-border stribe\">\n  <thead>\n    <tr>\n      <th>model<\/th>\n      <th>df<\/th>\n      <th>dev_expl<\/th>\n      <th>r2<\/th>\n      <th>reml<\/th>\n      <th>AIC<\/th>\n      <th>dAIC<\/th>\n      <th>w_AIC<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[1,2,3,4,5,6,7]}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
 ```
 
 #### Final model 
@@ -1951,8 +2187,8 @@ data.frame(model = c("GAMSA_I", "GAMSA_I2"),
 ```
 
 ```{=html}
-<div id="htmlwidget-f2241ef97423f77e75ea" style="width:100%;height:auto;" class="datatables html-widget"></div>
-<script type="application/json" data-for="htmlwidget-f2241ef97423f77e75ea">{"x":{"filter":"none","vertical":false,"data":[["GAMSA_I","GAMSA_I2"],[9.987,9.484],[40.25,39.15],[0.34,0.33],[232.48,233.39],[467.81,468.061],[0,0.25],[0.53133,0.46867]],"container":"<table class=\"cell-border stribe\">\n  <thead>\n    <tr>\n      <th>model<\/th>\n      <th>df<\/th>\n      <th>dev_expl<\/th>\n      <th>r2<\/th>\n      <th>reml<\/th>\n      <th>AIC<\/th>\n      <th>dAIC<\/th>\n      <th>w_AIC<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[1,2,3,4,5,6,7]}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
+<div id="htmlwidget-b9b149806268b6a7e78b" style="width:100%;height:auto;" class="datatables html-widget"></div>
+<script type="application/json" data-for="htmlwidget-b9b149806268b6a7e78b">{"x":{"filter":"none","vertical":false,"data":[["GAMSA_I","GAMSA_I2"],[9.987,9.484],[40.25,39.15],[0.34,0.33],[232.48,233.39],[467.81,468.061],[0,0.25],[0.53133,0.46867]],"container":"<table class=\"cell-border stribe\">\n  <thead>\n    <tr>\n      <th>model<\/th>\n      <th>df<\/th>\n      <th>dev_expl<\/th>\n      <th>r2<\/th>\n      <th>reml<\/th>\n      <th>AIC<\/th>\n      <th>dAIC<\/th>\n      <th>w_AIC<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[1,2,3,4,5,6,7]}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
 ```
 
 #### Final model 

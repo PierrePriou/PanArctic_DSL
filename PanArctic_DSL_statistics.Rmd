@@ -234,6 +234,8 @@ phy_grid_laea %>%
 
 # Spatial and interannual variability
 
+Nares Strait data is excluded because of the low number of data points from that region.
+
 ```{r prep-diff}
 SA_diff <- SA_grid_laea %>%
   mutate(LME = case_when(LME == "Beaufort Sea LME" ~ "BF",
@@ -246,6 +248,7 @@ SA_diff <- SA_grid_laea %>%
                       if_else(LME == "CAO" & yc > 0, "BF", LME)),
                       levels = c("BF", "NAR", "BB", "SV")),
          year = factor(year)) %>%
+  filter(LME != "NAR") %>%
   dplyr::select(year, LME, NASC_int, SA_int, CM)
 ```
 
@@ -279,10 +282,18 @@ bind_rows(kruskal_test(SA_diff, NASC_int ~ LME),
           kruskal_test(SA_diff, NASC_int ~ year),
           kruskal_test(SA_diff, CM ~ LME),
           kruskal_test(SA_diff, CM ~ year)) %>%
-  mutate(var = c("LME", "year", "LME", "year"))
+  mutate(var = c("LME", "year", "LME", "year")) %>%
+  kbl() %>%
+  kable_classic()
 ```
 
-Mesopelagic backscatter S\~A\~ varied significantly between areas (*H* = 29.792952, *p* \< 0.001) and years (*H* = 29.792952, *p* = 0.011). The center of mass varied significantly between areas (*H* = 61.185994, *p* \< 0.001) but not between years (*H* = 4.164743, *p* = 0.125).
+I use Dunn's test to know which group are significantly different.
+
+```{r Dunn-SA}
+dunn_test(SA_diff, NASC_int ~ LME) %>%
+  kbl() %>%
+  kable_classic()
+```
 
 ## Within areas
 
@@ -293,7 +304,18 @@ I check whether there are inter-annual variability in S\~A\~ across years within
 ```{r area-kruskal-wallis-NASC}
 SA_diff %>% # Kruskal wallis interannual difference SA within group
   group_by(LME) %>%
-  kruskal_test(NASC_int ~ year)
+  kruskal_test(NASC_int ~ year) %>%
+  kbl() %>%
+  kable_classic()
+```
+Dunn test for BF.
+
+```{r Dunn-BF-SA}
+SA_diff %>%
+  filter(LME == "BF") %>%
+  dunn_test(NASC_int ~ year) %>%
+  kbl() %>%
+  kable_classic()
 ```
 
 ### CM
@@ -301,7 +323,9 @@ SA_diff %>% # Kruskal wallis interannual difference SA within group
 ```{r area-kruskal-wallis-CM}
 SA_diff %>% # Kruskal wallis interannual difference SA within group
   group_by(LME) %>%
-  kruskal_test(NASC_int ~ year)
+  kruskal_test(CM ~ year) %>%
+  kbl() %>%
+  kable_classic()
 ```
 
 # LM - Latitude - S\~A\~ int
