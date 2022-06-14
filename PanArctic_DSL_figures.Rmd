@@ -590,11 +590,11 @@ p_map_pointrange_NASC
 # boxplot_NASC <- bind_rows(SA_grid_laea, NASC_all_year) %>%
 boxplot_NASC <- SA_grid_laea %>%
   mutate(LME = factor(case_when(LME == "BF" ~ "Beaufort Sea",
-                                LME == "NAR" ~ "Nares Strait",
+                                LME == "NAR" ~ "Nares Strait *",
                                 LME == "BB" ~ "Baffin Bay",
                                 LME == "SV" ~ "Northern\nBarents Sea",
                                 LME == "All areas" ~ "All areas",),
-                      levels = c("Beaufort Sea", "Nares Strait", 
+                      levels = c("Beaufort Sea", "Nares Strait *", 
                                  "Baffin Bay", "Northern\nBarents Sea",
                                  "All areas")),
     # year = factor(year, levels = c(2015, 2016, 2017, 9999))) %>%
@@ -1054,6 +1054,79 @@ GAMSAI_velo
 ```
 
 # Supplementary data
+
+## Map myctophid distribution
+
+```{r map-myctohpid}
+mycto_trawl <- trawl_station %>% 
+  filter(fish_species == "myctophidae") %>%
+  mutate(var = if_else(area == "BB", "This study", "Geoffroy et al. 2019")) %>%
+  dplyr::select(lon, lat, var)
+
+map_mycto <- data.frame(
+  lon = c(133 + (32.27/60), # AWI 1995
+          133 + (34.9/60), # AWI 1995
+          -179.99, # Zhang 2022
+          25.5, # Snoeijs Leijonmalm et al. 2021
+          -122.357, # Frosti 2021
+          -117.90, # Frosti 2021
+          -117.088, # Frosti 2021
+          -135), # Majewski 2017 approximate location
+  lat = c(78 + (06.02/60), # AWI 1995
+          77 + (54.83/60), # AWI 1995
+          75.04, # Zhang 2022
+          88.0, # Snoeijs Leijonmalm et al. 2021
+          70.896, # Frosti 2021
+          70.342, # Frosti 2021
+          70.332, # Frosti 2021
+          70.5), # Majewski 2017 approximate location)
+  var = c(rep("Chernova & Neyelov 1995", 2), 
+          "Zhang et al. 2022", 
+          "Snoeijs Leijonmalm et al. 2021", 
+          rep("Frosti 2021", 3),
+          "Majewski et al. 2017\n(approximate location)")) %>% 
+  bind_rows(., mycto_trawl) %>%
+  # Reorder studies
+  mutate(var = 
+           factor(var,
+                  levels = c("Chernova & Neyelov 1995",
+                             "Majewski et al. 2017\n(approximate location)",
+                             "Geoffroy et al. 2019",
+                             "Snoeijs Leijonmalm et al. 2021",
+                             "Zhang et al. 2022",
+                             "Frosti 2021",
+                             "This study"))) %>%
+  st_as_sf(coords = c("lon", "lat"), crs = crs(arctic_latlon), remove = F) %>%
+  st_transform(crs = st_crs(arctic_laea)) %>% # Change projection
+  mutate(xc = st_coordinates(.)[,1],
+         yc = st_coordinates(.)[,2]) %>%
+  st_drop_geometry() %>%
+  ggplot(aes(x = xc, y = yc)) +
+  # Plot bathy
+  geom_raster(data = bathy_laea, aes(fill = depth_d), alpha = 0.8) +
+  scale_fill_grey("Depth (m)", start = 0.9, end = 0.3) +
+  guides(fill = "none") +
+  new_scale_fill() +
+  geom_polygon(data = LME, aes(x = xc, y = yc, group = group),
+               col = "black", fill = NA, alpha = 0.2, 
+               lwd = 0.5, lty = 1) +
+  # Plot coastlines
+  geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group),
+               fill = "grey30") +
+  geom_point(aes(x = xc, y = yc, fill = var), shape = 21, size = 3, alpha = 0.8) + 
+  coord_fixed(xlim = c(-2450, 1200), ylim = c(-1500, 2000), expand = F) +
+  # guides(fill = "none") +
+  theme(legend.position = "right", 
+        legend.title = element_blank(),
+        panel.border = element_rect(fill = NA),
+        axis.text = element_blank(),
+        axis.ticks = element_blank(), 
+        axis.title = element_blank())
+# Save and display plots
+ggsave("plots/map_myctophid.png", map_mycto,
+       height = 4, width = 6, dpi = 600, units = "in")
+map_mycto
+```
 
 ## Figure SX boxplot WMD
 
