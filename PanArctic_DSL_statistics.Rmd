@@ -430,15 +430,16 @@ There was no poleward decrease in Baffin Bay. Thus, I want to make sure that thi
 load("data/nets/trawl_BB.RData")
 
 SA_grid_laea %>%
-  mutate(exclude = if_else(xc == -2025 & yc == -1275, T, 
-                   if_else(xc == -2025 & yc == -1125, T, 
-                   if_else(xc == -1875 & yc == -1125, T, 
-                   if_else(xc == -1725 & yc == -825, T, F))))) %>%
+  mutate(mycto_TF = if_else(xc == -2025 & yc == -1275, T, 
+                 if_else(xc == -2025 & yc == -1125, T, 
+                 if_else(xc == -1875 & yc == -1125, T, 
+                 if_else(xc == -1875 & yc == -975, T, 
+                 if_else(xc == -1725 & yc == -825, T, F)))))) %>%
   ggplot() +
   # Coastlines
   geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), 
                fill = "grey25") + # Coast
-  geom_tile(aes(x = xc, y = yc, fill = exclude), col = "white") +
+  geom_tile(aes(x = xc, y = yc, fill = mycto_TF), col = "white") +
   scale_fill_viridis_d() + 
   # Stations with myctophid
   geom_point(data = trawl_BB, aes(x = xc, y = yc, col = mycto)) +
@@ -455,14 +456,20 @@ SA_grid_laea %>%
 # Remove data where myctophid occur
 SA_BB <- SA_lm %>%
   filter(LME == "BB") %>%
-  mutate(exclude = if_else(xc == -2025 & yc == -1275, T, 
-                   if_else(xc == -2025 & yc == -1125, T, 
-                   if_else(xc == -1875 & yc == -1125, T, 
-                   if_else(xc == -1725 & yc == -825, T, F))))) %>%
-  filter(exclude == F) 
+  mutate(mycto_TF = if_else(xc == -2025 & yc == -1275, T, 
+                    if_else(xc == -2025 & yc == -1125, T, 
+                    if_else(xc == -1875 & yc == -1125, T, 
+                    if_else(xc == -1875 & yc == -975, T,                                         if_else(xc == -1725 & yc == -825, T, F)))))) 
 # Fit LM
-LM_BB <- lm(SA_int ~ lat, data = SA_BB)
-summary(LM_BB)
+LM_BB_myctoT <- SA_BB %>%
+  filter(mycto_TF == T) %>%
+  lm(SA_int ~ lat, data = .)
+summary(LM_BB_myctoT)
+# Fit LM
+LM_BB_myctoF <- SA_BB %>%
+  filter(mycto_TF == F) %>%
+  lm(SA_int ~ lat, data = .)
+summary(LM_BB_myctoF)
 ```
 There are still no decrease of mesopelagic backscatter when we remove cells with myctophids.
 
