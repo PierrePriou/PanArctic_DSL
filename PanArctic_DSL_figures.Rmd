@@ -326,14 +326,14 @@ MVBS_laea <- SpatialPoints(cbind(MVBS_latlon$lon, MVBS_latlon$lat),
 # Calculate median and mean SA across all areas
 SA_all_area <- SA_grid_laea %>%
   # filter(empty_clean == F) %>%
-  group_by(year) %>% # per year
+  # group_by(year) %>% # per year
   summarise(n = n(),
             NASC_int_median = median(NASC_int, na.rm = T),
             NASC_int_mad = mad(NASC_int, na.rm = T), 
             NASC_int_mean = mean(NASC_int, na.rm = T),
             NASC_int_sd = sd(NASC_int, na.rm = T), 
-            NASC_mean2 = mean(NASC_mean, na.rm = T),
-            NASC_sd2 = sd(NASC_mean, na.rm = T),
+            NASC_min = min(NASC_int, na.rm = T),
+            NASC_max = max(NASC_int, na.rm = T),
             CM_median = median(CM, na.rm = T),
             CM_mad = mad(CM, na.rm = T),
             CM_mean = mean(CM, na.rm = T),
@@ -344,8 +344,6 @@ SA_all_area <- SA_grid_laea %>%
   #           NASC_int_mad = round(mean(NASC_int_mad, na.rm = T), 1),
   #           NASC_int_mean = round(mean(NASC_int_mean, na.rm = T), 1),
   #           NASC_int_sd = round(mean(NASC_int_sd, na.rm = T), 1),
-  #           NASC_mean2 = round(mean(NASC_mean2, na.rm = T), 3),
-  #           NASC_sd2 = round(mean(NASC_sd2, na.rm = T), 3),
   #           CM_median = round(mean(CM_median, na.rm = T)),
   #           CM_mad = round(mean(CM_mad, na.rm = T)),
   #           CM_mean = round(mean(CM_mean, na.rm = T)),
@@ -355,14 +353,14 @@ SA_all_area <- SA_grid_laea %>%
 # Calculate median SA within each area
 SA_grid_laea %>%
   mutate(LME == as.character(LME)) %>%
-  group_by(LME, year) %>% # median per year
+  group_by(LME) %>% # median per year
   summarise(n = n(),
             NASC_int_median = median(NASC_int, na.rm = T),
             NASC_int_mad = mad(NASC_int, na.rm = T), 
             NASC_int_mean = mean(NASC_int, na.rm = T),
             NASC_int_sd = sd(NASC_int, na.rm = T), 
-            NASC_mean2 = mean(NASC_mean, na.rm = T),
-            NASC_sd2 = median(NASC_mean, na.rm = T),
+            NASC_min = min(NASC_int, na.rm = T),
+            NASC_max = max(NASC_int, na.rm = T),
             CM_median = median(CM, na.rm = T),
             CM_mad = mad(CM, na.rm = T),
             CM_mean = mean(CM, na.rm = T),
@@ -442,180 +440,43 @@ ggsave("plots/base_map_laeamap_stations.png",
 p_map_laea
 ```
 
-## Figure 3. Boxplot mesopelagic NASC & Map detections
+## Figure 2. Boxplot mesopelagic NASC
 
-### Map and Boxplot
-
-```{r fig3-boxplot-NASC, fig.width=6, fig.height=5}
-# Map NASC
-map_DSL <- SA_grid_laea %>% 
-  mutate(NASC_int_d = cut(NASC_int, c(0, 1, 10, 100, 1000, 10000, Inf))) %>%
-  ggplot(aes(x = xc,  y = yc)) +
-  geom_raster(data = bathy_laea, aes(x = xc, y = yc, fill = depth_d),
-              alpha = 0.8) + # bathy
-  scale_fill_grey("Depth (m)", start = 0.9, end = 0.3) +
-  guides(fill = "none") + 
-  new_scale_fill() + 
-  geom_polygon(data = LME, aes(x = xc, y = yc, group = group), 
-               col = "black", fill = NA, lwd = 0.3, alpha = 1) + # LME
-  geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), 
-               fill = "grey25") + # Coast
-  # geom_point(aes(col = NASC_int_d), size = 0.6) +
-  # scale_color_viridis_d(option = "plasma", 
-  #                       labels = c("< 1", "1-10", "11-100", "101-1000", 
-  #                                  "1001-10000", "> 10000")) +
-  geom_tile(aes(fill = NASC_int_d), size = 0.2, alpha = 0.8, col = "white") +
-  scale_fill_viridis_d(option = "viridis", 
-                       labels = c("< 1", "1-10", "11-100", "101-1000", 
-                                  "1001-10000", "> 10000")) +
-  facet_wrap(~ year) +
-  coord_fixed(xlim = c(-2450, 650), ylim = c(-1500, 1850), expand = F) +
-  guides(fill = guide_legend(override.aes = list(size = 2), 
-                               nrow = 1)) + 
-  # guides(fill = "none",
-  #        colour = guide_legend(override.aes = list(size = 2), 
-  #                              nrow = 1)) + # Increase symbol size in legend
-  theme(legend.position = "top",
-        legend.title = element_blank(),
-        axis.text = element_blank(),
-        axis.ticks = element_blank(),
-        axis.title = element_blank())
-# Bxplot SA
-p_boxplot_SA <-
-  SA_grid_laea %>% # Boxplot of SA per region
-  mutate(LME = factor(case_when(LME == "BF" ~ "Beaufort Sea",
-                                LME == "NAR" ~ "Nares Strait",
-                                LME == "BB" ~ "Baffin Bay",
-                                LME == "SV" ~ "Barents Sea"),
-                      levels = c("Beaufort Sea", "Nares Strait", 
-                                 "Baffin Bay", "Barents Sea"))) %>%
-  ggplot(aes(x = LME, y = SA_int)) + 
-  geom_boxplot(position = position_dodge(preserve = "single")) +
-  scale_y_continuous(expression("S"[A]*" (dB re 1 m"^2*" nmi"^-2*")")) +
-  theme(panel.border = element_blank(),
-        axis.title.x = element_blank(),
-        axis.line = element_line(),
-        legend.title = element_blank(), 
-        # legend.position = "none",
-        plot.margin = unit(c(0.1, 0.1, 0, 0), "in"))
-# Combine plots
-p_map_SA_DSL <- plot_grid(map_DSL, p_boxplot_SA, 
-                          ncol = 1, align = "v", axis = "lr",
-                          labels = "auto", label_size = 9) 
-# Save and display plots
-ggsave("plots/Fig3_map_boxplot_SA.png", p_map_SA_DSL,
-       height = 5, width = 6, dpi = 600, units = "in")
-p_map_SA_DSL
-```
-
-### Map and Points
-
-```{r fig3-map-points}
-map_DSL <- SA_grid_laea %>% 
-  mutate(NASC_int_d = cut(NASC_int, c(0, 1, 10, 100, 500, 1000, Inf))) %>%
-  ggplot(aes(x = xc,  y = yc)) +
-  geom_raster(data = bathy_laea, aes(x = xc, y = yc, fill = depth_d), 
-              alpha = 0.8) + # bathy
-  scale_fill_grey("Depth (m)", start = 0.9, end = 0.3) +
-  guides(fill = "none") + 
-  new_scale_fill() + 
-  geom_polygon(data = LME, aes(x = xc, y = yc, group = group), 
-               col = "black", fill = NA, lwd = 0.3, alpha = 1) + # LME
-  geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), 
-               fill = "grey25") + # Coast
-  geom_tile(aes(fill = NASC_int_d), size = 0.2, col = "white") +
-  scale_fill_viridis_d(expression("s"[A]*" ( m"^2*" nmi"^-2*")"),
-                       option = "viridis",
-                       labels = c("< 1", "1-10", "11-100", "101-500",
-                                  "501-1000", "> 1000")) +
-  geom_point(aes(x = 0, y = 0), size = 0.05) +
-  facet_wrap(~ year) +
-  coord_fixed(xlim = c(-2450, 650), ylim = c(-1500, 1850), expand = F) +
-  theme(legend.position = "right",
-        legend.key.height = unit(0.15, "in"),
-        legend.key.width = unit(0.15, "in"),
-        axis.text = element_blank(),
-        axis.ticks = element_blank(),
-        axis.title = element_blank())
-
-pointrange_NASC <- SA_grid_laea %>% # Pointrange of SA per region
-  mutate(LME = factor(case_when(LME == "BF" ~ "Beaufort Sea",
-                                LME == "NAR" ~ "Nares Strait",
-                                LME == "BB" ~ "Baffin Bay",
-                                LME == "SV" ~ "Barents Sea"),
-                      levels = c("Beaufort Sea", "Nares Strait", 
-                                 "Baffin Bay", "Barents Sea"))) %>%
-  group_by(LME, year) %>% # Median per year
-  summarise(NASC_median = median(NASC_int, na.rm = T),
-            NASC_mean = mean(NASC_int, na.rm = T),
-            NASC_q025 = quantile(NASC_int, 0.025),
-            NASC_q975 = quantile(NASC_int, 0.975)) %>%
-  ungroup() %>%
-  group_by(LME) %>% # Mean per area
-  summarise(NASC_median = mean(NASC_median, na.rm = T),
-            NASC_mean = mean(NASC_mean, na.rm = T),
-            NASC_q025 = min(NASC_q025, na.rm = T),
-            NASC_q975 = max(NASC_q975, na.rm = T)) %>%
-  ungroup() %>%
-  ggplot(aes(x = LME)) +
-  geom_point(aes(y = 10 * log10(NASC_mean)), 
-             shape = 18, size = 4.5, col = "black") +
-  geom_pointrange(aes(y = 10 * log10(NASC_median),
-                      ymin = 10 * log10(NASC_q025), 
-                      ymax = 10 * log10(NASC_q975)),
-                  col = "black", fill = "white", shape = 21) +
-  scale_y_continuous(
-    expression("S"[A]*" (dB re 1 m"^2*" nmi"^-2*")"),
-    sec.axis = 
-      sec_axis(trans = ~10^(./10), 
-               name = expression("s"[A]*" ( m"^2*" nmi"^-2*")"),
-               breaks = c(1, 5, 10, 50, 100, 500, 1000, 5000, 10000, 50000))) +
-  theme(axis.title.x = element_blank(),
-        plot.margin = unit(c(0.1, 0.1, 0, 0), "in"))
-# Combine plots
-p_map_pointrange_NASC <- plot_grid(pointrange_NASC, map_DSL,
-                                   ncol = 1, align = "v", axis = "lr",
-                                   labels = "auto", label_size = 9) 
-# Save and display plot
-ggsave("plots/Fig3_map_pointrange_NASC.png", p_map_pointrange_NASC, 
-       height = 5, width = 6.5, dpi = 600, units = "in")
-p_map_pointrange_NASC
-```
-
-### Just boxplot
-
-```{r fig3-boxplot}
+```{r boxplot-NASC}
 # NASC_all_year <- SA_grid_laea %>%
 #   mutate(year = 9999)
 # boxplot_NASC <- bind_rows(SA_grid_laea, NASC_all_year) %>%
 boxplot_NASC <- SA_grid_laea %>%
   mutate(LME = factor(case_when(LME == "BF" ~ "Beaufort Sea",
-                                LME == "NAR" ~ "Nares Strait *",
+                                LME == "NAR" ~ "Nares Strait",
                                 LME == "BB" ~ "Baffin Bay",
                                 LME == "SV" ~ "Northern\nBarents Sea",
                                 LME == "All areas" ~ "All areas",),
-                      levels = c("Beaufort Sea", "Nares Strait *", 
+                      levels = c("Beaufort Sea", "Nares Strait", 
                                  "Baffin Bay", "Northern\nBarents Sea",
                                  "All areas")),
     # year = factor(year, levels = c(2015, 2016, 2017, 9999))) %>%
     year = factor(year)) %>%
+  group_by(LME) %>%
+  mutate(mean_NASC = mean(NASC_int)) %>%
   ggplot(aes(x = LME)) +
-  geom_boxplot(aes(y = 10*log10(NASC_int), col = year),
+  geom_boxplot(aes(y = 10*log10(NASC_int), col = LME),
                size = 0.4, outlier.size = 0.7,
                alpha = 0.8, position = position_dodge(preserve = "single")) +
+  geom_point(aes(y = 10*log10(mean_NASC), fill = LME), shape = 23) + 
+  scale_x_discrete(labels = c("BF", "NAR", "BB", "BA")) +
   scale_y_continuous(
     expression("S"[A]*" (dB re 1 m"^2*" nmi"^-2*")"),
     position = "left",
+    breaks = seq(0, 40, 10),
     sec.axis =
       sec_axis(trans = ~10^(./10),
                name = expression("s"[A]*" ( m"^2*" nmi"^-2*")"),
                breaks = c(1, 5, 10, 50, 100, 500, 1000, 5000, 10000))) +
-  # scale_colour_manual(values =  c("#132B69", "black", "#03739B",
-  #                                 "#93AA43", "grey50")) +
-  scale_colour_manual(values =  c("#132B69", "#03739B", 
-                                  "#93AA43", "grey50"),
-                      labels = c("2015", "2016", "2017", "All years")) +
-  theme(legend.position = "right",
+  scale_colour_manual(values =  c("#132B69", "grey50", "#03739B", "#93AA43")) +
+  scale_fill_manual(values =  c("#132B69", "grey50", "#03739B", "#93AA43")) +
+  coord_cartesian(ylim = c(-4, 43)) +
+  theme(legend.position = "none",
         axis.title.x = element_blank(),
         legend.title = element_blank(),
         legend.key.width = unit(0.15, "in"),
@@ -623,60 +484,12 @@ boxplot_NASC <- SA_grid_laea %>%
         plot.margin = unit(c(0.1, 0.1, 0, 0), "in"))
 # Save and display plot
 ggsave("plots/Fig3_boxplot_SA.png", boxplot_NASC,
-       height = 2.5, width = 6.5, dpi = 600, units = "in")
+       height = 2.5, width = 3.5, dpi = 600, units = "in")
 boxplot_NASC
 ```
 
-### Just points
 
-```{r fig3-points}
-pointrange_NASC <- SA_grid_laea %>% # Pointrange of SA per region
-  dplyr::select(year, LME, NASC_int) %>%
-  mutate(LME = factor(case_when(LME == "BF" ~ "Beaufort Sea",
-                                LME == "NAR" ~ "Nares Strait",
-                                LME == "BB" ~ "Baffin Bay",
-                                LME == "SV" ~ "Northern\nBarents Sea"),
-                      levels = c("Beaufort Sea", "Nares Strait",
-                                 "Baffin Bay", "Northern\nBarents Sea")),
-         year = factor(year)) %>%
-  group_by(LME, year) %>% # Median per year
-  summarise(NASC_median = median(NASC_int, na.rm = T),
-            NASC_mean = mean(NASC_int, na.rm = T),
-            NASC_q025 = quantile(NASC_int, 0.025),
-            NASC_q975 = quantile(NASC_int, 0.975)) %>%
-  ungroup() %>%
-  group_by(LME) %>% # Mean per area
-  summarise(NASC_median = mean(NASC_median, na.rm = T),
-            NASC_mean = mean(NASC_mean, na.rm = T),
-            NASC_q025 = min(NASC_q025, na.rm = T),
-            NASC_q975 = max(NASC_q975, na.rm = T)) %>%
-  ungroup() %>%
-  ggplot(aes(x = LME)) +
-  geom_point(aes(y = 10 * log10(NASC_mean), col = LME),
-             shape = 18, size = 4.5) +
-  geom_pointrange(aes(y = 10 * log10(NASC_median),
-                      ymin = 10 * log10(NASC_q025),
-                      ymax = 10 * log10(NASC_q975), 
-                      col = LME),
-                  fill = "white", shape = 21) +
-  scale_y_continuous(
-    expression("S"[A]*" (dB re 1 m"^2*" nmi"^-2*")"),
-    position = "left",
-    sec.axis = 
-      sec_axis(trans = ~10^(./10), 
-               name = expression("s"[A]*" ( m"^2*" nmi"^-2*")"),
-               breaks = c(1, 5, 10, 50, 100, 500, 1000, 5000, 10000))) +
-  scale_colour_manual(values =  c("#132B69", "black", "#03739B", "#93AA43")) +
-  theme(legend.position = "none",
-        axis.title.x = element_blank(),
-        plot.margin = unit(c(0.1, 0.1, 0, 0), "in"))
-# Save and display plot
-ggsave("plots/Fig3_pointrange_NASC.png", pointrange_NASC,
-       height = 2.5, width = 4.5, dpi = 600, units = "in")
-pointrange_NASC
-```
-
-## Map/table 1. Abundance mesopelagic fish and map
+## Figure 3. Abundance mesopelagic fish and map
 
 ### Data preparation
 
@@ -891,57 +704,7 @@ ggsave("plots/Table1_RA_map.png", table1_RA,
 table1_RA
 ```
 
-## Figure 4. Linear regression latitude
-
-### Without map
-
-```{r LM-SA-latitude}
-col_pal <- c("#132B69", "#03739B", "#93AA43", "black")
-lm_SA_lat <- LM_area_res %>%
-  ggplot() + 
-  geom_point(data = SA_lm, aes(x = lat, y = SA_int, col = LME, shape = shape,
-                               size = shape),
-             alpha = 0.7) +
-  geom_line(aes(x = lat, y = .fitted, col = LME), size = 0.6) + 
-  geom_ribbon(aes(x = lat, ymin = .lower, ymax = .upper,
-                  group = LME, fill = LME),
-              alpha = 0.15) +
-  scale_x_continuous("Latitude (°N)", breaks = seq(0, 90, 2)) + 
-  # scale_y_continuous(expression("S"[A]*" (dB re 1 m"^2*" nmi"^-2*")")) + 
-  scale_y_continuous(
-    expression("S"[A]*" (dB re 1 m"^2*" nmi"^-2*")"),
-    position = "left",
-    sec.axis = 
-      sec_axis(trans = ~10^(./10), 
-               name = expression("s"[A]*" ( m"^2*" nmi"^-2*")"),
-               breaks = c(1, 5, 10, 50, 100, 500, 1000, 5000, 10000))) +
-  scale_shape_manual(values = c(17, 16)) +
-  scale_size_manual(values = c(1.5, 1)) +
-  scale_colour_manual("LME", values = col_pal) +
-  scale_fill_manual("LME", values = col_pal) +
-  coord_cartesian(ylim = c(-3, 42)) +
-  guides(fill = "none", shape = "none", size = "none") +
-  theme(legend.position = "right", 
-        legend.title = element_blank(),
-        legend.key.height = unit(0.15, "in"), 
-        legend.key.width = unit(0.15, "in"), 
-        panel.border = element_blank(),
-        axis.line = element_line())
-# Save and display plot
-ggsave("plots/Figure_LM_SA_lat.png", lm_SA_lat, 
-       height = 2.5, width = 6.5, dpi = 600, units = "in")
-lm_SA_lat
-```
-
-```{r}
-SA_grid_50 %>%
-  ggplot(aes(x = lat, y = SA_int, col = LME)) + 
-  geom_point(alpha = 0.5) +
-  geom_smooth(method = "lm")
-```
-
-
-### With map
+## Figure 4. Linear regression latitude and map
 
 ```{r map-lm}
 # Map
@@ -994,7 +757,7 @@ lm_SA_lat <- LM_area_res %>%
   scale_shape_manual(values = c(17, 16)) +
   scale_colour_manual("LME", values = col_pal) +
   scale_fill_manual("LME", values = col_pal) +
-  coord_cartesian(ylim = c(-3, 42)) +
+  coord_cartesian(ylim = c(-4.5, 44.5)) +
   guides(fill = "none", shape = "none") +
   theme(legend.position = "top", 
         legend.title = element_blank(),
@@ -1024,7 +787,7 @@ GAMSAI_velo <- predSA_I %>%
   geom_line(aes(x = v, y = fitted, col = LME, linetype = LME), 
             size = 0.6) +
   geom_ribbon(aes(x = v, ymin = lwr_ci, ymax = upr_ci, fill = LME), 
-              alpha = 0.15) +
+              alpha = 0.1) +
   scale_colour_manual(name = "LME",
                       values = met.brewer("Johnson", n = 6, direction = -1)) +
   scale_fill_manual(name = "LME",
@@ -1037,11 +800,11 @@ GAMSAI_velo <- predSA_I %>%
     sec.axis = sec_axis(trans = ~10^(./10), 
                         name = expression("s"[A]*" ( m"^2*" nmi"^-2*")"),
                         breaks = c(1, 5, 10, 50, 100, 500, 1000, 5000, 10000))) +
-  scale_linetype_manual(name = "LME", values = c(1, 1, 1)) +
+  scale_linetype_manual(name = "LME", values = c(2, 2, 1)) +
   labs(x = expression("Mean velocity at 318 m (cm s"^-1*")"),
        y = expression("S"[A]*" (dB re 1 m"^2*" nmi"^-2*")")) +
   # facet_wrap(~ LME) +
-  guides(linetype = "none") +
+  # guides(linetype = "none") +
   theme(panel.border = element_blank(),
         axis.line = element_line(),
         legend.title = element_blank(),
@@ -1131,9 +894,7 @@ map_mycto
 ## Figure SX boxplot WMD
 
 ```{r WMD-boxplot}
-WMD_all_year <- SA_grid_laea %>%
-  mutate(year = 9999)
-boxplot_WMD <- bind_rows(SA_grid_laea, NASC_all_year) %>%
+boxplot_WMD <- bind_rows(SA_grid_laea) %>%
   mutate(LME = factor(case_when(LME == "BF" ~ "Beaufort Sea",
                                 LME == "NAR" ~ "Nares Strait",
                                 LME == "BB" ~ "Baffin Bay",
@@ -1144,14 +905,14 @@ boxplot_WMD <- bind_rows(SA_grid_laea, NASC_all_year) %>%
                                  "All areas")),
     year = factor(year, levels = c(2015, 2016, 2017, 9999))) %>%
   ggplot(aes(x = LME)) +
-  geom_boxplot(aes(y = CM, col = year),
+  geom_boxplot(aes(y = CM, col = LME),
                size = 0.4, outlier.size = 0.7,
                alpha = 0.8, position = position_dodge(preserve = "single")) +
+  scale_x_discrete(labels = c("BF", "NAR", "BB", "BA")) +
   scale_y_reverse() +
-  scale_colour_manual(values =  c("#132B69", "#03739B", 
-                                  "#93AA43", "grey50"),
+  scale_colour_manual(values =  c("#132B69", "grey50", "#03739B", "#93AA43"),
                       labels = c("2015", "2016", "2017", "All years")) +
-  theme(legend.position = "right",
+  theme(legend.position = "none",
         axis.title.x = element_blank(),
         legend.title = element_blank(),
         legend.key.width = unit(0.15, "in"),
@@ -1159,7 +920,7 @@ boxplot_WMD <- bind_rows(SA_grid_laea, NASC_all_year) %>%
         plot.margin = unit(c(0.1, 0.1, 0, 0), "in"))
 # Save and display plot
 ggsave("plots/boxplot_WMD.png", boxplot_WMD,
-       height = 2.5, width = 6.5, dpi = 600, units = "in")
+       height = 2.5, width = 3.5, dpi = 600, units = "in")
 boxplot_WMD
 ```
 
@@ -1175,7 +936,8 @@ col_pal <- c("(250,300]" = "#F0F921FF",
              "(550,600]" = "#0D0887FF")
 
 map_WMD <- SA_grid_laea %>%
-  mutate(CM_d = cut(CM, seq(250,600,50))) %>%
+  mutate(CM_d = cut(CM, seq(250,600,50)),
+         CM_d = if_else(CM > 550, "(550,600]", as.character(CM_d))) %>%
   ggplot(aes(x = xc,  y = yc)) +
   geom_raster(data = bathy_laea, aes(x = xc, y = yc, fill = depth_d), 
               alpha = 0.8) + # bathy
@@ -1197,9 +959,9 @@ map_WMD <- SA_grid_laea %>%
                                "(450,500]", "(500,550]", 
                                "(550,600]"),
                     values = col_pal,
-                    labels = c("251-300", "301-350", "351-400", 
+                    labels = c("< 301", "301-350", "351-400", 
                                   "401-450", "451-500", "501-550", 
-                                  "551-600")) +
+                                  "> 550")) +
   geom_point(aes(x = 0, y = 0), shape = 23, stroke = 0.2, col = "white",
              fill = "#C26744") +
   facet_wrap(~ year) +
@@ -1301,6 +1063,240 @@ data.frame(year=c(rep(2015,3), rep(2016,3), rep(2017,3)),
 
 
 # OLD PLOTS
+## LM map DSL
+
+```{r LM-SA-latitude}
+col_pal <- c("#132B69", "#03739B", "#93AA43", "black")
+lm_SA_lat <- LM_area_res %>%
+  ggplot() + 
+  geom_point(data = SA_lm, aes(x = lat, y = SA_int, col = LME, shape = shape,
+                               size = shape),
+             alpha = 0.7) +
+  geom_line(aes(x = lat, y = .fitted, col = LME), size = 0.6) + 
+  geom_ribbon(aes(x = lat, ymin = .lower, ymax = .upper,
+                  group = LME, fill = LME),
+              alpha = 0.15) +
+  scale_x_continuous("Latitude (°N)", breaks = seq(0, 90, 2)) + 
+  # scale_y_continuous(expression("S"[A]*" (dB re 1 m"^2*" nmi"^-2*")")) + 
+  scale_y_continuous(
+    expression("S"[A]*" (dB re 1 m"^2*" nmi"^-2*")"),
+    position = "left",
+    sec.axis = 
+      sec_axis(trans = ~10^(./10), 
+               name = expression("s"[A]*" ( m"^2*" nmi"^-2*")"),
+               breaks = c(1, 5, 10, 50, 100, 500, 1000, 5000, 10000))) +
+  scale_shape_manual(values = c(17, 16)) +
+  scale_size_manual(values = c(1.5, 1)) +
+  scale_colour_manual("LME", values = col_pal) +
+  scale_fill_manual("LME", values = col_pal) +
+  coord_cartesian(ylim = c(-3, 42)) +
+  guides(fill = "none", shape = "none", size = "none") +
+  theme(legend.position = "right", 
+        legend.title = element_blank(),
+        legend.key.height = unit(0.15, "in"), 
+        legend.key.width = unit(0.15, "in"), 
+        panel.border = element_blank(),
+        axis.line = element_line())
+# Save and display plot
+ggsave("plots/Figure_LM_SA_lat.png", lm_SA_lat, 
+       height = 2.5, width = 6.5, dpi = 600, units = "in")
+lm_SA_lat
+```
+
+```{r}
+SA_grid_50 %>%
+  ggplot(aes(x = lat, y = SA_int, col = LME)) + 
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "lm")
+```
+
+## Map and Boxplot
+
+```{r fig3-boxplot-NASC, fig.width=6, fig.height=5}
+# Map NASC
+map_DSL <- SA_grid_laea %>% 
+  mutate(NASC_int_d = cut(NASC_int, c(0, 1, 10, 100, 1000, 10000, Inf))) %>%
+  ggplot(aes(x = xc,  y = yc)) +
+  geom_raster(data = bathy_laea, aes(x = xc, y = yc, fill = depth_d),
+              alpha = 0.8) + # bathy
+  scale_fill_grey("Depth (m)", start = 0.9, end = 0.3) +
+  guides(fill = "none") + 
+  new_scale_fill() + 
+  geom_polygon(data = LME, aes(x = xc, y = yc, group = group), 
+               col = "black", fill = NA, lwd = 0.3, alpha = 1) + # LME
+  geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), 
+               fill = "grey25") + # Coast
+  # geom_point(aes(col = NASC_int_d), size = 0.6) +
+  # scale_color_viridis_d(option = "plasma", 
+  #                       labels = c("< 1", "1-10", "11-100", "101-1000", 
+  #                                  "1001-10000", "> 10000")) +
+  geom_tile(aes(fill = NASC_int_d), size = 0.2, alpha = 0.8, col = "white") +
+  scale_fill_viridis_d(option = "viridis", 
+                       labels = c("< 1", "1-10", "11-100", "101-1000", 
+                                  "1001-10000", "> 10000")) +
+  facet_wrap(~ year) +
+  coord_fixed(xlim = c(-2450, 650), ylim = c(-1500, 1850), expand = F) +
+  guides(fill = guide_legend(override.aes = list(size = 2), 
+                               nrow = 1)) + 
+  # guides(fill = "none",
+  #        colour = guide_legend(override.aes = list(size = 2), 
+  #                              nrow = 1)) + # Increase symbol size in legend
+  theme(legend.position = "top",
+        legend.title = element_blank(),
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        axis.title = element_blank())
+# Bxplot SA
+p_boxplot_SA <-
+  SA_grid_laea %>% # Boxplot of SA per region
+  mutate(LME = factor(case_when(LME == "BF" ~ "Beaufort Sea",
+                                LME == "NAR" ~ "Nares Strait",
+                                LME == "BB" ~ "Baffin Bay",
+                                LME == "SV" ~ "Barents Sea"),
+                      levels = c("Beaufort Sea", "Nares Strait", 
+                                 "Baffin Bay", "Barents Sea"))) %>%
+  ggplot(aes(x = LME, y = SA_int)) + 
+  geom_boxplot(position = position_dodge(preserve = "single")) +
+  scale_y_continuous(expression("S"[A]*" (dB re 1 m"^2*" nmi"^-2*")")) +
+  theme(panel.border = element_blank(),
+        axis.title.x = element_blank(),
+        axis.line = element_line(),
+        legend.title = element_blank(), 
+        # legend.position = "none",
+        plot.margin = unit(c(0.1, 0.1, 0, 0), "in"))
+# Combine plots
+p_map_SA_DSL <- plot_grid(map_DSL, p_boxplot_SA, 
+                          ncol = 1, align = "v", axis = "lr",
+                          labels = "auto", label_size = 9) 
+# Save and display plots
+ggsave("plots/Fig3_map_boxplot_SA.png", p_map_SA_DSL,
+       height = 5, width = 6, dpi = 600, units = "in")
+p_map_SA_DSL
+```
+
+## Map and Points
+
+```{r fig3-map-points}
+map_DSL <- SA_grid_laea %>% 
+  mutate(NASC_int_d = cut(NASC_int, c(0, 1, 10, 100, 500, 1000, Inf))) %>%
+  ggplot(aes(x = xc,  y = yc)) +
+  geom_raster(data = bathy_laea, aes(x = xc, y = yc, fill = depth_d), 
+              alpha = 0.8) + # bathy
+  scale_fill_grey("Depth (m)", start = 0.9, end = 0.3) +
+  guides(fill = "none") + 
+  new_scale_fill() + 
+  geom_polygon(data = LME, aes(x = xc, y = yc, group = group), 
+               col = "black", fill = NA, lwd = 0.3, alpha = 1) + # LME
+  geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), 
+               fill = "grey25") + # Coast
+  geom_tile(aes(fill = NASC_int_d), size = 0.2, col = "white") +
+  scale_fill_viridis_d(expression("s"[A]*" ( m"^2*" nmi"^-2*")"),
+                       option = "viridis",
+                       labels = c("< 1", "1-10", "11-100", "101-500",
+                                  "501-1000", "> 1000")) +
+  geom_point(aes(x = 0, y = 0), size = 0.05) +
+  facet_wrap(~ year) +
+  coord_fixed(xlim = c(-2450, 650), ylim = c(-1500, 1850), expand = F) +
+  theme(legend.position = "right",
+        legend.key.height = unit(0.15, "in"),
+        legend.key.width = unit(0.15, "in"),
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        axis.title = element_blank())
+
+pointrange_NASC <- SA_grid_laea %>% # Pointrange of SA per region
+  mutate(LME = factor(case_when(LME == "BF" ~ "Beaufort Sea",
+                                LME == "NAR" ~ "Nares Strait",
+                                LME == "BB" ~ "Baffin Bay",
+                                LME == "SV" ~ "Barents Sea"),
+                      levels = c("Beaufort Sea", "Nares Strait", 
+                                 "Baffin Bay", "Barents Sea"))) %>%
+  group_by(LME, year) %>% # Median per year
+  summarise(NASC_median = median(NASC_int, na.rm = T),
+            NASC_mean = mean(NASC_int, na.rm = T),
+            NASC_q025 = quantile(NASC_int, 0.025),
+            NASC_q975 = quantile(NASC_int, 0.975)) %>%
+  ungroup() %>%
+  group_by(LME) %>% # Mean per area
+  summarise(NASC_median = mean(NASC_median, na.rm = T),
+            NASC_mean = mean(NASC_mean, na.rm = T),
+            NASC_q025 = min(NASC_q025, na.rm = T),
+            NASC_q975 = max(NASC_q975, na.rm = T)) %>%
+  ungroup() %>%
+  ggplot(aes(x = LME)) +
+  geom_point(aes(y = 10 * log10(NASC_mean)), 
+             shape = 18, size = 4.5, col = "black") +
+  geom_pointrange(aes(y = 10 * log10(NASC_median),
+                      ymin = 10 * log10(NASC_q025), 
+                      ymax = 10 * log10(NASC_q975)),
+                  col = "black", fill = "white", shape = 21) +
+  scale_y_continuous(
+    expression("S"[A]*" (dB re 1 m"^2*" nmi"^-2*")"),
+    sec.axis = 
+      sec_axis(trans = ~10^(./10), 
+               name = expression("s"[A]*" ( m"^2*" nmi"^-2*")"),
+               breaks = c(1, 5, 10, 50, 100, 500, 1000, 5000, 10000, 50000))) +
+  theme(axis.title.x = element_blank(),
+        plot.margin = unit(c(0.1, 0.1, 0, 0), "in"))
+# Combine plots
+p_map_pointrange_NASC <- plot_grid(pointrange_NASC, map_DSL,
+                                   ncol = 1, align = "v", axis = "lr",
+                                   labels = "auto", label_size = 9) 
+# Save and display plot
+ggsave("plots/Fig3_map_pointrange_NASC.png", p_map_pointrange_NASC, 
+       height = 5, width = 6.5, dpi = 600, units = "in")
+p_map_pointrange_NASC
+```
+
+## Just points
+
+```{r fig3-points}
+pointrange_NASC <- SA_grid_laea %>% # Pointrange of SA per region
+  dplyr::select(year, LME, NASC_int) %>%
+  mutate(LME = factor(case_when(LME == "BF" ~ "Beaufort Sea",
+                                LME == "NAR" ~ "Nares Strait",
+                                LME == "BB" ~ "Baffin Bay",
+                                LME == "SV" ~ "Northern\nBarents Sea"),
+                      levels = c("Beaufort Sea", "Nares Strait",
+                                 "Baffin Bay", "Northern\nBarents Sea")),
+         year = factor(year)) %>%
+  group_by(LME, year) %>% # Median per year
+  summarise(NASC_median = median(NASC_int, na.rm = T),
+            NASC_mean = mean(NASC_int, na.rm = T),
+            NASC_q025 = quantile(NASC_int, 0.025),
+            NASC_q975 = quantile(NASC_int, 0.975)) %>%
+  ungroup() %>%
+  group_by(LME) %>% # Mean per area
+  summarise(NASC_median = mean(NASC_median, na.rm = T),
+            NASC_mean = mean(NASC_mean, na.rm = T),
+            NASC_q025 = min(NASC_q025, na.rm = T),
+            NASC_q975 = max(NASC_q975, na.rm = T)) %>%
+  ungroup() %>%
+  ggplot(aes(x = LME)) +
+  geom_point(aes(y = 10 * log10(NASC_mean), col = LME),
+             shape = 18, size = 4.5) +
+  geom_pointrange(aes(y = 10 * log10(NASC_median),
+                      ymin = 10 * log10(NASC_q025),
+                      ymax = 10 * log10(NASC_q975), 
+                      col = LME),
+                  fill = "white", shape = 21) +
+  scale_y_continuous(
+    expression("S"[A]*" (dB re 1 m"^2*" nmi"^-2*")"),
+    position = "left",
+    sec.axis = 
+      sec_axis(trans = ~10^(./10), 
+               name = expression("s"[A]*" ( m"^2*" nmi"^-2*")"),
+               breaks = c(1, 5, 10, 50, 100, 500, 1000, 5000, 10000))) +
+  scale_colour_manual(values =  c("#132B69", "black", "#03739B", "#93AA43")) +
+  theme(legend.position = "none",
+        axis.title.x = element_blank(),
+        plot.margin = unit(c(0.1, 0.1, 0, 0), "in"))
+# Save and display plot
+ggsave("plots/Fig3_pointrange_NASC.png", pointrange_NASC,
+       height = 2.5, width = 4.5, dpi = 600, units = "in")
+pointrange_NASC
+```
+
 ## OLD Figure 1. Bathy map with sampling locations
 
 Careful this map takes forever to compute (\> 18 h) when bathy has to be drawn.

@@ -92,20 +92,21 @@ Acoustic data were collected continuously at 38 kHz. We selected data when the s
 
 ```{r MVBS-loading-tidying, message=FALSE}
 # Load and tidy files
-MVBS_raw <- list.files("C:/Users/cfer/PhD/Chapt 2 - Arctic Mesopelagic DSL/data/acoustics/90dB threshold",
+MVBS_raw <- list.files("C:/Users/cfer/PhD/Chapt 2 - Arctic Mesopelagic DSL/data/acoustics/82dB threshold",
 # MVBS_raw <- list.files("D:/Travail/PhD/Chapt 2 - Arctic Mesopelagic DSL/data/acoustics/90dB threshold", 
                        pattern = "*.csv", full.names = TRUE) %>% 
   set_names() %>%
   map_dfr(.f = ~ read_csv(., show_col_types = FALSE), 
           .id = "filename") %>% # read file
-  dplyr::select(-Interval, -Layer, -Dist_S, -Sv_min, -Sv_max) %>%
+  dplyr::select(-Interval, -Layer, -Dist_S,
+                -Sv_min, -Sv_max, -Process_ID) %>%
   rename("layer_depth_min" = "Layer_depth_min",
          "layer_depth_max" = "Layer_depth_max",
          "lat" = "Lat_S",
          "lon" = "Lon_S",
          "frequency" = "Frequency") %>%
   unite(date, Date_S, Time_S, sep = " ", remove = FALSE) %>%
-  mutate(filename = str_remove(filename, pattern = "C:/Users/cfer/PhD/Chapt 2 - Arctic Mesopelagic DSL/data/acoustics/90dB threshold"),
+  mutate(filename = str_remove(filename, pattern = "C:/Users/cfer/PhD/Chapt 2 - Arctic Mesopelagic DSL/data/acoustics/82dB threshold"),
          date = ymd_hm(format(ymd_hms(date, tz = "UTC"), 
                               format = '%Y%m%d %H:%M'), tz = "UTC"),
          Date_S = as.character(ymd(Date_S)),
@@ -292,7 +293,7 @@ Instead of rasterizing data and having the mean value of each grid cell of the r
 
 More info on this projection can be found on the [NSIDC website](https://nsidc.org/data/ease/).I calculate the median Sv for each depth interval of each georeferenced grid cell.
 
-```{r 3D-EPSG-6931-acoustic-grid, eval = F}
+```{r 3D-EPSG-6931-acoustic-grid, eval=F}
 # Sv_grid_laea <- data.frame() # Empty dataframe that will be filled with gridded CTD data
 # 
 # for (i in seq(2015, 2017, 1)) { # Loop through every year

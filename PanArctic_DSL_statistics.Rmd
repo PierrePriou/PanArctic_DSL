@@ -1189,7 +1189,7 @@ summary(GAMSA_I2)
 Compare models
 
 ```{r summary-GAMSAI}
-# # Summary metrics
+# Summary metrics
 GAMSAI_AIC <- AIC(GAMSA_I, GAMSA_I2) %>%
   rownames_to_column() %>%
   rename(model = rowname)
@@ -1222,7 +1222,7 @@ Refit model with REML
 ```{r fit-GAMSAI3-reml}
 GAMSA_I3 <- gam(SA_int ~
                   s(year, bs = "re") +
-                  # s(LME, bs = "re") +
+                  s(LME, bs = "re") +
                   s(v, by = LME, k = 5, bs = "tp"),
                 data = SA_df, family = "gaussian", method = "REML")
 summary(GAMSA_I3)
