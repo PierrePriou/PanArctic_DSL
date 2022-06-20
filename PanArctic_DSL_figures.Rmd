@@ -683,8 +683,8 @@ map_RA <- trawl_station_df %>%
   # col = "green") +
   scale_fill_manual(values = met.brewer("Johnson", n = 5, direction = -1)) +
   coord_fixed(xlim = c(-2450, 650), ylim = c(-1500, 1850), expand = F) +
-  geom_point(aes(x = 0, y = 0), shape = 23, stroke = 0.2, col = "white",
-             fill = "#C26744") +  # Legend over 2 rows
+  # Plot North Pole
+  geom_point(aes(x = 0, y = 0), shape = 4, stroke = 1) +
   guides(fill = guide_legend(nrow = 2, byrow = T)) +
   theme(legend.position = "top", 
         legend.title = element_blank(),
@@ -725,8 +725,8 @@ map_DSL <- SA_grid_laea %>%
                        option = "viridis",
                        labels = c("< 1", "1-10", "11-100", "101-500",
                                   "501-1000", "> 1000")) +
-  geom_point(aes(x = 0, y = 0), shape = 23, stroke = 0.2, col = "white",
-             fill = "#C26744") +
+  # Plot North Pole
+  geom_point(aes(x = 0, y = 0), shape = 4, stroke = 0.5) +
   facet_wrap(~ year) +
   coord_fixed(xlim = c(-2450, 650), ylim = c(-1500, 1850), expand = F) +
   theme(legend.position = "right",
@@ -834,7 +834,14 @@ map_mycto <- data.frame(
           -122.357, # Frosti 2021
           -117.90, # Frosti 2021
           -117.088, # Frosti 2021
-          -135), # Majewski 2017 approximate location
+          -135, # Majewski 2017 approximate location
+          15.2937, # Gjosaeter 2017
+          14.9276, # Gjosaeter 2017
+          5.1679, # Gjosaeter 2017
+          15.2468, # Gjosaeter 2017
+          15.0405, # Gjosaeter 2017
+          5.8664, # Gjosaeter 2017
+          7.5160), # Gjosaeter 2017
   lat = c(78 + (06.02/60), # AWI 1995
           77 + (54.83/60), # AWI 1995
           75.04, # Zhang 2022
@@ -842,17 +849,26 @@ map_mycto <- data.frame(
           70.896, # Frosti 2021
           70.342, # Frosti 2021
           70.332, # Frosti 2021
-          70.5), # Majewski 2017 approximate location)
+          70.5, # Majewski 2017 approximate location)
+          81.5606, # Gjosaeter 2017
+          81.3716, # Gjosaeter 2017
+          79.6945, # Gjosaeter 2017
+          81.3636, # Gjosaeter 2017
+          80.9763, # Gjosaeter 2017
+          79.6613, # Gjosaeter 2017
+          79.6689), # Gjosaeter 2017
   var = c(rep("Chernova & Neyelov 1995", 2), 
           "Zhang et al. 2022", 
           "Snoeijs Leijonmalm et al. 2021", 
           rep("Frosti 2021", 3),
-          "Majewski et al. 2017\n(approximate location)")) %>% 
+          "Majewski et al. 2017\n(approximate location)",
+          rep("Gjøsaeter et al. 2017", 7))) %>% 
   bind_rows(., mycto_trawl) %>%
   # Reorder studies
   mutate(var = 
            factor(var,
                   levels = c("Chernova & Neyelov 1995",
+                             "Gjøsaeter et al. 2017",
                              "Majewski et al. 2017\n(approximate location)",
                              "Geoffroy et al. 2019",
                              "Snoeijs Leijonmalm et al. 2021",
@@ -871,12 +887,16 @@ map_mycto <- data.frame(
   guides(fill = "none") +
   new_scale_fill() +
   geom_polygon(data = LME, aes(x = xc, y = yc, group = group),
-               col = "black", fill = NA, alpha = 0.2, 
-               lwd = 0.5, lty = 1) +
+               col = "black", fill = NA, alpha = 0.2,
+               lwd = 0.35, lty = 1) +
   # Plot coastlines
   geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group),
                fill = "grey30") +
-  geom_point(aes(x = xc, y = yc, fill = var), shape = 21, size = 3, alpha = 0.8) + 
+  # Plot locations of myctophids
+  geom_point(aes(x = xc, y = yc, fill = var), shape = 21,
+             size = 2.5, alpha = 0.8) +
+  # Plot North Pole
+  geom_point(aes(x = 0, y = 0), shape = 4, stroke = 1) +
   coord_fixed(xlim = c(-2450, 1200), ylim = c(-1500, 2000), expand = F) +
   # guides(fill = "none") +
   theme(legend.position = "right", 
@@ -962,8 +982,8 @@ map_WMD <- SA_grid_laea %>%
                     labels = c("< 301", "301-350", "351-400", 
                                   "401-450", "451-500", "501-550", 
                                   "> 550")) +
-  geom_point(aes(x = 0, y = 0), shape = 23, stroke = 0.2, col = "white",
-             fill = "#C26744") +
+  # Plot North Pole
+  geom_point(aes(x = 0, y = 0), shape = 4, stroke = 0.5) +
   facet_wrap(~ year) +
   coord_fixed(xlim = c(-2450, 650), ylim = c(-1500, 1850), expand = F) +
   theme(legend.title = element_text(hjust = 0.5),
@@ -1001,9 +1021,8 @@ map_velo <- phy_grid_laea_hd %>%
   geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), 
                fill = "grey25") + 
   coord_fixed(xlim = c(-2450, 650), ylim = c(-1500, 1850), expand = F) +
-  # North pole
-  geom_point(aes(x = 0, y = 0), shape = 23, stroke = 0.2, col = "white",
-             fill = "#C26744") + 
+  # Plot North Pole
+  geom_point(aes(x = 0, y = 0), shape = 4, stroke = 0.5) +
   # Coords 
   geom_tile(data = SA_df, aes(x = xc, y = yc), fill = NA,
             colour = "red", size = 0.3) + 
