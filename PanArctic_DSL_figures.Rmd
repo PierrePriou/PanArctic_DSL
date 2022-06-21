@@ -784,7 +784,8 @@ GAMSAI_velo <- predSA_I %>%
   filter(var == "v") %>%
   ggplot() +
   # geom_point(data = SA_df, aes(x = v, y = SA_int, col = LME), alpha = 0.5) +
-  geom_line(aes(x = v, y = fitted, col = LME, linetype = LME), 
+  # geom_line(aes(x = v, y = fitted, col = LME, linetype = LME), 
+  geom_line(aes(x = v, y = fitted, col = LME), 
             size = 0.6) +
   geom_ribbon(aes(x = v, ymin = lwr_ci, ymax = upr_ci, fill = LME), 
               alpha = 0.1) +
@@ -821,6 +822,9 @@ GAMSAI_velo
 ## Map myctophid distribution
 
 ```{r map-myctohpid}
+col_pal <- c("#999999", "#E69F00", "#56B4E9", "#009E73",
+          "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+
 mycto_trawl <- trawl_station %>% 
   filter(fish_species == "myctophidae") %>%
   mutate(var = if_else(area == "BB", "This study", "Geoffroy et al. 2019")) %>%
@@ -830,7 +834,7 @@ map_mycto <- data.frame(
   lon = c(133 + (32.27/60), # AWI 1995
           133 + (34.9/60), # AWI 1995
           -179.99, # Zhang 2022
-          25.5, # Snoeijs Leijonmalm et al. 2021
+          25.5, # Snoeijs Leijonmalm et al. 2022
           -122.357, # Frosti 2021
           -117.90, # Frosti 2021
           -117.088, # Frosti 2021
@@ -845,7 +849,7 @@ map_mycto <- data.frame(
   lat = c(78 + (06.02/60), # AWI 1995
           77 + (54.83/60), # AWI 1995
           75.04, # Zhang 2022
-          88.0, # Snoeijs Leijonmalm et al. 2021
+          88.0, # Snoeijs Leijonmalm et al. 20221
           70.896, # Frosti 2021
           70.342, # Frosti 2021
           70.332, # Frosti 2021
@@ -859,7 +863,7 @@ map_mycto <- data.frame(
           79.6689), # Gjosaeter 2017
   var = c(rep("Chernova & Neyelov 1995", 2), 
           "Zhang et al. 2022", 
-          "Snoeijs Leijonmalm et al. 2021", 
+          "Snoeijs Leijonmalm et al. 2022", 
           rep("Frosti 2021", 3),
           "Majewski et al. 2017\n(approximate location)",
           rep("Gjøsaeter et al. 2017", 7))) %>% 
@@ -871,9 +875,9 @@ map_mycto <- data.frame(
                              "Gjøsaeter et al. 2017",
                              "Majewski et al. 2017\n(approximate location)",
                              "Geoffroy et al. 2019",
-                             "Snoeijs Leijonmalm et al. 2021",
-                             "Zhang et al. 2022",
                              "Frosti 2021",
+                             "Snoeijs Leijonmalm et al. 2022",
+                             "Zhang et al. 2022",
                              "This study"))) %>%
   st_as_sf(coords = c("lon", "lat"), crs = crs(arctic_latlon), remove = F) %>%
   st_transform(crs = st_crs(arctic_laea)) %>% # Change projection
@@ -886,9 +890,10 @@ map_mycto <- data.frame(
   scale_fill_grey("Depth (m)", start = 0.9, end = 0.3) +
   guides(fill = "none") +
   new_scale_fill() +
-  geom_polygon(data = LME, aes(x = xc, y = yc, group = group),
-               col = "black", fill = NA, alpha = 0.2,
-               lwd = 0.35, lty = 1) +
+  # Plot LME
+  # geom_polygon(data = LME, aes(x = xc, y = yc, group = group),
+  #              col = "black", fill = NA, alpha = 0.2,
+  #              lwd = 0.35, lty = 1) +
   # Plot coastlines
   geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group),
                fill = "grey30") +
@@ -898,6 +903,7 @@ map_mycto <- data.frame(
   # Plot North Pole
   geom_point(aes(x = 0, y = 0), shape = 4, stroke = 1) +
   coord_fixed(xlim = c(-2450, 1200), ylim = c(-1500, 2000), expand = F) +
+  scale_fill_manual(values = col_pal) +
   # guides(fill = "none") +
   theme(legend.position = "right", 
         legend.title = element_blank(),
