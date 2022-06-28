@@ -81,6 +81,16 @@ LME <- readOGR("data/arctic_regions/LME/LME_2013_polygon.shp",
   fortify() %>% # Convert to dataframe for ggplot
   rename(xc = long, yc = lat)
 
+# Sutton 2017 Mesopelagic ecoregions
+Sutton2017 <- st_read("data/arctic_regions/Sutton 2017/mmc.shp") %>%
+  st_make_valid() %>%
+  # Two regions do not have valid shape so I remove them
+  mutate(row = seq(1,33,1)) %>%
+  filter(!row %in% c(4, 32)) %>%
+  # Calculate area in square km
+  mutate(area = as.numeric(st_area(geometry))/1000) %>% 
+  st_drop_geometry()
+
 # Bathy data
 bathy_df <- getNOAA.ice.bathy(lon1 = -180, lon2 = 180, lat1 = 50, lat2 = 90,
                               resolution = 2, keep = T, path = "data/bathy/") %>%
