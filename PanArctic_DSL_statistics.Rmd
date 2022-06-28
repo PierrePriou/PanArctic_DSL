@@ -459,7 +459,13 @@ SA_BB <- SA_lm %>%
   mutate(mycto_TF = if_else(xc == -2025 & yc == -1275, T, 
                     if_else(xc == -2025 & yc == -1125, T, 
                     if_else(xc == -1875 & yc == -1125, T, 
-                    if_else(xc == -1875 & yc == -975, T,                                         if_else(xc == -1725 & yc == -825, T, F)))))) 
+                    if_else(xc == -1875 & yc == -975, T, 
+                    if_else(xc == -1725 & yc == -825, T, F)))))) 
+# Fit LM
+LM_BB_all <- SA_BB %>%
+  # filter(mycto_TF == T) %>%
+  lm(SA_int ~ lat, data = .)
+summary(LM_BB_all)
 # Fit LM
 LM_BB_myctoT <- SA_BB %>%
   filter(mycto_TF == T) %>%
@@ -488,6 +494,8 @@ SA_BB %>%
 # Save data
 save(LM_area_coefs, LM_area_fit, LM_area_res, SA_lm, 
      file = "data/statistics/LM_results.RData")
+save(SA_BB, LM_BB_all, LM_BB_myctoT, LM_BB_myctoF,
+     file = "data/statistics/LM_BB_results.RData")
 ```
 
 # HGAM - Gamma NASC
