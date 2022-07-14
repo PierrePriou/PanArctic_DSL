@@ -1301,7 +1301,7 @@ trawl_summary <- trawl %>%
 
 # ICES/PICES presentation plots
 
-## Map with currents
+## Maps
 
 ```{r ICES-map-currents, fig.height=4, fig.width=6}
 lat70 <- data.frame(lon = seq(-180, 180, length.out = 1000)) %>%
@@ -1356,11 +1356,11 @@ lon90e <- data.frame(lon = rep(-90, 1000)) %>%
 map_laea <- bathy_laea %>%
   ggplot(aes(x = xc, y = yc)) +
   # Plot bathy
-  geom_raster(aes(fill = depth), alpha = 0.8) +
-  # scale_fill_grey("Depth (m)", start = 0.9, end = 0.3) +
-  scale_fill_cmocean("Depth (m)", name = "deep", limits = c(-4500, 0),
-                     direction = -1, breaks = seq(-6000, 0, 500),
-                     na.value = "#281A2CCC") +
+  geom_raster(aes(fill = depth_d), alpha = 0.8) +
+  scale_fill_grey("Depth (m)", start = 0.9, end = 0.3) +
+  # scale_fill_cmocean("Depth (m)", name = "deep", limits = c(-4500, 0),
+  #                    direction = -1, breaks = seq(-6000, 0, 500),
+  #                    na.value = "#281A2CCC") +
   # guides(fill = "none") + 
   new_scale_fill() +
   # LME
@@ -1401,6 +1401,60 @@ map_laea <- bathy_laea %>%
         axis.title = element_blank())
 ggsave("plots/ICES_base_map_laea.png",
        map_laea, height = 6.5, width = 10, dpi = 600, units = "in")
+
+map_laea <- bathy_laea %>%
+  ggplot(aes(x = xc, y = yc)) +
+  # Plot bathy
+  geom_raster(aes(fill = depth_d), alpha = 0.8) +
+  scale_fill_grey("Depth (m)", start = 0.9, end = 0.3) +
+  new_scale_fill() +
+  # Plot coastlines
+  # geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group),
+  #              fill = "grey30") +
+  coord_fixed(xlim = c(-2800, 2800), ylim = c(-2800, 2800), expand = F) +
+  guides(fill = "none") +
+  # geom_point(aes(x = 0, y = 0), shape = 4, stroke = 0.5) +
+  theme(legend.position = "right", 
+        legend.key.height = unit(0.75, "in"),
+        legend.key.width = unit(0.3, "in"),
+        legend.text = element_text(size = 16),
+        legend.title = element_text(size = 18),
+        panel.border = element_rect(fill = NA),
+        axis.text = element_blank(),
+        axis.ticks = element_blank(), 
+        axis.title = element_blank())
+ggsave("plots/ICES_base_map_laea_bathy_only.png",
+       map_laea, height = 6.5, width = 10, dpi = 600, units = "in")
+
+map_laea <- bathy_laea %>%
+  ggplot(aes(x = xc, y = yc)) +
+  # # Plot bathy
+  # geom_raster(aes(fill = depth_d), alpha = 0.8) +
+  # scale_fill_grey("Depth (m)", start = 0.9, end = 0.3) +
+  # new_scale_fill() +
+  # Plot coastlines
+  geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group),
+               fill = "grey30") +
+  coord_fixed(xlim = c(-2800, 2800), ylim = c(-2800, 2800), expand = F) +
+  guides(fill = "none") +
+  geom_path(data = arctic_circle_laea, aes(x = xc, y = yc), 
+            col = "white", lty = 2, size = 0.6) +
+  # geom_point(aes(x = 0, y = 0), shape = 4, stroke = 0.5) +
+  theme(legend.position = "right", 
+        plot.background = element_rect(fill = "transparent", colour = NA),
+        panel.background = element_rect(fill = "transparent", colour = NA),
+        legend.key.height = unit(0.75, "in"),
+        legend.key.width = unit(0.3, "in"),
+        legend.text = element_text(size = 16),
+        legend.title = element_text(size = 18),
+        panel.border = element_rect(fill = NA),
+        axis.text = element_blank(),
+        axis.ticks = element_blank(), 
+        axis.title = element_blank())
+ggsave("plots/ICES_base_map_laea_land_only.png", bg = 'transparent',
+       map_laea, height = 6.5, width = 10, dpi = 600, units = "in")
+
+
 # col_pal <- c("#999999", "#E69F00", "#56B4E9", "#009E73",
 #           "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
 # 
@@ -1457,8 +1511,155 @@ ggsave("plots/ICES_base_map_laea.png",
 #        map_laea_lon, height = 4, width = 6, dpi = 600, units = "in")
 ```
 
+## Boxplot NASC without Nares
 
+```{r ICES-boxplot-LM}
+boxplot_NASC <- SA_grid_laea %>%
+  filter(LME != "NAR") %>%
+  mutate(LME = factor(case_when(LME == "BF" ~ "Beaufort Sea",
+                                LME == "NAR" ~ "Nares Strait",
+                                LME == "BB" ~ "Baffin Bay",
+                                LME == "SV" ~ "Northern\nBarents Sea",
+                                LME == "All areas" ~ "All areas",),
+                      levels = c("Beaufort Sea", "Nares Strait", 
+                                 "Baffin Bay", "Northern\nBarents Sea",
+                                 "All areas")),
+    year = factor(year)) %>%
+  group_by(LME) %>%
+  mutate(mean_NASC = mean(NASC_int)) %>%
+  ggplot(aes(x = LME)) +
+  geom_boxplot(aes(y = 10*log10(NASC_int), col = LME),
+               # size = 0.4, outlier.size = 0.7,
+               alpha = 0.8, position = position_dodge(preserve = "single")) +
+  geom_point(aes(y = 10*log10(mean_NASC), fill = LME), shape = 23, size = 2.5) +
+  # scale_x_discrete(labels = c("BF", "BB", "BA")) +
+  scale_y_continuous(
+    expression("IntegratedS"[A]*"\n(dB re 1 m"^2*" nmi"^-2*")"),
+    position = "left",
+    breaks = seq(0, 40, 10))+
+  scale_colour_manual(values =  c("#132B69", "#03739B", "#93AA43")) +
+  scale_fill_manual(values =  c("#132B69", "#03739B", "#93AA43")) +
+  coord_cartesian(ylim = c(-4.5, 44.5)) +
+  theme(legend.position = "none",
+        axis.text = element_text(size = 14),
+        axis.title = element_text(size = 16),
+        axis.title.x = element_blank(),
+        legend.title = element_blank(),
+        panel.border = element_blank(),
+        axis.line = element_line(size = 0.5),
+        legend.key.width = unit(0.15, "in"),
+        legend.key.height = unit(0.15, "in"),
+        plot.margin = unit(c(0.1, 0.1, 0, 0), "in"))
 
+# LM
+col_pal <- c("#132B69", "#03739B", "#93AA43", "black")
+lm_SA_lat <- LM_area_res %>%
+  ggplot() + 
+  geom_point(data = subset(SA_lm, LME != "Nares Strait"),
+             aes(x = lat, y = SA_int, col = LME, shape = shape),
+             alpha = 0.5, size = 3) +
+  geom_line(aes(x = lat, y = .fitted, col = LME), size = 1) + 
+  geom_ribbon(aes(x = lat, ymin = .lower, ymax = .upper,
+                  group = LME, fill = LME),
+              alpha = 0.15) +
+  scale_x_continuous("Latitude (°N)", breaks = seq(0, 90, 2)) + 
+  scale_y_continuous(expression("S"[A]*" (dB re 1 m"^2*" nmi"^-2*")")) +
+  # scale_shape_manual("LME", values = c(17, 16)) +
+  scale_colour_manual("LME", values = col_pal) +
+  scale_fill_manual("LME", values = col_pal) +
+  coord_cartesian(ylim = c(-4.5, 44.5)) +
+  guides(fill = "none", shape = "none") +
+  theme(legend.position = "top", 
+        legend.title = element_blank(),
+        legend.key.height = unit(0.15, "in"), 
+        legend.key.width = unit(0.15, "in"), 
+        legend.text = element_text(size = 14),
+        panel.border = element_blank(),
+        axis.line = element_line(),
+        axis.text = element_text(size = 14),
+        axis.title = element_text(size = 16),
+        axis.title.y = element_blank())
+# Combine plots
+p_boxplot_NASC_LM <- plot_grid(boxplot_NASC, lm_SA_lat, rel_widths = c(0.4, 0.7),
+                               ncol = 2, align = "hv", axis = "tblr")
+# Save and display plot
+ggsave("plots/ICES_boxplot_SA_LM.png", p_boxplot_NASC_LM,
+       height = 4.5, width = 13, dpi = 600, units = "in")
+```
+
+## Current velocity
+
+```{r}
+# Map current velocity
+map_velo <- phy_grid_laea_hd %>%
+  filter(depth == 318 & year == 2017) %>%
+  ggplot() +
+  # Bathymetry
+  # geom_raster(data = bathy_laea, aes(x = xc, y = yc, fill = depth_d),
+  #             alpha = 0.8) +
+  # scale_fill_grey("Depth (m)", start = 0.9, end = 0.3) +
+  # guides(fill = "none") +
+  # new_scale_fill() +
+  # Velocity
+  geom_tile(aes(x = xc, y = yc, fill = v_mean * 100)) + 
+  scale_fill_cmocean(expression("Velocity\n(cm s"^-1*")"),
+                       name = "speed", limits = c(0, 4.5),
+                       na.value = "#172313FF") +
+  # Coastlines
+  geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group), 
+               fill = "grey25") + 
+  coord_fixed(xlim = c(-2450, 1200), ylim = c(-2000, 1950), expand = F) +
+  # Plot North Pole
+  geom_point(aes(x = 0, y = 0), shape = 4, stroke = 0.5) +
+  theme(legend.title = element_text(hjust = 0.5),
+        legend.key.width = unit(0.1, "in"),
+        legend.position = "none",
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        axis.title = element_blank())
+
+# Save and display plot
+ggsave("plots/ICES_map_velo.png", map_velo, 
+       height = 2.5, width = 2.5, dpi = 600, units = "in")
+# map_velo
+```
+
+## GAM
+
+```{r ICES-HGAM-plot}
+# GAM velocity
+ICES_GAMSAI_velo <- predSA_I %>%
+  filter(var == "v") %>%
+  ggplot() +
+  # geom_point(data = SA_df, aes(x = v, y = SA_int, col = LME), alpha = 0.5) +
+  geom_line(aes(x = v, y = fitted, col = LME, linetype = LME),
+  # geom_line(aes(x = v, y = fitted, col = LME),
+            size = 0.6) +
+  geom_ribbon(aes(x = v, ymin = lwr_ci, ymax = upr_ci, fill = LME), 
+              alpha = 0.1) +
+  scale_colour_manual(name = "LME",
+                      values = met.brewer("Johnson", n = 6, direction = -1)) +
+  scale_fill_manual(name = "LME",
+                    values = met.brewer("Johnson", n = 6, direction = -1)) +
+  coord_cartesian(xlim = c(-0.05, 4.6), ylim = c(-2, 32), expand = F) +
+  scale_x_continuous(breaks = seq(0, 10, 0.5)) +
+  # scale_y_continuous(expression("S"[A]*" (dB re 1 m"^2*" nmi"^-2*")")) +
+  scale_linetype_manual(name = "LME", values = c(2, 2, 1)) +
+  labs(x = expression("Current velocity at 318 m (cm s"^-1*")"),
+       y = expression("S"[A]*" (dB re 1 m"^2*" nmi"^-2*")")) +
+  theme(panel.border = element_blank(),
+        axis.line = element_line(),
+        legend.title = element_blank(),
+        legend.position = "top",
+        legend.text = element_text(size = 14),
+        axis.text = element_text(size = 14),
+        axis.title = element_text(size = 16),
+        plot.margin = unit(c(0, 0, 0, 0), "in"))
+# Save and display plot
+ggsave("plots/ICES_HGAM_SAI3.png", ICES_GAMSAI_velo, 
+       height = 3.5, width = 8, dpi = 600, units = "in")
+ICES_GAMSAI_velo
+```
 # OLD PLOTS
 ## LM map DSL
 
@@ -1469,7 +1670,7 @@ lm_SA_lat <- LM_area_res %>%
   geom_point(data = SA_lm, aes(x = lat, y = SA_int, col = LME, shape = shape,
                                size = shape),
              alpha = 0.7) +
-  geom_line(aes(x = lat, y = .fitted, col = LME), size = 0.6) + 
+  geom_line(aes(x = lat, y = .fitted, col = LME), size = 1) + 
   geom_ribbon(aes(x = lat, ymin = .lower, ymax = .upper,
                   group = LME, fill = LME),
               alpha = 0.15) +
