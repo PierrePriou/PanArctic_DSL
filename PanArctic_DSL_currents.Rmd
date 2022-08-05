@@ -1,0 +1,253 @@
+---
+title: "Pan-Arctic DSL - Arctic current velocities and directions"
+author: "Pierre Priou - pierre.priou@mi.mun.ca"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    code_folding: show
+    toc: true
+    toc_float: true
+    toc_collapsed: true
+---
+
+```{r load-packages, message=FALSE}
+library(tidyverse)
+library(dtplyr)
+library(lubridate)
+library(plotly)
+library(cowplot)
+library(raster)
+library(sf)
+library(metR)
+library(cmocean)
+library(tidync)
+```
+
+```{r figure-theme}
+theme_set(theme_bw())
+theme_update(panel.border = element_blank(), 
+             axis.line = element_line(),
+             axis.text = element_text(size = 10),
+             axis.title = element_text(size = 11),
+             legend.title = element_text(size = 11),
+             strip.text.x = element_text(size = 11, face = "plain", 
+                                         hjust = 0.5),
+             strip.background = element_rect(colour = "transparent", 
+                                             fill = "transparent"),
+             legend.margin = margin(0, 0, 0, 0),
+             legend.box.margin = margin(0, 0, -8, 0),
+             plot.margin = unit(c(0.075, 0.075, 0.075, 0.075), "in"))
+```
+
+# Aim
+
+This document creates maps of annual mean current velocity and directions in 2015, 2016, and 2017. 
+
+# NetCDF to csv
+
+First I convert Arctic Ocean Physics Reanalysis data from NetCDF to csv files. 
+
+```{r NetCDF-csv, eval=FALSE}
+# Empty dataframe
+velo <- data.frame() 
+
+# List files per year
+file_list <- list.files("data/ocean_currents/nc", pattern = "*.nc", full.names = T) 
+
+# Loop through each file
+for (i in file_list) { 
+  
+  # Temperature, salinity, depth, and current velocity
+  velo_tmp <- tidync(i) %>%
+    activate("D0,D1,D3,D2") %>% 
+    hyper_tibble()
+  
+  # Coordinates
+  coord_tmp <- tidync(i) %>%
+    activate("D0,D1") %>% 
+    hyper_tibble() %>%
+    # Find extent of grid
+    mutate(xmin = min(x),
+           xmax = max(x),
+           ymin = min(y), 
+           ymax = max(y))
+  
+  # Retrieve projection details
+  r <- terra::rast(i)
+  proj_tmp <- tibble(proj = crs(r, proj = T),
+                     res_x = r@ptr$res[1],
+                     res_y = r@ptr$res[2])
+
+  # Combine datasets
+  tmp <- left_join(velo_tmp, coord_tmp, by = c("x", "y")) %>%
+    # Add projection details
+    bind_cols(., proj_tmp) %>%
+    # Calculate date and add extents
+    mutate(date = as.POSIXct(time * 3600, origin = "1950-01-01 00:00:00", tz = "UTC")) %>%
+    # Rename variables
+    rename(lat = latitude, 
+           lon = longitude) %>%
+    # Only keep velocity data 
+    dplyr::select(date, lat, lon, x, y, depth, vxo, vyo, proj, res_x, res_y,
+                  xmin, xmax, ymin, ymax)
+  
+  # Append data in a single file
+  velo <- bind_rows(velo, tmp)
+  print(paste0("Processing of ", i, " over."))
+}
+
+# Write csv file
+write_csv(velo, file = "data/ocean_currents/velocity_318m_CMEMS.csv")
+
+rm(velo, file_list, i, velo_tmp, coord_tmp, r, proj_tmp, tmp)
+```
+
+# Data tidying
+
+I load the csv file and tidy it. 
+
+```{r load-data}
+# List files
+velo_raw <- read_csv("data/ocean_currents/velocity_318m_CMEMS.csv", show_col_types = F)
+
+# Get projection, cell resolution, and extents of data
+proj_current <- velo_raw$proj[1]
+res_current <- c(velo_raw$res_x[1], velo_raw$res_x[1])
+extent_current <- c(velo_raw$xmin[1], velo_raw$xmax[1], velo_raw$ymin[1], velo_raw$ymax[1])
+
+# Remove projection variables from tibble
+velo <- velo_raw %>%
+  dplyr::select(-proj, -res_x, -res_y) %>%
+  # Add month and year, and calculate velocity (in m/s)
+  mutate(year = year(date),
+         month = month(date),
+         velocity = sqrt(vxo^2 + vyo^2))
+```
+
+The original projection of the data is: *`r proj_current`*
+
+Each pixel represents a `r paste0(res_current[1] * 100, " km x ", res_current[2] * 100, " km")` cell.
+
+The variables are:
+
+-   time: time in hours since 1950-01-01 00:00:00
+-   latitude: latitude
+-   longitude: longitude
+-   x: x-coordinate (polar stereographic x coordinate)
+-   y: y-coordinate (polar stereographic y coordinate)
+-   vxo: Zonal velocity m/s (x)
+-   vyo: Meridional velocity m/s (y)
+
+```{r load-coastline-data, message=FALSE, warning=FALSE, include=FALSE}
+proj_coast <- raster(extent(extent_current), crs = proj_current, resolution = res_current)
+
+# Coastline shapefile
+coast <- rgdal::readOGR("data/bathy/ne_10m_land.shp", verbose = F) %>% 
+  # spTransform(CRSobj = crs("EPSG:4326")) %>% 
+  crop(extent(-180, 180, 0, 90)) %>%
+  # Project shapefile in new proj
+  spTransform(CRSobj = crs(proj_current)) %>% 
+  # Convert to a dataframe for ggplot
+  fortify() %>% 
+  rename(x = long, y = lat) %>%
+  mutate(x = x * 10^-5,
+         y = y * 10^-5)
+
+rm(proj_coast)
+```
+
+Here is a plot of current velocity at 318 m depth in October 2016.
+
+```{r plot-velocity-oct-2016-12.5km, fig.height=8.5, fig.width=10}
+velo %>%
+  filter(year == 2016 & month == 10) %>%
+  ggplot(aes(x = x, y = y)) +
+  geom_tile(aes(fill = velocity), alpha = 0.8) +
+  geom_polygon(data = coast, aes(x = x, y = y, group = group), fill = "grey30") +
+  geom_vector(aes(dx = vxo, dy = vyo, mag = velocity), 
+              arrow.angle = 30, arrow.type = "open", arrow.length = 1,
+              pivot = 0, preserve.dir = TRUE, direction = "ccw") +
+  scale_color_viridis_c(option = "turbo", 
+                        limits = c(0, 0.075), oob = scales::squish) + 
+  scale_fill_cmocean(name = "speed") +
+  coord_fixed(xlim = c(-27, 27), ylim = c(-35, 18), expand = F) +
+  guides(mag = "none", alpha = "none") +
+  theme(axis.title = element_blank(),
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        panel.border = element_rect(fill = NA, size = 0.3))
+```
+
+# Reduce data resolution
+
+Define projections. 
+
+```{r current-projection}
+# Set current projection (12.5 x 12.5 km)
+r_current <- raster(extent(extent_current), crs = proj_current, resolution = res_current)
+
+# Set new projection 
+res_new <- c(1, 1)
+r_new <- raster(extent(extent_current), crs = proj_current, resolution = res_new)
+```
+
+Calculate the mean velocity and direction for each grid cell per year.
+
+```{r rasterize-data}
+# Empty dataframe
+velo_new <- data.frame()
+
+# Loop through each year
+for (i in seq(2015, 2017, 1)) {
+  
+  # Select data of that year
+  data_tmp <- velo %>%
+    filter(year == i)
+  
+  # Convert to spatial data
+  velo_tmp <- SpatialPointsDataFrame(
+    SpatialPoints(cbind(data_tmp$x, data_tmp$y), proj4string = crs(r_current)),
+    data.frame(lat = data_tmp$lat,
+               lon = data_tmp$lon,
+               vxo = data_tmp$vxo,
+               vyo = data_tmp$vyo)) %>%
+    # Rasterize on the 100 x 100 km cells
+    rasterize(., r_new, fun = mean, na.rm = T) %>% 
+    # Remove ID layer
+    dropLayer(1) %>% 
+    # Convert raster to data frame
+    rasterToPoints() %>% 
+    as.data.frame() %>% 
+    # Add year
+    mutate(year = i, 
+           velocity = sqrt(vxo^2 + vyo^2))
+  
+  # Append into a single dataframe
+  velo_new <- bind_rows(velo_new, velo_tmp)
+}
+
+# Remove unused variables
+rm(i, data_tmp, velo_tmp)
+```
+
+The following plot show annual mean current velocity in 2016 with a `r paste0(res_new[1] * 100, " km x ", res_new[2] * 100, " km")` cell resolution.
+
+```{r plot-velocity-oct-2016-new-res, fig.height=8.5, fig.width=10}
+velo_new %>%
+  filter(year == 2016) %>%
+  ggplot(aes(x = x, y = y)) +
+  geom_tile(aes(fill = velocity), alpha = 0.8) +
+  geom_polygon(data = coast, aes(x = x, y = y, group = group), fill = "grey30") +
+  geom_vector(aes(dx = vxo, dy = vyo, mag = velocity), 
+              arrow.angle = 30, arrow.type = "open", arrow.length = 1,
+              pivot = 0, preserve.dir = TRUE, direction = "ccw") +
+  scale_color_viridis_c(option = "turbo", 
+                        limits = c(0, 0.075), oob = scales::squish) + 
+  scale_fill_cmocean(name = "speed") +
+  coord_fixed(xlim = c(-27, 27), ylim = c(-35, 18), expand = F) +
+  guides(mag = "none", alpha = "none") +
+  theme(axis.title = element_blank(),
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        panel.border = element_rect(fill = NA, size = 0.3))
+```
