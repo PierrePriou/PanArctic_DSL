@@ -2,6 +2,7 @@
 .Rapp.history
 .RData
 .Ruserdata
+*.html
 /*.tar.gz
 /*.Rcheck/
 .Rproj.user/
