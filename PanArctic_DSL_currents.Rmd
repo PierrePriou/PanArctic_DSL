@@ -118,9 +118,11 @@ extent_current <- c(velo_raw$xmin[1], velo_raw$xmax[1], velo_raw$ymin[1], velo_r
 # Remove projection variables from tibble
 velo <- velo_raw %>%
   dplyr::select(-proj, -res_x, -res_y) %>%
-  # Add month and year, and calculate velocity (in m/s)
+  # Add month and year, and calculate velocity (in cm/s)
   mutate(year = year(date),
          month = month(date),
+         vxo = vxo * 100,
+         vyo = vyo * 100,
          velocity = sqrt(vxo^2 + vyo^2))
 ```
 
@@ -152,24 +154,24 @@ coast <- rgdal::readOGR("data/bathy/ne_10m_land.shp", verbose = F) %>%
   rename(x = long, y = lat) %>%
   mutate(x = x * 10^-5,
          y = y * 10^-5)
-
-rm(proj_coast)
 ```
 
 Here is a plot of current velocity at 318 m depth in October 2016.
 
-```{r plot-velocity-oct-2016-12.5km, fig.height=8.5, fig.width=10}
+```{r plot-velocity-oct-2016-12.5km, message=FALSE, fig.height=8.5, fig.width=10}
 velo %>%
-  filter(year == 2016 & month == 10) %>%
+  group_by(year, x, y) %>%
+  # Calculate annual mean
+  summarise(vxo = mean(vxo),
+            vyo = mean(vyo)) %>%
+  ungroup() %>%
+  mutate(velocity = sqrt(vxo^2 + vyo^2)) %>%
+  # Only plot 2016
+  filter(year == 2016) %>%
   ggplot(aes(x = x, y = y)) +
-  geom_tile(aes(fill = velocity), alpha = 0.8) +
+  geom_tile(aes(fill = velocity)) +
   geom_polygon(data = coast, aes(x = x, y = y, group = group), fill = "grey30") +
-  geom_vector(aes(dx = vxo, dy = vyo, mag = velocity), 
-              arrow.angle = 30, arrow.type = "open", arrow.length = 1,
-              pivot = 0, preserve.dir = TRUE, direction = "ccw") +
-  scale_color_viridis_c(option = "turbo", 
-                        limits = c(0, 0.075), oob = scales::squish) + 
-  scale_fill_cmocean(name = "speed") +
+  scale_fill_cmocean(name = "delta", limits = c(0, 10), oob = scales::squish, alpha = 0.5) +
   coord_fixed(xlim = c(-27, 27), ylim = c(-35, 18), expand = F) +
   guides(mag = "none", alpha = "none") +
   theme(axis.title = element_blank(),
@@ -187,67 +189,56 @@ Define projections.
 r_current <- raster(extent(extent_current), crs = proj_current, resolution = res_current)
 
 # Set new projection 
-res_new <- c(1, 1)
-r_new <- raster(extent(extent_current), crs = proj_current, resolution = res_new)
+res_new <- c(150, 150) # in km
+r_new <- raster(extent(extent_current), crs = proj_current, resolution = res_new / 100)
 ```
 
-Calculate the mean velocity and direction for each grid cell per year.
+Calculate the mean velocity and direction for each grid cell between 2015 and 2017.
 
 ```{r rasterize-data}
-# Empty dataframe
-velo_new <- data.frame()
-
-# Loop through each year
-for (i in seq(2015, 2017, 1)) {
-  
-  # Select data of that year
-  data_tmp <- velo %>%
-    filter(year == i)
-  
-  # Convert to spatial data
-  velo_tmp <- SpatialPointsDataFrame(
-    SpatialPoints(cbind(data_tmp$x, data_tmp$y), proj4string = crs(r_current)),
-    data.frame(lat = data_tmp$lat,
-               lon = data_tmp$lon,
-               vxo = data_tmp$vxo,
-               vyo = data_tmp$vyo)) %>%
-    # Rasterize on the 100 x 100 km cells
-    rasterize(., r_new, fun = mean, na.rm = T) %>% 
-    # Remove ID layer
-    dropLayer(1) %>% 
-    # Convert raster to data frame
-    rasterToPoints() %>% 
-    as.data.frame() %>% 
-    # Add year
-    mutate(year = i, 
-           velocity = sqrt(vxo^2 + vyo^2))
-  
-  # Append into a single dataframe
-  velo_new <- bind_rows(velo_new, velo_tmp)
-}
-
-# Remove unused variables
-rm(i, data_tmp, velo_tmp)
+# Convert to spatial data
+velo_new <- SpatialPointsDataFrame(
+  SpatialPoints(cbind(velo$x, velo$y), proj4string = crs(r_current)),
+  data.frame(lat = velo$lat,
+            lon = velo$lon,
+            vxo = velo$vxo,
+            vyo = velo$vyo)) %>%
+  # Rasterize on the new grid
+  rasterize(., r_new, fun = mean, na.rm = T) %>% 
+  # Remove ID layer
+  dropLayer(1) %>% 
+  # Convert raster to data frame
+  rasterToPoints() %>% 
+  as.data.frame() %>% 
+  # Add year
+  mutate(velocity = sqrt(vxo^2 + vyo^2))
 ```
 
-The following plot show annual mean current velocity in 2016 with a `r paste0(res_new[1] * 100, " km x ", res_new[2] * 100, " km")` cell resolution.
+The following plot show annual mean current velocity in 2016 with a `r paste0(res_new[1], " km x ", res_new[2], " km")` cell resolution.
 
-```{r plot-velocity-oct-2016-new-res, fig.height=8.5, fig.width=10}
-velo_new %>%
-  filter(year == 2016) %>%
-  ggplot(aes(x = x, y = y)) +
-  geom_tile(aes(fill = velocity), alpha = 0.8) +
+```{r plot-velocity-oct-2016-new-res, message=FALSE, fig.height=3, fig.width=6.5}
+map_velo <- velo_new %>%
+  ggplot() +
+  # geom_tile(aes(x = x, y = y, fill = velocity), col = NA) +
+  geom_contour_fill(aes(x = x, y = y, z = velocity), binwidth = 0.5, col = NA) +
   geom_polygon(data = coast, aes(x = x, y = y, group = group), fill = "grey30") +
-  geom_vector(aes(dx = vxo, dy = vyo, mag = velocity), 
-              arrow.angle = 30, arrow.type = "open", arrow.length = 1,
-              pivot = 0, preserve.dir = TRUE, direction = "ccw") +
-  scale_color_viridis_c(option = "turbo", 
-                        limits = c(0, 0.075), oob = scales::squish) + 
-  scale_fill_cmocean(name = "speed") +
-  coord_fixed(xlim = c(-27, 27), ylim = c(-35, 18), expand = F) +
+  geom_vector(aes(x = x, y = y, dx = vxo, dy = vyo, mag = velocity),
+              size = 0.2, arrow.angle = 30, arrow.type = "open", arrow.length = 0.75) +
+  scale_alpha(range = c(0.5, 0.8)) +
+  scale_fill_cmocean(expression("Velocity\n(m s"^-1*")"), 
+                     name = "delta", limits = c(0, 5), end = 0.7, oob = scales::squish, alpha = 0.5,
+                     breaks = seq(0, 10, 1)) +
+  coord_fixed(xlim = c(-27, 27), ylim = c(-40, 18), expand = F) +
   guides(mag = "none", alpha = "none") +
-  theme(axis.title = element_blank(),
+  theme(legend.position = "right",
+        legend.key.height = unit(0.3, "in"),
+        legend.key.width = unit(0.1, "in"),
+        legend.title = element_text(hjust = 0.5),
+        panel.grid = element_blank(),
+        axis.line = element_blank(),
+        axis.title = element_blank(),
         axis.text = element_blank(),
         axis.ticks = element_blank(),
         panel.border = element_rect(fill = NA, size = 0.3))
+ggsave("plots/map_velo.png", map_velo, height = 3, width = 4, units = "in", dpi = 600)
 ```
