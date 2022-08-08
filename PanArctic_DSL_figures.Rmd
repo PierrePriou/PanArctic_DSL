@@ -489,7 +489,7 @@ map_laea <- bathy_laea %>%
   # LME
   geom_polygon(data = LME, aes(x = xc, y = yc, group = group),
                col = "black", fill = NA, alpha = 0.2, 
-               lwd = 0.5, lty = 1) +
+               lwd = 0.35, lty = 1) +
   # Plot coastlines
   geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group),
                fill = "grey30") +
@@ -501,35 +501,32 @@ map_laea <- bathy_laea %>%
   # Arctic circle
   geom_path(data = arctic_circle_laea, aes(x = xc, y = yc), 
             col = "white", lty = 2, size = 0.4) +
-  # coord_fixed(xlim = c(-2450, 1200), ylim = c(-1500, 2000), expand = F) +
-  # coord_fixed(xlim = c(-2450, 650), ylim = c(-1500, 1800), expand = F) +
   coord_fixed(xlim = c(-2500, 1700), ylim = c(-1700, 2200), expand = F) +
   guides(fill = "none") +
-  # Acoustics
+   # Acoustics
   geom_point(data = MVBS_laea, aes(x = xc, y = yc), 
-             shape = 20, col = "#009E73", alpha = 0.5) +
+             shape = 20, col = met.brewer("Johnson", n = 5)[4],#"#009E73",
+             alpha = 0.5) +
   # Trawls
   geom_point(data = trawl_laea, aes(x = xc, y = yc),
              shape = 23, fill = "#E69F00", size = 2) +
   # Plot North Pole
-  geom_point(aes(x = 0, y = 0), shape = 4, stroke = 0.5) +
-
+  geom_point(aes(x = 0, y = 0), shape = 4, size = 1, stroke = 0.3) +
   theme(legend.position = "right", 
-        panel.border = element_rect(fill = NA),
+        panel.border = element_rect(fill = NA, size = 1),
+        axis.line = element_blank(),
         axis.text = element_blank(),
         axis.ticks = element_blank(), 
         axis.title = element_blank())
 ggsave("plots/base_map_laea_stations.png",
        map_laea, height = 4, width = 6, dpi = 600, units = "in")
-col_pal <- c("#999999", "#E69F00", "#56B4E9", "#009E73",
-          "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
 
 map_laea_lon <- bathy_laea %>%
   ggplot(aes(x = xc, y = yc)) +
   # Plot bathy
   geom_raster(aes(fill = depth_d), alpha = 0.8) +
   scale_fill_grey("Depth (m)", start = 0.9, end = 0.3) +
-  # guides(fill = "none") +
+  # guides(fill = "none") + 
   new_scale_fill() +
   # LME
   geom_polygon(data = LME, aes(x = xc, y = yc, group = group),
@@ -554,22 +551,21 @@ map_laea_lon <- bathy_laea %>%
             col = "red", lty = 1, size = 0.4, alpha = 0.75) +
   # Arctic circle
   geom_path(data = arctic_circle_laea, aes(x = xc, y = yc), 
-            col = "white", lty = 2, size = 0.4, alpha = 0.75) +
-  # coord_fixed(xlim = c(-2450, 1200), ylim = c(-1500, 2000), expand = F) +
-  # coord_fixed(xlim = c(-2450, 650), ylim = c(-1500, 1800), expand = F) +
+            col = "white", lty = 2, size = 0.4) +
   coord_fixed(xlim = c(-2500, 1700), ylim = c(-1700, 2200), expand = F) +
   guides(fill = "none") +
-  # Acoustics
+   # Acoustics
   geom_point(data = MVBS_laea, aes(x = xc, y = yc), 
-             shape = 20, col = "#009E73", alpha = 0.5) +
+             shape = 20, col = "#a00e00",#"#009E73",
+             alpha = 0.5) +
   # Trawls
   geom_point(data = trawl_laea, aes(x = xc, y = yc),
-             shape = 18, col = "#E69F00", size = 2) +
+             shape = 23, fill = "#E69F00", size = 2) +
   # Plot North Pole
   geom_point(aes(x = 0, y = 0), shape = 4, stroke = 0.5) +
-
   theme(legend.position = "right", 
-        panel.border = element_rect(fill = NA),
+        panel.border = element_rect(fill = NA, size = 1),
+        axis.line = element_blank(),
         axis.text = element_blank(),
         axis.ticks = element_blank(), 
         axis.title = element_blank())
