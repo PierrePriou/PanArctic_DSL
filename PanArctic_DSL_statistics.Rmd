@@ -118,7 +118,7 @@ plot_grid(
           axis.ticks = element_blank(),
           axis.title = element_blank()),
   stat_laea %>% 
-    filter(depth == 318) %>%
+    filter(depth == 380) %>%
     ggplot(aes(x = xc,  y = yc)) +
     geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group),
                  fill = "grey80") +
@@ -144,7 +144,7 @@ stat_laea <- stat_laea %>%
                   levels = c("CAO", "BF", "NAR", "BB", "SV")))
 
 stat_laea %>%
-  filter(depth == 318) %>%
+  filter(depth == 380) %>%
   group_by(LME) %>% 
   summarise(n = n())
 ```
@@ -161,7 +161,7 @@ stat_laea <- stat_laea %>%
   droplevels()
 
 stat_laea %>%
-  filter(depth == 318) %>%
+  filter(depth == 380) %>%
   group_by(LME) %>% 
   summarise(n = n())
 ```
@@ -169,7 +169,7 @@ stat_laea %>%
 ```{r map-NA2, fig.width=8, fig.height=6}
 plot_grid(
   stat_laea %>%
-    filter(depth == 318) %>%
+    filter(depth == 380) %>%
     ggplot(aes(x = xc,  y = yc)) +
     geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group),
                  fill = "grey80") +
@@ -180,7 +180,7 @@ plot_grid(
           axis.ticks = element_blank(),
           axis.title = element_blank()),
   stat_laea %>% 
-    filter(depth == 318) %>%
+    filter(depth == 380) %>%
     ggplot(aes(x = xc,  y = yc)) +
     geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group),
                  fill = "grey80") +
@@ -217,7 +217,7 @@ stat_laea %>%
 ```{r map-velocity318, fig.height=3.5, fig.width=6}
 # Velocity
 phy_grid_laea %>% 
-  filter(depth == 318) %>%
+  filter(depth == 380) %>%
   ggplot(aes(x = xc,  y = yc)) +
   geom_tile(aes(fill = v_mean * 100)) +
   geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group),
@@ -506,7 +506,7 @@ I select data at 318 m depth because it fits well with the DSL diurnal centre of
 
 ```{r GAM-prep}
 SA_df <- stat_laea %>%
-  filter(depth == 318) %>%
+  filter(depth == 380) %>%
   dplyr::select(year, xc, yc, LME, NASC_int, SA_int, v, depth) %>%
   mutate(year = factor(year))
 ```
@@ -923,7 +923,7 @@ I select data at 318 m depth because it fits well with the DSL diurnal centre of
 
 ```{r GAMSA-prep}
 SA_df <- stat_laea %>%
-  filter(depth == 318) %>%
+  filter(depth == 380) %>%
   dplyr::select(year, xc, yc, LME, NASC_int, SA_int, v, depth) %>%
   mutate(year = factor(year))
 ```

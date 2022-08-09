@@ -21,6 +21,8 @@ library(sf)
 library(metR)
 library(cmocean)
 library(tidync)
+library(marmap)
+source("R/getNOAA.ice.bathy.R") # Load bathy data from NOAA
 ```
 
 ```{r figure-theme}
@@ -41,18 +43,28 @@ theme_update(panel.border = element_blank(),
 
 # Aim
 
-This document creates maps of annual mean current velocity and directions in 2015, 2016, and 2017. 
+This document creates maps of annual mean current velocity and directions, and temperature in 2015, 2016, and 2017. 
 
 # NetCDF to csv
 
-First I convert Arctic Ocean Physics Reanalysis data from NetCDF to csv files. 
+First I convert Arctic Ocean Physics Reanalysis data from NetCDF to csv files. The raw file contains these variables:
+
+-   time: time in hours since 1950-01-01 00:00:00
+-   latitude: latitude
+-   longitude: longitude
+-   x: x-coordinate (polar stereographic x coordinate)
+-   y: y-coordinate (polar stereographic y coordinate)
+-   vxo: Zonal velocity m/s (x)
+-   vyo: Meridional velocity m/s (y)
+
+The csv file also contains the date.
 
 ```{r NetCDF-csv, eval=FALSE}
 # Empty dataframe
 velo <- data.frame() 
 
 # List files per year
-file_list <- list.files("data/ocean_currents/nc", pattern = "*.nc", full.names = T) 
+file_list <- list.files("data/ocean_currents/nc", pattern = "380", full.names = T) 
 
 # Loop through each file
 for (i in file_list) { 
@@ -88,7 +100,7 @@ for (i in file_list) {
     rename(lat = latitude, 
            lon = longitude) %>%
     # Only keep velocity data 
-    dplyr::select(date, lat, lon, x, y, depth, vxo, vyo, proj, res_x, res_y,
+    dplyr::select(date, lat, lon, x, y, depth, vxo, vyo, thetao, proj, res_x, res_y,
                   xmin, xmax, ymin, ymax)
   
   # Append data in a single file
@@ -97,18 +109,18 @@ for (i in file_list) {
 }
 
 # Write csv file
-write_csv(velo, file = "data/ocean_currents/velocity_318m_CMEMS.csv")
+write_csv(velo, file = "data/ocean_currents/velocity_380m_CMEMS.csv")
 
 rm(velo, file_list, i, velo_tmp, coord_tmp, r, proj_tmp, tmp)
 ```
 
 # Data tidying
 
-I load the csv file and tidy it. 
+I load the csv file and calculate velocity and angle. 
 
 ```{r load-data}
 # List files
-velo_raw <- read_csv("data/ocean_currents/velocity_318m_CMEMS.csv", show_col_types = F)
+velo_raw <- read_csv("data/ocean_currents/velocity_380m_CMEMS.csv", show_col_types = F)
 
 # Get projection, cell resolution, and extents of data
 proj_current <- velo_raw$proj[1]
@@ -118,27 +130,18 @@ extent_current <- c(velo_raw$xmin[1], velo_raw$xmax[1], velo_raw$ymin[1], velo_r
 # Remove projection variables from tibble
 velo <- velo_raw %>%
   dplyr::select(-proj, -res_x, -res_y) %>%
-  # Add month and year, and calculate velocity (in cm/s)
+  # Add month and year, and calculate velocity (in cm/s) and angle (in radians)
   mutate(year = year(date),
          month = month(date),
          vxo = vxo * 100,
          vyo = vyo * 100,
-         velocity = sqrt(vxo^2 + vyo^2))
+         velocity = sqrt(vxo^2 + vyo^2),
+         angle_deg = ((atan((vyo / vxo)) * 180) / pi) - 180)
 ```
 
 The original projection of the data is: *`r proj_current`*
 
 Each pixel represents a `r paste0(res_current[1] * 100, " km x ", res_current[2] * 100, " km")` cell.
-
-The variables are:
-
--   time: time in hours since 1950-01-01 00:00:00
--   latitude: latitude
--   longitude: longitude
--   x: x-coordinate (polar stereographic x coordinate)
--   y: y-coordinate (polar stereographic y coordinate)
--   vxo: Zonal velocity m/s (x)
--   vyo: Meridional velocity m/s (y)
 
 ```{r load-coastline-data, message=FALSE, warning=FALSE, include=FALSE}
 proj_coast <- raster(extent(extent_current), crs = proj_current, resolution = res_current)
@@ -163,30 +166,63 @@ arctic_circle <- data.frame(lon = seq(-180, 180, 0.1)) %>%
   mutate(x = st_coordinates(.)[,1] * 10^-5,
          y = st_coordinates(.)[,2] * 10^-5) %>%
   st_drop_geometry()
+
+# Depth
+# bathy <- getNOAA.ice.bathy(lon1 = -180, lon2 = 180, lat1 = 50, lat2 = 90,
+#                            resolution = 2, keep = T, path = "data/bathy/") %>%
+#   fortify.bathy() %>%
+#   rename(lon = x, lat = y, depth = z)
 ```
 
-Here is a plot of current velocity at 318 m depth in October 2016.
+Here is a plot of current velocity at 380 m depth averaged over 2015-2017.
 
-```{r plot-velocity-oct-2016-12.5km, message=FALSE, fig.height=8.5, fig.width=10}
+```{r plot-velocity-12.5km, message=FALSE, fig.height=8.5, fig.width=10}
 velo %>%
-  group_by(year, x, y) %>%
+  group_by(x, y) %>%
   # Calculate annual mean
   summarise(vxo = mean(vxo),
             vyo = mean(vyo)) %>%
   ungroup() %>%
   mutate(velocity = sqrt(vxo^2 + vyo^2)) %>%
-  # Only plot 2016
-  filter(year == 2016) %>%
   ggplot(aes(x = x, y = y)) +
-  geom_tile(aes(fill = velocity)) +
+  geom_tile(aes(fill = velocity, col = velocity)) +
   geom_polygon(data = coast, aes(x = x, y = y, group = group), fill = "grey30") +
-  scale_fill_cmocean(name = "delta", limits = c(0, 10), oob = scales::squish, alpha = 0.5) +
+  scale_color_cmocean(name = "speed", limits = c(0, 10), oob = scales::squish,) +
+  scale_fill_cmocean(name = "speed", limits = c(0, 10), oob = scales::squish,) +
   coord_fixed(xlim = c(-27, 27), ylim = c(-35, 18), expand = F) +
   guides(mag = "none", alpha = "none") +
   theme(axis.title = element_blank(),
         axis.text = element_blank(),
         axis.ticks = element_blank(),
         panel.border = element_rect(fill = NA, size = 0.3))
+```
+
+Plot of temperature at 380 m depth.
+
+```{r plot-temperature-12.5km, message=FALSE, fig.height=8.5, fig.width=10}
+map_temp <- velo %>%
+  group_by(x, y) %>%
+  # Calculate annual mean
+  summarise(thetao = mean(thetao)) %>%
+  ungroup() %>%
+  ggplot(aes(x = x, y = y)) +
+  geom_tile(aes(fill = thetao, col = thetao)) +
+  geom_contour(aes(z = thetao), breaks = 0, col = "green", lwd = 0.25) +
+  geom_polygon(data = coast, aes(x = x, y = y, group = group), fill = "grey30") +
+  scale_color_cmocean("T", name = "thermal", limits = c(-1, 5), oob = scales::squish) +
+  scale_fill_cmocean("T", name = "thermal", limits = c(-1, 5), oob = scales::squish) +
+  coord_fixed(xlim = c(-40, 40), ylim = c(-40, 40), expand = F) +
+  theme(legend.position = "right",
+        legend.key.height = unit(0.3, "in"),
+        legend.key.width = unit(0.1, "in"),
+        panel.grid = element_blank(),
+        axis.line = element_blank(),
+        axis.title = element_blank(),
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        panel.border = element_rect(fill = NA, size = 0.3))
+ggsave("plots/map_temp.png", map_temp, height = 5, width = 5, units = "in", dpi = 600)
+map_temp
 ```
 
 # Reduce data resolution
@@ -207,7 +243,8 @@ velo_new <- SpatialPointsDataFrame(
   data.frame(lat = velo$lat,
              lon = velo$lon,
              vxo = velo$vxo,
-             vyo = velo$vyo)) %>%
+             vyo = velo$vyo,
+             thetao = velo$thetao)) %>%
   # Rasterize on the new grid
   rasterize(., r_new, fun = mean, na.rm = T) %>% 
   # Remove ID layer
@@ -247,6 +284,8 @@ SA_new <- SA_df %>%
          y = st_coordinates(.)[,2] / 100) %>%
   st_drop_geometry()
 ```
+
+# Plots
 
 The following plot show annual mean current velocity in 2016 with a `r paste0(res_new[1], " km x ", res_new[2], " km")` cell resolution.
 
