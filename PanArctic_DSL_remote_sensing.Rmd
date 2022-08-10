@@ -514,7 +514,7 @@ Plot average current velocity in 2015 in Svalbard at 318 m depth.
 
 ```{r plot-current}
 phy_year %>%
-  filter(year == 2015 & month == 8 & depth == 318 & between(x, 7, 15) & between(y, -10, -6)) %>%
+  filter(year == 2015 & month == 8 & depth == 380 & between(x, 7, 15) & between(y, -10, -6)) %>%
   ggplot() +
   geom_raster(aes(x = x, y = y, fill = velocity)) + 
   geom_vector(aes(x = x, y = y, dx = vxo, dy = vyo, mag = velocity),
@@ -530,7 +530,7 @@ Data is projected on the EPSG:6931 projection and the median value is extracted.
 
 ```{r EPSG-6931-physics-grid-median}
 # Projection, cell resolution in km
-cell_res <- 100
+cell_res <- 150
 arctic_laea <- raster(extent(-2700, 2700, -2700, 2700), crs = "EPSG:6931") 
 projection(arctic_laea) <- gsub("units=m", "units=km", projection(arctic_laea)) 
 res(arctic_laea) <- c(cell_res, cell_res)
@@ -543,7 +543,8 @@ for (i in seq(2015, 2017, 1)) {
   # Loop through each month
   for (j in seq(1, 12, 1)) {
     # Loop through each depth bin
-    for (k in c(0, 222, 266, 318, 380, 644, 1062)) { 
+    # for (k in c(0, 222, 266, 318, 380, 644, 1062)) {
+    for (k in c(318, 380)) {
       phy_year_tmp <- phy_year %>%
         # Select depth bin
         filter(year == i & month == j & depth == k) 
@@ -580,7 +581,9 @@ for (i in seq(2015, 2017, 1)) {
       # Combine data
       phy_month_grid_laea <- bind_rows(phy_month_grid_laea, phy_tmp_laea)
     }
+    print(paste0("Year ", i, " month ", j, " finished"))
   }
+  print(paste0("Year ", i, "finished"))
 }
 # Remove temporary data
 rm(phy_year_tmp, phy_tmp_laea, i, j) 
