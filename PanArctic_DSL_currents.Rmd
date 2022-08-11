@@ -166,12 +166,6 @@ arctic_circle <- data.frame(lon = seq(-180, 180, 0.1)) %>%
   mutate(x = st_coordinates(.)[,1] * 10^-5,
          y = st_coordinates(.)[,2] * 10^-5) %>%
   st_drop_geometry()
-
-# Depth
-# bathy <- getNOAA.ice.bathy(lon1 = -180, lon2 = 180, lat1 = 50, lat2 = 90,
-#                            resolution = 2, keep = T, path = "data/bathy/") %>%
-#   fortify.bathy() %>%
-#   rename(lon = x, lat = y, depth = z)
 ```
 
 Here is a plot of current velocity at 380 m depth averaged over 2015-2017.
@@ -234,7 +228,7 @@ Define projections and calculate the mean velocity and direction for each grid c
 r_current <- raster(extent(extent_current), crs = proj_current, resolution = res_current)
 
 # Set new projection 
-res_new <- c(150, 150) # in km
+res_new <- c(50, 50) # in km
 r_new <- raster(extent(extent_current), crs = proj_current, resolution = res_new / 100)
 
 # Convert to spatial data
@@ -255,6 +249,34 @@ velo_new <- SpatialPointsDataFrame(
   # Add year
   mutate(velocity = sqrt(vxo^2 + vyo^2)) %>%
   complete(x = seq(min(x), max(x), res_new[1] / 100), y = seq(min(y), max(y), res_new[2] / 100))
+```
+
+Do the same thing at much finer grid resolution. This is used to plot the actual bathymetric contour on the map and not the large cells.
+
+```{r new-projection-raster-HD}
+# Set new projection 
+res_new_HD <- c(25, 25) # in km
+r_new_HD <- raster(extent(extent_current), crs = proj_current, resolution = res_new_HD / 100)
+
+# Convert to spatial data
+velo_new_HD <- SpatialPointsDataFrame(
+  SpatialPoints(cbind(velo$x, velo$y), proj4string = crs(r_current)),
+  data.frame(lat = velo$lat,
+             lon = velo$lon,
+             vxo = velo$vxo,
+             vyo = velo$vyo,
+             thetao = velo$thetao)) %>%
+  # Rasterize on the new grid
+  rasterize(., r_new_HD, fun = mean, na.rm = T) %>% 
+  # Remove ID layer
+  dropLayer(1) %>% 
+  # Convert raster to data frame
+  rasterToPoints() %>% 
+  as.data.frame() %>% 
+  # Add year
+  mutate(velocity = sqrt(vxo^2 + vyo^2)) %>%
+  complete(x = seq(min(x - 2 * (res_new_HD[1] / 100)), max(x + 2 * (res_new_HD[2] / 100)), res_new_HD[1] / 100), 
+           y = seq(min(y - 2 * (res_new_HD[2] / 100)), max(y + 2 * (res_new_HD[2] / 100)), res_new_HD[2] / 100))
 ```
 
 I also superimpose the grid cells of the GAM on the oceanic circulation map. First I load GAM data and re project their coordinates in the current velocity projection.
@@ -287,6 +309,8 @@ SA_new <- SA_df %>%
 
 # Plots
 
+## Arctic map
+
 The following plot show annual mean current velocity in 2016 with a `r paste0(res_new[1], " km x ", res_new[2], " km")` cell resolution.
 
 ```{r plot-velocity-new-res, warning=FALSE, fig.height=3, fig.width=4}
@@ -295,9 +319,12 @@ map_velo <- velo_new %>%
   # Plot interpolated current velocity
   geom_contour_fill(aes(x = x, y = y, z = velocity), binwidth = 0.5, na.fill = T) +
   # Cover areas that are shallower than our data
-  geom_tile(data = subset(velo_new, is.na(vxo) == T), aes(x = x, y = y), fill = "white", col = "white") +
+  geom_tile(data = subset(velo_new_HD, is.na(vxo) == T), aes(x = x, y = y), fill = "white", col = "white") +
   # Coast
   geom_polygon(data = coast, aes(x = x, y = y, group = group), fill = "grey30") +
+  annotate("rect", xmin = 3, xmax = 15, ymin = -10, ymax = 3, fill = NA, col = "#F7941D", lwd = 0.5) +
+  annotate("rect", xmin = -12, xmax = 0, ymin = -27, ymax = -7.5, fill = NA, col = "#F7941D", lwd = 0.5) +
+  annotate("rect", xmin = -24, xmax = -13, ymin = -10, ymax = 6, fill = NA, col = "#F7941D", lwd = 0.5) +
   # Current vectors
   geom_arrow(aes(x = x, y = y, dx = vxo, dy = vyo, mag = velocity), size = 0.2, arrow.angle = 30,
              arrow.type = "open", arrow.length = 0.5) +
@@ -308,21 +335,18 @@ map_velo <- velo_new %>%
   # GAM locations
   # geom_tile(data = SA_new, aes(x = x, y = y), fill = NA, colour = "red", size = 3.8) + 
   # Scales
-  scale_fill_viridis_c("V", option = "viridis", limits = c(0, 5), end = 1, 
-                       oob = scales::squish, alpha = 0.5, breaks = seq(0, 10, 1)) +
+  scale_fill_viridis_c("V", option = "viridis", limits = c(0, 5), end = 1, oob = scales::squish,
+                       alpha = 0.5, breaks = seq(0, 10, 0.5)) +
+  scale_x_continuous(breaks = seq(-50, 50 , 5)) +
+  scale_y_continuous(breaks = seq(-50, 50 , 5)) +
   coord_fixed(xlim = c(-28, 28), ylim = c(-34, 20), expand = F) +
-  guides(mag = "none", alpha = "none") +
+  guides(mag = "none", alpha = "none", fill = guide_colorsteps(show.limits = T)) +
   theme(legend.position = "right",
         legend.key.height = unit(0.3, "in"),
         legend.key.width = unit(0.1, "in"),
-        panel.grid = element_blank(),
-        axis.line = element_blank(),
-        axis.title = element_blank(),
-        axis.text = element_blank(),
-        axis.ticks = element_blank(),
         panel.border = element_rect(fill = NA, size = 0.3))
-ggsave("plots/map_velo.png", map_velo, height = 3, width = 4, units = "in", dpi = 600)
-map_velo
+ggsave("plots/map_velo.png", map_velo, height = 8, width = 8, units = "in", dpi = 600)
+# map_velo
 ```
 
 I print several layers of the plot for easy implementation in Illustrator.
@@ -330,12 +354,12 @@ I print several layers of the plot for easy implementation in Illustrator.
 Base map.
 
 ```{r base-map, warning=FALSE, fig.height=3, fig.width=4}
-map_base <- velo_new %>%
+map_base <- velo_new_HD %>%
   ggplot() +
   # Plot interpolated current velocity
   geom_contour_fill(aes(x = x, y = y, z = velocity), binwidth = 0.5, na.fill = T) +
   # Cover areas that are shallower than our data
-  geom_tile(data = subset(velo_new, is.na(vxo) == T), aes(x = x, y = y), fill = "white", col = "white") +
+  geom_tile(data = subset(velo_new_HD, is.na(vxo) == T), aes(x = x, y = y), fill = "white", col = "white") +
   # Coast
   geom_polygon(data = coast, aes(x = x, y = y, group = group), fill = "grey30") +
   # Current vectors
@@ -346,14 +370,12 @@ map_base <- velo_new %>%
   # Plot North Pole
   geom_point(aes(x = 0, y = 0), shape = 4, size = 0.7, stroke = 0.3, col = "white") +
   # GAM locations
-  # geom_tile(data = SA_new, aes(x = x, y = y), fill = NA, colour = "red", size = 4) +
+  # geom_tile(data = SA_new, aes(x = x, y = y), fill = NA, colour = "red", size = 3.6) +
   # Scales
-  # scale_fill_viridis_c("", option = "plasma", limits = c(0, 5), end = 1, 
-  #                      oob = scales::squish, alpha = 0.5, breaks = seq(0, 10, 1)) +
-  scale_fill_cmocean("", name = "speed", limits = c(0, 5), end = 0.9, 
-                       oob = scales::squish, alpha = 0.5, breaks = seq(0, 10, 1)) +
-  coord_fixed(xlim = c(-40, 40), ylim = c(-40, 40), expand = F) +
-  guides(mag = "none", alpha = "none") +
+  scale_fill_cmocean("", name = "delta", limits = c(0, 5), end = 0.8, 
+                       oob = scales::squish, alpha = 0.7, breaks = seq(0, 10, 0.5)) +
+  coord_fixed(xlim = c(-45, 45), ylim = c(-45, 45), expand = F) +
+  guides(mag = "none", alpha = "none", fill = guide_colorsteps(show.limits = T)) +
   theme(legend.position = "right",
         legend.key.height = unit(0.3, "in"),
         legend.key.width = unit(0.1, "in"),
@@ -369,26 +391,21 @@ ggsave("plots/map_velo_base.png", map_base, height = 5, width = 5, units = "in",
 Current vectors only. 
 
 ```{r map-current-vectors, warning=FALSE, fig.height=3, fig.width=4}
-map_vectors <- velo_new %>%
+map_vectors <- velo_new_HD %>%
+  filter(between(x, -40, 40) & between(y, -41, 40)) %>%
   ggplot() +
   # Plot interpolated current velocity
   geom_contour_fill(aes(x = x, y = y, z = velocity), binwidth = 0.5, na.fill = T) +
-  # Cover areas that are shallower than our data
-  # geom_tile(data = subset(velo_new, is.na(vxo) == T), aes(x = x, y = y), fill = "white", col = "white") +
   # Coast
   geom_polygon(data = coast, aes(x = x, y = y, group = group), fill = "transparent") +
   # Current vectors
-  geom_arrow(aes(x = x, y = y, dx = vxo, dy = vyo, mag = velocity), size = 0.2, arrow.angle = 30,
-             arrow.type = "open", arrow.length = 0.75) +
-  # Arctic circle
-  # geom_path(data = arctic_circle, aes(x = x, y = y), col = "white", lty = 2, size = 0.3) +
-  # GAM locations
-  # geom_tile(data = SA_new, aes(x = x, y = y), fill = NA, colour = "red", size = 3.8) + 
+  geom_arrow(aes(x = x, y = y, dx = vxo, dy = vyo, mag = velocity), skip = 4, size = 0.2, 
+             arow.angle = 30, arrow.type = "open", arrow.length = 0.75) +
   # Scales
-  scale_fill_viridis_c("", option = "viridis", limits = c(0, 5), end = 1,
-                       oob = scales::squish, alpha = 0, breaks = seq(0, 10, 1)) +
-  coord_fixed(xlim = c(-40, 40), ylim = c(-40, 40), expand = F) +
-  guides(mag = "none", alpha = "none") +
+  scale_fill_cmocean("", name = "delta", limits = c(0, 5), end = 0.7, oob = scales::squish,
+                     alpha = 0, breaks = seq(0, 10, 0.5)) +
+  coord_fixed(xlim = c(-45, 45), ylim = c(-45, 45), expand = F) +
+  guides(mag = "none", alpha = "none", fill = guide_colorsteps(show.limits = T)) +
   theme(legend.position = "right",
         legend.key.height = unit(0.3, "in"),
         legend.key.width = unit(0.1, "in"),
@@ -400,6 +417,238 @@ map_vectors <- velo_new %>%
         axis.text = element_blank(),
         axis.ticks = element_blank(),
         panel.border = element_rect(fill = NA, size = 0.3))
-ggsave("plots/map_vectors.png", map_vectors, bg = "transparent",
-       height = 5, width = 5, units = "in", dpi = 600)
+ggsave("plots/map_vectors.png", map_vectors, bg = "transparent", height = 5, width = 5, units = "in", dpi = 600)
+```
+
+## Regional maps
+
+```{r new-projection-raster-HD}
+# Set new projection 
+res_HD <- c(25, 25) # in km
+r_HD <- raster(extent(extent_current), crs = proj_current, resolution = res_HD / 100)
+
+# Convert to spatial data
+velo_HD <- SpatialPointsDataFrame(
+  SpatialPoints(cbind(velo$x, velo$y), proj4string = crs(r_current)),
+  data.frame(lat = velo$lat,
+             lon = velo$lon,
+             vxo = velo$vxo,
+             vyo = velo$vyo,
+             thetao = velo$thetao)) %>%
+  # Rasterize on the new grid
+  rasterize(., r_HD, fun = mean, na.rm = T) %>% 
+  # Remove ID layer
+  dropLayer(1) %>% 
+  # Convert raster to data frame
+  rasterToPoints() %>% 
+  as.data.frame() %>% 
+  # Add year
+  mutate(velocity = sqrt(vxo^2 + vyo^2)) %>%
+  complete(x = seq(min(x - (res_HD[1] / 100)), max(x + (res_HD[1] / 100)), res_HD[1] / 100), 
+           y = seq(min(y - (res_HD[2] / 100)), max(y + (res_HD[2] / 100)), res_HD[2] / 100)) %>%
+  # Remove data that is not relevant for regional maps
+  mutate(vxo = if_else(between(x, -Inf, Inf) & between(y, -Inf, -31), NaN,
+               if_else(between(x, 0, Inf) & between(y, -Inf, -14), NaN, vxo)),
+               # if_else(between(x, 0, Inf) & between(y, 4, Inf), NaN,
+               # if_else(between(x, -12, 2) & between(y, -6, Inf), NaN, vxo)))), 
+         vyo = if_else(between(x, -Inf, Inf) & between(y, -Inf, -31), NaN,
+               if_else(between(x, 0, Inf) & between(y, -Inf, -14), NaN, vyo)))
+               # if_else(between(x, 0, Inf) & between(y, 4, Inf), NaN, 
+               # if_else(between(x, -12, 2) & between(y, -6, Inf), NaN, vyo)))))
+  
+```
+
+Northern Barents Sea.
+
+```{r map-BA, warning=FALSE}
+# Map limits
+xmin <- -1
+xmax <- 18
+ymin <- -13
+ymax <- 5
+
+map_BA <- velo_HD %>%
+ ggplot() +
+  # Plot interpolated current velocity
+  geom_contour_fill(aes(x = x, y = y, z = velocity), binwidth = 0.5, na.fill = T) +
+  # Cover areas that are shallower than our data
+  geom_tile(data = subset(velo_HD, is.na(vxo) == T), aes(x = x, y = y), fill = "white", col = "white") +
+  # Coast
+  geom_polygon(data = coast, aes(x = x, y = y, group = group), fill = "grey30") +
+  # # Current vectors
+  # geom_arrow(aes(x = x, y = y, dx = vxo, dy = vyo, mag = velocity), skip = 1, size = 0.15, arrow.angle = 30,
+  #            arrow.type = "open", arrow.length = 0.5) +
+  # Arctic circle
+  geom_path(data = arctic_circle, aes(x = x, y = y), col = "white", lty = 2, size = 0.3) +
+  # Plot North Pole
+  geom_point(aes(x = 0, y = 0), shape = 4, size = 0.7, stroke = 0.3, col = "white") +
+  # GAM locations
+  # geom_tile(data = SA_new, aes(x = x, y = y), fill = NA, colour = "red", size = 9) +
+  # Scales
+  scale_fill_cmocean("", name = "delta", limits = c(0, 5), end = 0.8, 
+                       oob = scales::squish, alpha = 0.7, breaks = seq(0, 10, 0.5)) +
+  coord_fixed(xlim = c(xmin, xmax), ylim = c(ymin, ymax), expand = F) +
+  guides(mag = "none", alpha = "none", fill = guide_colorsteps(show.limits = T)) +
+  theme(legend.position = "none",
+        panel.grid = element_blank(),
+        axis.line = element_blank(),    
+        axis.title = element_blank(),
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        panel.border = element_rect(fill = NA, size = 0.3))
+ggsave("plots/map_velo_BA.png", map_BA, height = 2.5, width = 2.5, units = "in", dpi = 600)
+
+map_BA_vector <- velo_HD %>%
+ ggplot() +
+  # Coast
+  geom_polygon(data = coast, aes(x = x, y = y, group = group), fill = "transparent") +
+  # Current vectors
+  geom_arrow(aes(x = x, y = y, dx = vxo, dy = vyo, mag = velocity), skip = 1, size = 0.2, arrow.angle = 30,
+             arrow.type = "open", arrow.length = 0.5) +
+  # Scales
+  scale_fill_cmocean("", name = "delta", limits = c(0, 5), end = 0.8, 
+                       oob = scales::squish, alpha = 0, breaks = seq(0, 10, 0.5)) +
+  coord_fixed(xlim = c(xmin, xmax), ylim = c(ymin, ymax), expand = F) +
+  guides(mag = "none", alpha = "none", fill = guide_colorsteps(show.limits = T)) +
+  theme(legend.position = "none",
+        panel.grid = element_blank(),
+        plot.background = element_rect(fill = "transparent", colour = NA),
+        panel.background = element_rect(fill = "transparent", colour = NA),
+        axis.line = element_blank(),    
+        axis.title = element_blank(),
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        panel.border = element_rect(fill = NA, size = 0.3, colour = NA))
+ggsave("plots/map_velo_BA_vector.png", map_BA_vector, bg = "transparent",
+       height = 2.5, width = 2.5, units = "in", dpi = 600)
+```
+
+Baffin Bay.
+
+```{r map-BB, warning=FALSE}
+# Map limits
+xmin <- -15
+xmax <- -1
+ymin <- -30.5
+ymax <- -10
+
+map_BB <- velo_HD %>%
+  ggplot() +
+  # Plot interpolated current velocity
+  geom_contour_fill(aes(x = x, y = y, z = velocity), binwidth = 0.5, na.fill = T) +
+  # Cover areas that are shallower than our data
+  geom_tile(data = subset(velo_HD, is.na(vxo) == T), aes(x = x, y = y), fill = "white", col = "white") +
+  # Coast
+  geom_polygon(data = coast, aes(x = x, y = y, group = group), fill = "grey30") +
+  # Current vectors
+  # geom_arrow(aes(x = x, y = y, dx = vxo, dy = vyo, mag = velocity), skip = 1, size = 0.15, arrow.angle = 30,
+  #            arrow.type = "open", arrow.length = 0.5) +
+  # Arctic circle
+  geom_path(data = arctic_circle, aes(x = x, y = y), col = "white", lty = 2, size = 0.3) +
+  # Plot North Pole
+  geom_point(aes(x = 0, y = 0), shape = 4, size = 0.7, stroke = 0.3, col = "white") +
+  # GAM locations
+  # geom_tile(data = SA_new, aes(x = x, y = y), fill = NA, colour = "red", size = 12) +
+  # Scales
+  scale_fill_cmocean("", name = "delta", limits = c(0, 5), end = 0.8, 
+                       oob = scales::squish, alpha = 0.7, breaks = seq(0, 10, 0.5)) +
+  coord_fixed(xlim = c(xmin, xmax), ylim = c(ymin, ymax), expand = F) +
+  guides(mag = "none", alpha = "none", fill = guide_colorsteps(show.limits = T)) +
+  theme(legend.position = "none",
+        panel.grid = element_blank(),
+        axis.line = element_blank(),
+        axis.title = element_blank(),
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        panel.border = element_rect(fill = NA, size = 0.3))
+ggsave("plots/map_velo_BB.png", map_BB, height = 3.55, width = 3.4, units = "in", dpi = 600)
+
+map_BB_vector <- velo_HD %>%
+ ggplot() +
+  # Coast
+  geom_polygon(data = coast, aes(x = x, y = y, group = group), fill = "transparent") +
+  # Current vectors
+  geom_arrow(aes(x = x, y = y, dx = vxo, dy = vyo, mag = velocity), skip = 1, size = 0.2, arrow.angle = 30,
+             arrow.type = "open", arrow.length = 0.5) +
+  # Scales
+  scale_fill_cmocean("", name = "delta", limits = c(0, 5), end = 0.8, 
+                       oob = scales::squish, alpha = 0, breaks = seq(0, 10, 0.5)) +
+  coord_fixed(xlim = c(xmin, xmax), ylim = c(ymin, ymax), expand = F) +
+  guides(mag = "none", alpha = "none", fill = guide_colorsteps(show.limits = T)) +
+  theme(legend.position = "none",
+        panel.grid = element_blank(),
+        plot.background = element_rect(fill = "transparent", colour = NA),
+        panel.background = element_rect(fill = "transparent", colour = NA),
+        axis.line = element_blank(),    
+        axis.title = element_blank(),
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        panel.border = element_rect(fill = NA, size = 0.3, colour = NA))
+ggsave("plots/map_velo_BB_vector.png", map_BB_vector, bg = "transparent",
+       height = 3.55, width = 3.4, units = "in", dpi = 600)
+```
+
+Beaufort Sea.
+
+```{r map-BF, warning=FALSE}
+# Map limits
+xmin <- -28
+xmax <- -6
+ymin <- -15
+ymax <- 9
+
+map_BF <- velo_HD %>%
+  ggplot() +
+  # Plot interpolated current velocity
+  geom_contour_fill(aes(x = x, y = y, z = velocity), binwidth = 0.5, na.fill = T) +
+  # Cover areas that are shallower than our data
+  geom_tile(data = subset(velo_HD, is.na(vxo) == T), aes(x = x, y = y), fill = "white", col = "white") +
+  # Coast
+  geom_polygon(data = coast, aes(x = x, y = y, group = group), fill = "grey30") +
+  # # Current vectors
+  # geom_arrow(aes(x = x, y = y, dx = vxo, dy = vyo, mag = velocity), skip = 1, size = 0.15, arrow.angle = 30,
+  #            arrow.type = "open", arrow.length = 0.5) +
+  # Arctic circle
+  geom_path(data = arctic_circle, aes(x = x, y = y), col = "white", lty = 2, size = 0.3) +
+  # Plot North Pole
+  geom_point(aes(x = 0, y = 0), shape = 4, size = 0.7, stroke = 0.3, col = "white") +
+  # GAM locations
+  # geom_tile(data = SA_new, aes(x = x, y = y), fill = NA, colour = "red", size = 9) +
+  # Scales
+  scale_fill_cmocean("", name = "delta", limits = c(0, 5), end = 0.8, 
+                       oob = scales::squish, alpha = 0.7, breaks = seq(0, 10, 0.5)) +
+  coord_fixed(xlim = c(xmin, xmax), ylim = c(ymin, ymax), expand = F) +
+  guides(mag = "none", alpha = "none", fill = guide_colorsteps(show.limits = T)) +
+  theme(legend.position = "none",
+        panel.grid = element_blank(),
+        axis.line = element_blank(),
+        axis.title = element_blank(),
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        panel.border = element_rect(fill = NA, size = 0.3))
+ggsave("plots/map_velo_BF.png", map_BF, height = 3.15, width = 3, units = "in", dpi = 600)
+
+map_BF_vector <- velo_HD %>%
+ ggplot() +
+  # Coast
+  geom_polygon(data = coast, aes(x = x, y = y, group = group), fill = "transparent") +
+  # Current vectors
+  geom_arrow(aes(x = x, y = y, dx = vxo, dy = vyo, mag = velocity), skip = 1, size = 0.2, arrow.angle = 30,
+             arrow.type = "open", arrow.length = 0.5) +
+  # Scales
+  scale_fill_cmocean("", name = "delta", limits = c(0, 5), end = 0.8, 
+                       oob = scales::squish, alpha = 0, breaks = seq(0, 10, 0.5)) +
+  coord_fixed(xlim = c(xmin, xmax), ylim = c(ymin, ymax), expand = F) +
+  guides(mag = "none", alpha = "none", fill = guide_colorsteps(show.limits = T)) +
+  theme(legend.position = "none",
+        panel.grid = element_blank(),
+        plot.background = element_rect(fill = "transparent", colour = NA),
+        panel.background = element_rect(fill = "transparent", colour = NA),
+        axis.line = element_blank(),    
+        axis.title = element_blank(),
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        panel.border = element_rect(fill = NA, size = 0.3, colour = NA))
+ggsave("plots/map_velo_BF_vector.png", map_BF_vector, bg = "transparent",
+       height = 3.15, width = 3, units = "in", dpi = 600)
 ```
