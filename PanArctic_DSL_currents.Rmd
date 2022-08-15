@@ -143,7 +143,7 @@ The original projection of the data is: *`r proj_current`*
 
 Each pixel represents a `r paste0(res_current[1] * 100, " km x ", res_current[2] * 100, " km")` cell.
 
-```{r load-coastline-data, message=FALSE, warning=FALSE, include=FALSE}
+```{r load-coastline-data-graticules, message=FALSE, warning=FALSE, include=FALSE}
 proj_coast <- raster(extent(extent_current), crs = proj_current, resolution = res_current)
 
 # Coastline shapefile
@@ -166,8 +166,33 @@ arctic_circle <- data.frame(lon = seq(-180, 180, 0.1)) %>%
   mutate(x = st_coordinates(.)[,1] * 10^-5,
          y = st_coordinates(.)[,2] * 10^-5) %>%
   st_drop_geometry()
-```
 
+# Graticules
+longitudes <- data.frame(lon = rep(seq(-180, 180, 45), each = 200)) %>%
+  group_by(lon) %>%
+  mutate(lat =  seq(0, 89.9, length.out = 200)) %>%
+  ungroup() %>%
+  # Transform into sf
+  st_as_sf(coords = c("lon", "lat"), crs = st_crs("EPSG:4326"), remove = F) %>% 
+  # Change projection
+  st_transform(crs = st_crs(proj_coast)) %>%
+  mutate(x = st_coordinates(.)[,1] * 10^-5,
+         y = st_coordinates(.)[,2] * 10^-5, 
+         lon = factor(lon)) %>%
+  st_drop_geometry()
+latitudes <- data.frame(lat = rep(seq(0, 90, 10), each = 200)) %>%
+  group_by(lat) %>%
+  mutate(lon =  seq(-180, 180, length.out = 200)) %>%
+  ungroup() %>%
+  # Transform into sf
+  st_as_sf(coords = c("lon", "lat"), crs = st_crs("EPSG:4326"), remove = F) %>% 
+  # Change projection
+  st_transform(crs = st_crs(proj_coast)) %>%
+  mutate(x = st_coordinates(.)[,1] * 10^-5,
+         y = st_coordinates(.)[,2] * 10^-5,
+         lat = factor(lat)) %>%
+  st_drop_geometry()
+```
 Here is a plot of current velocity at 380 m depth averaged over 2015-2017.
 
 ```{r plot-velocity-12.5km, message=FALSE, fig.height=8.5, fig.width=10}
@@ -335,14 +360,14 @@ map_velo <- velo_new %>%
   # GAM locations
   # geom_tile(data = SA_new, aes(x = x, y = y), fill = NA, colour = "red", size = 3.8) + 
   # Scales
-  scale_fill_viridis_c("V", option = "viridis", limits = c(0, 5), end = 1, oob = scales::squish,
+  scale_fill_viridis_c("V", option = "viridis", limits = c(0, 6.5), end = 1, oob = scales::squish,
                        alpha = 0.5, breaks = seq(0, 10, 0.5)) +
   scale_x_continuous(breaks = seq(-50, 50 , 5)) +
   scale_y_continuous(breaks = seq(-50, 50 , 5)) +
   coord_fixed(xlim = c(-28, 28), ylim = c(-34, 20), expand = F) +
   guides(mag = "none", alpha = "none", fill = guide_colorsteps(show.limits = T)) +
   theme(legend.position = "right",
-        legend.key.height = unit(0.3, "in"),
+        legend.key.height = unit(0.4, "in"),
         legend.key.width = unit(0.1, "in"),
         panel.border = element_rect(fill = NA, size = 0.3))
 ggsave("plots/map_velo.png", map_velo, height = 8, width = 8, units = "in", dpi = 600)
@@ -367,13 +392,16 @@ map_base <- velo_new_HD %>%
   #            arrow.type = "open", arrow.length = 0.5) +
   # Arctic circle
   geom_path(data = arctic_circle, aes(x = x, y = y), col = "white", lty = 2, size = 0.3) +
+  # Graticules 
+  geom_path(data = latitudes, aes(x = x, y = y, group = lat), col = "grey20", size = 0.15, alpha = 0.75) +
+  geom_path(data = longitudes, aes(x = x, y = y, group = lon), col = "grey20", size = 0.15, alpha = 0.75) +
   # Plot North Pole
   # geom_point(aes(x = 0, y = 0), shape = 3, size = 0.7, stroke = 0.7, col = "#F05223") +
   # GAM locations
   # geom_tile(data = SA_new, aes(x = x, y = y), fill = NA, colour = "red", size = 3.6) +
   # Scales
-  scale_fill_cmocean("", name = "delta", limits = c(0, 5), end = 0.8, 
-                       oob = scales::squish, alpha = 0.7, breaks = seq(0, 10, 0.5)) +
+  scale_fill_cmocean("", name = "delta", limits = c(0, 6.5), end = 0.95, oob = scales::squish, 
+                     alpha = 0.7, breaks = seq(0, 10, 0.5)) +
   coord_fixed(xlim = c(-45, 45), ylim = c(-45, 45), expand = F) +
   guides(mag = "none", alpha = "none", fill = guide_colorsteps(show.limits = T)) +
   theme(legend.position = "right",
@@ -402,7 +430,7 @@ map_vectors <- velo_new %>%
   geom_arrow(aes(x = x, y = y, dx = vxo, dy = vyo, mag = velocity), skip = 0, size = 0.15, 
              arow.angle = 30, arrow.type = "open", arrow.length = 0.75) +
   # Scales
-  scale_fill_cmocean("", name = "delta", limits = c(0, 5), end = 0.7, oob = scales::squish,
+  scale_fill_cmocean("", name = "delta", limits = c(0, 6.5), end = 0.95, oob = scales::squish, 
                      alpha = 0, breaks = seq(0, 10, 0.5)) +
   coord_fixed(xlim = c(-45, 45), ylim = c(-45, 45), expand = F) +
   guides(mag = "none", alpha = "none", fill = guide_colorsteps(show.limits = T)) +
@@ -443,10 +471,10 @@ Northern Barents Sea.
 
 ```{r map-BA, warning=FALSE}
 # Map limits
-xmin <- -1
+xmin <- 0
 xmax <- 18
-ymin <- -13
-ymax <- 5
+ymin <- -12
+ymax <- 4
 
 map_BA <- velo_HD %>%
  ggplot() +
@@ -460,14 +488,17 @@ map_BA <- velo_HD %>%
   # geom_arrow(aes(x = x, y = y, dx = vxo, dy = vyo, mag = velocity), skip = 1, size = 0.15, arrow.angle = 30,
   #            arrow.type = "open", arrow.length = 0.5) +
   # Arctic circle
-  geom_path(data = arctic_circle, aes(x = x, y = y), col = "white", lty = 2, size = 0.3) +
+  geom_path(data = arctic_circle, aes(x = x, y = y), col = "grey80", lty = 2, size = 0.3) +
+  # Graticules 
+  geom_path(data = latitudes, aes(x = x, y = y, group = lat), col = "grey20", size = 0.15, alpha = 0.75) +
+  geom_path(data = longitudes, aes(x = x, y = y, group = lon), col = "grey20", size = 0.15, alpha = 0.75) +
   # Plot North Pole
   geom_point(aes(x = 0, y = 0), shape = 4, size = 0.7, stroke = 0.3, col = "white") +
   # GAM locations
-  # geom_tile(data = SA_new, aes(x = x, y = y), fill = NA, colour = "red", size = 9) +
+  # geom_tile(data = SA_new, aes(x = x, y = y), fill = NA, colour = "red", size = 12) +
   # Scales
-  scale_fill_cmocean("", name = "delta", limits = c(0, 5), end = 0.8, 
-                       oob = scales::squish, alpha = 0.7, breaks = seq(0, 10, 0.5)) +
+  scale_fill_cmocean("", name = "delta", limits = c(0, 6.5), end = 0.95, oob = scales::squish, 
+                     alpha = 0.7, breaks = seq(0, 10, 0.5)) +
   coord_fixed(xlim = c(xmin, xmax), ylim = c(ymin, ymax), expand = F) +
   guides(mag = "none", alpha = "none", fill = guide_colorsteps(show.limits = T)) +
   theme(legend.position = "none",
@@ -477,7 +508,7 @@ map_BA <- velo_HD %>%
         axis.text = element_blank(),
         axis.ticks = element_blank(),
         panel.border = element_rect(fill = NA, size = 0.3))
-ggsave("plots/map_velo_BA.png", map_BA, height = 2.5, width = 2.5, units = "in", dpi = 600)
+ggsave("plots/map_velo_BA.png", map_BA, height = 3, width = 3, units = "in", dpi = 600)
 
 map_BA_vector <- velo_HD %>%
  ggplot() +
@@ -487,8 +518,8 @@ map_BA_vector <- velo_HD %>%
   geom_arrow(aes(x = x, y = y, dx = vxo, dy = vyo, mag = velocity), skip = 1, size = 0.2, arrow.angle = 30,
              arrow.type = "open", arrow.length = 0.5) +
   # Scales
-  scale_fill_cmocean("", name = "delta", limits = c(0, 5), end = 0.8, 
-                       oob = scales::squish, alpha = 0, breaks = seq(0, 10, 0.5)) +
+  scale_fill_cmocean("", name = "delta", limits = c(0, 6.5), end = 0.95, oob = scales::squish, 
+                     alpha = 0, breaks = seq(0, 10, 0.5)) +
   coord_fixed(xlim = c(xmin, xmax), ylim = c(ymin, ymax), expand = F) +
   guides(mag = "none", alpha = "none", fill = guide_colorsteps(show.limits = T)) +
   theme(legend.position = "none",
@@ -501,17 +532,17 @@ map_BA_vector <- velo_HD %>%
         axis.ticks = element_blank(),
         panel.border = element_rect(fill = NA, size = 0.3, colour = NA))
 ggsave("plots/map_velo_BA_vector.png", map_BA_vector, bg = "transparent",
-       height = 2.5, width = 2.5, units = "in", dpi = 600)
+       height = 3, width = 3, units = "in", dpi = 600)
 ```
 
 Baffin Bay.
 
 ```{r map-BB, warning=FALSE}
 # Map limits
-xmin <- -15
-xmax <- -1
-ymin <- -30.5
-ymax <- -10
+xmin <- -19
+xmax <- 3
+ymin <- -29
+ymax <- -4
 
 map_BB <- velo_HD %>%
   ggplot() +
@@ -526,13 +557,16 @@ map_BB <- velo_HD %>%
   #            arrow.type = "open", arrow.length = 0.5) +
   # Arctic circle
   geom_path(data = arctic_circle, aes(x = x, y = y), col = "white", lty = 2, size = 0.3) +
+  # Graticules 
+  geom_path(data = latitudes, aes(x = x, y = y, group = lat), col = "grey20", size = 0.15, alpha = 0.75) +
+  geom_path(data = longitudes, aes(x = x, y = y, group = lon), col = "grey20", size = 0.15, alpha = 0.75) +
   # Plot North Pole
   geom_point(aes(x = 0, y = 0), shape = 4, size = 0.7, stroke = 0.3, col = "white") +
   # GAM locations
-  # geom_tile(data = SA_new, aes(x = x, y = y), fill = NA, colour = "red", size = 12) +
+  # geom_tile(data = SA_new, aes(x = x, y = y), fill = NA, colour = "red", size = 11) +
   # Scales
-  scale_fill_cmocean("", name = "delta", limits = c(0, 5), end = 0.8, 
-                       oob = scales::squish, alpha = 0.7, breaks = seq(0, 10, 0.5)) +
+  scale_fill_cmocean("", name = "delta", limits = c(0, 6.5), end = 0.95, oob = scales::squish, 
+                     alpha = 0.7, breaks = seq(0, 10, 0.5)) +
   coord_fixed(xlim = c(xmin, xmax), ylim = c(ymin, ymax), expand = F) +
   guides(mag = "none", alpha = "none", fill = guide_colorsteps(show.limits = T)) +
   theme(legend.position = "none",
@@ -542,7 +576,7 @@ map_BB <- velo_HD %>%
         axis.text = element_blank(),
         axis.ticks = element_blank(),
         panel.border = element_rect(fill = NA, size = 0.3))
-ggsave("plots/map_velo_BB.png", map_BB, height = 3.55, width = 3.4, units = "in", dpi = 600)
+ggsave("plots/map_velo_BB.png", map_BB, height = 4, width = 4, units = "in", dpi = 600)
 
 map_BB_vector <- velo_HD %>%
  ggplot() +
@@ -552,8 +586,8 @@ map_BB_vector <- velo_HD %>%
   geom_arrow(aes(x = x, y = y, dx = vxo, dy = vyo, mag = velocity), skip = 1, size = 0.2, arrow.angle = 30,
              arrow.type = "open", arrow.length = 0.5) +
   # Scales
-  scale_fill_cmocean("", name = "delta", limits = c(0, 5), end = 0.8, 
-                       oob = scales::squish, alpha = 0, breaks = seq(0, 10, 0.5)) +
+  scale_fill_cmocean("", name = "delta", limits = c(0, 6.5), end = 0.95, oob = scales::squish, 
+                     alpha = 0, breaks = seq(0, 10, 0.5)) +
   coord_fixed(xlim = c(xmin, xmax), ylim = c(ymin, ymax), expand = F) +
   guides(mag = "none", alpha = "none", fill = guide_colorsteps(show.limits = T)) +
   theme(legend.position = "none",
@@ -566,17 +600,17 @@ map_BB_vector <- velo_HD %>%
         axis.ticks = element_blank(),
         panel.border = element_rect(fill = NA, size = 0.3, colour = NA))
 ggsave("plots/map_velo_BB_vector.png", map_BB_vector, bg = "transparent",
-       height = 3.55, width = 3.4, units = "in", dpi = 600)
+       height = 4, width = 4, units = "in", dpi = 600)
 ```
 
 Beaufort Sea.
 
 ```{r map-BF, warning=FALSE}
 # Map limits
-xmin <- -28
-xmax <- -6
-ymin <- -15
-ymax <- 9
+xmin <- -26
+xmax <- -10
+ymin <- -11
+ymax <- 6
 
 map_BF <- velo_HD %>%
   ggplot() +
@@ -591,13 +625,16 @@ map_BF <- velo_HD %>%
   #            arrow.type = "open", arrow.length = 0.5) +
   # Arctic circle
   geom_path(data = arctic_circle, aes(x = x, y = y), col = "white", lty = 2, size = 0.3) +
+  # Graticules 
+  geom_path(data = latitudes, aes(x = x, y = y, group = lat), col = "grey20", size = 0.15, alpha = 0.75) +
+  geom_path(data = longitudes, aes(x = x, y = y, group = lon), col = "grey20", size = 0.15, alpha = 0.75) +
   # Plot North Pole
   geom_point(aes(x = 0, y = 0), shape = 4, size = 0.7, stroke = 0.3, col = "white") +
   # GAM locations
-  # geom_tile(data = SA_new, aes(x = x, y = y), fill = NA, colour = "red", size = 9) +
+  # geom_tile(data = SA_new, aes(x = x, y = y), fill = NA, colour = "red", size = 13) +
   # Scales
-  scale_fill_cmocean("", name = "delta", limits = c(0, 5), end = 0.8, 
-                       oob = scales::squish, alpha = 0.7, breaks = seq(0, 10, 0.5)) +
+  scale_fill_cmocean("", name = "delta", limits = c(0, 6.5), end = 0.95, oob = scales::squish, 
+                     alpha = 0.7, breaks = seq(0, 10, 0.5)) +
   coord_fixed(xlim = c(xmin, xmax), ylim = c(ymin, ymax), expand = F) +
   guides(mag = "none", alpha = "none", fill = guide_colorsteps(show.limits = T)) +
   theme(legend.position = "none",
@@ -617,8 +654,8 @@ map_BF_vector <- velo_HD %>%
   geom_arrow(aes(x = x, y = y, dx = vxo, dy = vyo, mag = velocity), skip = 1, size = 0.2, arrow.angle = 30,
              arrow.type = "open", arrow.length = 0.5) +
   # Scales
-  scale_fill_cmocean("", name = "delta", limits = c(0, 5), end = 0.8, 
-                       oob = scales::squish, alpha = 0, breaks = seq(0, 10, 0.5)) +
+  scale_fill_cmocean("", name = "delta", limits = c(0, 6.5), end = 0.95, oob = scales::squish, 
+                     alpha = 0, breaks = seq(0, 10, 0.5)) +
   coord_fixed(xlim = c(xmin, xmax), ylim = c(ymin, ymax), expand = F) +
   guides(mag = "none", alpha = "none", fill = guide_colorsteps(show.limits = T)) +
   theme(legend.position = "none",

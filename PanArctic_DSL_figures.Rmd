@@ -491,7 +491,7 @@ map_laea <- bathy_laea %>%
   # LME
   geom_polygon(data = subset(LME, LME_study == "a"), 
                aes(x = xc, y = yc, group = group, col = LME_study), 
-               col = "#C12126", fill = NA, lwd = 0.35, lty = 1) +
+               col = "#F05223", fill = NA, lwd = 0.35, lty = 1) +
   # Plot coastlines
   geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group),
                fill = "grey30") +
@@ -513,7 +513,7 @@ map_laea <- bathy_laea %>%
   geom_point(data = trawl_laea, aes(x = xc, y = yc),
              shape = 23, fill = "#E69F00", size = 2) +
   # Plot North Pole
-  geom_point(aes(x = 0, y = 0), shape = 4, size = 1, stroke = 0.3) +
+  geom_point(aes(x = 0, y = 0), shape = 4, size = 1, stroke = 0.7, col = "#F05223") +
   theme(legend.position = "right", 
         panel.border = element_rect(fill = NA, size = 1),
         axis.line = element_blank(),
@@ -533,7 +533,7 @@ map_laea_lon <- bathy_laea %>%
   # LME
   geom_polygon(data = subset(LME, LME_study == "a"), 
                aes(x = xc, y = yc, group = group, col = LME_study), 
-               col = "#C12126", fill = NA, lwd = 0.35, lty = 1) +
+               col = "#F05223", fill = NA, lwd = 0.35, lty = 1) +
   # Plot coastlines
   geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group),
                fill = "grey30") +
@@ -564,7 +564,7 @@ map_laea_lon <- bathy_laea %>%
   geom_point(data = trawl_laea, aes(x = xc, y = yc),
              shape = 23, fill = "#E69F00", size = 2) +
   # Plot North Pole
-  geom_point(aes(x = 0, y = 0), shape = 4, stroke = 0.5) +
+  geom_point(aes(x = 0, y = 0), shape = 4, size = 1, stroke = 0.7, col = "#F05223") +
   theme(legend.position = "right", 
         panel.border = element_rect(fill = NA, size = 1),
         axis.line = element_blank(),
