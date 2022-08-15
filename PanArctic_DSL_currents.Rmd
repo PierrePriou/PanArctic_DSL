@@ -228,7 +228,7 @@ Define projections and calculate the mean velocity and direction for each grid c
 r_current <- raster(extent(extent_current), crs = proj_current, resolution = res_current)
 
 # Set new projection 
-res_new <- c(50, 50) # in km
+res_new <- c(125, 125) # in km
 r_new <- raster(extent(extent_current), crs = proj_current, resolution = res_new / 100)
 
 # Convert to spatial data
@@ -368,7 +368,7 @@ map_base <- velo_new_HD %>%
   # Arctic circle
   geom_path(data = arctic_circle, aes(x = x, y = y), col = "white", lty = 2, size = 0.3) +
   # Plot North Pole
-  geom_point(aes(x = 0, y = 0), shape = 4, size = 0.7, stroke = 0.3, col = "white") +
+  # geom_point(aes(x = 0, y = 0), shape = 3, size = 0.7, stroke = 0.7, col = "#F05223") +
   # GAM locations
   # geom_tile(data = SA_new, aes(x = x, y = y), fill = NA, colour = "red", size = 3.6) +
   # Scales
@@ -391,15 +391,15 @@ ggsave("plots/map_velo_base.png", map_base, height = 5, width = 5, units = "in",
 Current vectors only. 
 
 ```{r map-current-vectors, warning=FALSE, fig.height=3, fig.width=4}
-map_vectors <- velo_new_HD %>%
-  filter(between(x, -40, 40) & between(y, -41, 40)) %>%
+map_vectors <- velo_new %>%
+  # filter(between(x, -40, 40) & between(y, -45, 40)) %>%
   ggplot() +
   # Plot interpolated current velocity
   geom_contour_fill(aes(x = x, y = y, z = velocity), binwidth = 0.5, na.fill = T) +
   # Coast
   geom_polygon(data = coast, aes(x = x, y = y, group = group), fill = "transparent") +
   # Current vectors
-  geom_arrow(aes(x = x, y = y, dx = vxo, dy = vyo, mag = velocity), skip = 4, size = 0.2, 
+  geom_arrow(aes(x = x, y = y, dx = vxo, dy = vyo, mag = velocity), skip = 0, size = 0.15, 
              arow.angle = 30, arrow.type = "open", arrow.length = 0.75) +
   # Scales
   scale_fill_cmocean("", name = "delta", limits = c(0, 5), end = 0.7, oob = scales::squish,
@@ -422,30 +422,11 @@ ggsave("plots/map_vectors.png", map_vectors, bg = "transparent", height = 5, wid
 
 ## Regional maps
 
-```{r new-projection-raster-HD}
-# Set new projection 
-res_HD <- c(25, 25) # in km
-r_HD <- raster(extent(extent_current), crs = proj_current, resolution = res_HD / 100)
+For regional maps, I remove data that is outside of the areas of interest. 
 
+```{r projection-HD-regions}
 # Convert to spatial data
-velo_HD <- SpatialPointsDataFrame(
-  SpatialPoints(cbind(velo$x, velo$y), proj4string = crs(r_current)),
-  data.frame(lat = velo$lat,
-             lon = velo$lon,
-             vxo = velo$vxo,
-             vyo = velo$vyo,
-             thetao = velo$thetao)) %>%
-  # Rasterize on the new grid
-  rasterize(., r_HD, fun = mean, na.rm = T) %>% 
-  # Remove ID layer
-  dropLayer(1) %>% 
-  # Convert raster to data frame
-  rasterToPoints() %>% 
-  as.data.frame() %>% 
-  # Add year
-  mutate(velocity = sqrt(vxo^2 + vyo^2)) %>%
-  complete(x = seq(min(x - (res_HD[1] / 100)), max(x + (res_HD[1] / 100)), res_HD[1] / 100), 
-           y = seq(min(y - (res_HD[2] / 100)), max(y + (res_HD[2] / 100)), res_HD[2] / 100)) %>%
+velo_HD <- velo_new_HD %>%
   # Remove data that is not relevant for regional maps
   mutate(vxo = if_else(between(x, -Inf, Inf) & between(y, -Inf, -31), NaN,
                if_else(between(x, 0, Inf) & between(y, -Inf, -14), NaN, vxo)),
