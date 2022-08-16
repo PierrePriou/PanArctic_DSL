@@ -1141,42 +1141,6 @@ data.frame(model = c("GAMSA_S", "GAMSA_S2"),
   datatable(class = "cell-border stribe", rownames = F)
 ```
 
-#### Final model 
-Refit model with REML
-
-```{r fit-GAMSAS3-reml}
-GAMSA_S3 <- gam(SA_int ~ 
-                  s(year, bs = "re") +
-                  # s(LME, bs = "re") +
-                  s(v, LME, bs = "fs", k = 5),
-                data = SA_df, family = "gaussian", method = "REML")
-summary(GAMSA_S3)
-```
-
-Check residuals.
-
-```{r GAMSAS3-residuals-covariates, message=FALSE}
-appraise(GAMSA_S3)
-GAMSA_S3_resid <- bind_cols(SA_df, residuals.gam(GAMSA_S3)) %>%
-  rename(resid = "...9")
-plot_grid(GAMSA_S3_resid %>%
-            ggplot(aes(x = v, y = resid)) + 
-            geom_hline(yintercept = 0, col = "red") +
-            labs(x = "velocity") +
-            geom_point(), 
-          GAMSA_S3_resid %>%
-            ggplot(aes(x = LME, y = resid)) + 
-            geom_hline(yintercept = 0, col = "red") +
-            labs(x = "area") +
-            geom_boxplot(fill = NA), 
-          GAMSA_S3_resid %>%
-            ggplot(aes(x = year, y = resid)) + 
-            geom_hline(yintercept = 0, col = "red") +
-            labs(x = "year") +
-            geom_boxplot(fill = NA),
-          nrow = 1)
-```
-
 ### Model I
 
 ```{r shrink-GAMSAI-selection}
@@ -1231,7 +1195,46 @@ data.frame(model = c("GAMSA_I", "GAMSA_I2"),
   datatable(class = "cell-border stribe", rownames = F)
 ```
 
-#### Final model 
+
+## Final models
+
+### Model S
+Refit model with REML
+
+```{r fit-GAMSAS3-reml}
+GAMSA_S3 <- gam(SA_int ~ 
+                  s(year, bs = "re") +
+                  # s(LME, bs = "re") +
+                  s(v, LME, bs = "fs", k = 5),
+                data = SA_df, family = "gaussian", method = "REML")
+summary(GAMSA_S3)
+```
+
+Check residuals.
+
+```{r GAMSAS3-residuals-covariates, message=FALSE}
+appraise(GAMSA_S3)
+GAMSA_S3_resid <- bind_cols(SA_df, residuals.gam(GAMSA_S3)) %>%
+  rename(resid = "...9")
+plot_grid(GAMSA_S3_resid %>%
+            ggplot(aes(x = v, y = resid)) + 
+            geom_hline(yintercept = 0, col = "red") +
+            labs(x = "velocity") +
+            geom_point(), 
+          GAMSA_S3_resid %>%
+            ggplot(aes(x = LME, y = resid)) + 
+            geom_hline(yintercept = 0, col = "red") +
+            labs(x = "area") +
+            geom_boxplot(fill = NA), 
+          GAMSA_S3_resid %>%
+            ggplot(aes(x = year, y = resid)) + 
+            geom_hline(yintercept = 0, col = "red") +
+            labs(x = "year") +
+            geom_boxplot(fill = NA),
+          nrow = 1)
+```
+
+### Model I
 
 Refit model with REML
 
@@ -1399,3 +1402,23 @@ GAMSAI_velo <- predSA_I %>%
 # Combine plots
 plot_grid(GAMSAS_velo, GAMSAI_velo, ncol = 1)
 ```
+
+```{r}
+library(plotly)
+predSA_I %>%
+  filter(var == "v") %>%
+  ggplot() +
+  geom_line(aes(x = v, y = fitted, col = LME), size = 0.8) +
+  geom_ribbon(aes(x = v, ymin = lwr_ci, ymax = upr_ci, fill = LME), 
+              alpha = 0.1) +
+  scale_colour_manual(values = met.brewer("Johnson", n = 6, direction = -1)) +
+  scale_fill_manual(values = met.brewer("Johnson", n = 6, direction = -1)) +
+  coord_cartesian(ylim = c(-2, 30), expand = T) +
+  scale_x_continuous(breaks = seq(0, 10, 1)) +
+  scale_y_continuous(breaks = seq(0, 50, 10)) +
+  theme(panel.grid = element_line(color = "grey80"),
+        axis.line = element_line(),
+        legend.title = element_blank(), 
+        legend.position = "top")
+```
+

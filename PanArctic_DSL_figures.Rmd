@@ -430,53 +430,41 @@ SA_grid_laea %>%
 ## Figure 1. Base map with IHO areas reprojcted
 
 ```{r map-areas, fig.height=4, fig.width=6}
-lat70 <- data.frame(lon = seq(-180, 180, length.out = 1000)) %>%
-  mutate(lat = rep(70, 1000)) %>%
-  st_as_sf(coords = c("lon", "lat"),
-           crs = st_crs("EPSG:4326"), remove = F) %>% # Transform into sf
-  st_transform(crs = st_crs(arctic_laea)) %>% # Change projection
+# Graticules
+longitudes <- data.frame(lon = rep(seq(-180, 180, 45), each = 200)) %>%
+  group_by(lon) %>%
+  mutate(lat =  seq(0, 80, length.out = 200)) %>%
+  ungroup() %>%
+  # Transform into sf
+  st_as_sf(coords = c("lon", "lat"), crs = st_crs("EPSG:4326"), remove = F) %>% 
+  # Change projection
+  st_transform(crs = st_crs(arctic_laea)) %>%
   mutate(xc = st_coordinates(.)[,1],
-         yc = st_coordinates(.)[,2]) %>%
+         yc = st_coordinates(.)[,2], 
+         lon = factor(lon)) %>%
   st_drop_geometry()
-lat80 <- data.frame(lon = seq(-180, 180, length.out = 1000)) %>%
-  mutate(lat = rep(80, 1000)) %>%
-  st_as_sf(coords = c("lon", "lat"),
-           crs = st_crs("EPSG:4326"), remove = F) %>% # Transform into sf
-  st_transform(crs = st_crs(arctic_laea)) %>% # Change projection
+latitudes <- data.frame(lat = rep(seq(0, 90, 10), each = 200)) %>%
+  group_by(lat) %>%
+  mutate(lon =  seq(-180, 180, length.out = 200)) %>%
+  ungroup() %>%
+  # Transform into sf
+  st_as_sf(coords = c("lon", "lat"), crs = st_crs("EPSG:4326"), remove = F) %>% 
+  # Change projection
+  st_transform(crs = st_crs(arctic_laea)) %>%
   mutate(xc = st_coordinates(.)[,1],
-         yc = st_coordinates(.)[,2]) %>%
+         yc = st_coordinates(.)[,2], 
+         lon = factor(lon)) %>%
   st_drop_geometry()
-lon0 <- data.frame(lon = rep(0, 1000)) %>%
-  mutate(lat =  seq(0, 90, length.out = 1000)) %>%
-  st_as_sf(coords = c("lon", "lat"),
-           crs = st_crs("EPSG:4326"), remove = F) %>% # Transform into sf
-  st_transform(crs = st_crs(arctic_laea)) %>% # Change projection
+can_usa <- data.frame(lon = rep(-141, 200)) %>%
+  mutate(lat =  seq(0, 69.64, length.out = 200)) %>%
+  ungroup() %>%
+  # Transform into sf
+  st_as_sf(coords = c("lon", "lat"), crs = st_crs("EPSG:4326"), remove = F) %>% 
+  # Change projection
+  st_transform(crs = st_crs(arctic_laea)) %>%
   mutate(xc = st_coordinates(.)[,1],
-         yc = st_coordinates(.)[,2]) %>%
-  st_drop_geometry()
-lon90 <- data.frame(lon = rep(90, 1000)) %>%
-  mutate(lat =  seq(0, 90, length.out = 1000)) %>%
-  st_as_sf(coords = c("lon", "lat"),
-           crs = st_crs("EPSG:4326"), remove = F) %>% # Transform into sf
-  st_transform(crs = st_crs(arctic_laea)) %>% # Change projection
-  mutate(xc = st_coordinates(.)[,1],
-         yc = st_coordinates(.)[,2]) %>%
-  st_drop_geometry()
-lon180 <- data.frame(lon = rep(180, 1000)) %>%
-  mutate(lat =  seq(0, 90, length.out = 1000)) %>%
-  st_as_sf(coords = c("lon", "lat"),
-           crs = st_crs("EPSG:4326"), remove = F) %>% # Transform into sf
-  st_transform(crs = st_crs(arctic_laea)) %>% # Change projection
-  mutate(xc = st_coordinates(.)[,1],
-         yc = st_coordinates(.)[,2]) %>%
-  st_drop_geometry()
-lon90e <- data.frame(lon = rep(-90, 1000)) %>%
-  mutate(lat =  seq(0, 90, length.out = 1000)) %>%
-  st_as_sf(coords = c("lon", "lat"),
-           crs = st_crs("EPSG:4326"), remove = F) %>% # Transform into sf
-  st_transform(crs = st_crs(arctic_laea)) %>% # Change projection
-  mutate(xc = st_coordinates(.)[,1],
-         yc = st_coordinates(.)[,2]) %>%
+         yc = st_coordinates(.)[,2], 
+         lon = factor(lon)) %>%
   st_drop_geometry()
 
 map_laea <- bathy_laea %>%
@@ -495,11 +483,10 @@ map_laea <- bathy_laea %>%
   # Plot coastlines
   geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group),
                fill = "grey30") +
-  # Latitudes 
-  geom_path(data = lat70, aes(x = xc, y = yc), 
-            col = "white", lty = 2, size = 0.4) +
-  geom_path(data = lat80, aes(x = xc, y = yc), 
-            col = "white", lty = 2, size = 0.4) +
+  # Graticules 
+  geom_path(data = latitudes, aes(x = xc, y = yc, group = lat), col = "grey95", size = 0.4, lty = 2) +
+  geom_path(data = longitudes, aes(x = xc, y = yc, group = lon), col = "grey95", size = 0.4, lty = 2) +
+  geom_path(data = can_usa, aes(x = xc, y = yc, group = lon), col = "grey5", size = 0.4) +
   # Arctic circle
   geom_path(data = arctic_circle_laea, aes(x = xc, y = yc), 
             col = "white", lty = 2, size = 0.4) +
@@ -520,59 +507,57 @@ map_laea <- bathy_laea %>%
         axis.text = element_blank(),
         axis.ticks = element_blank(), 
         axis.title = element_blank())
-ggsave("plots/base_map_laea_stations.png",
-       map_laea, height = 4, width = 6, dpi = 600, units = "in")
+ggsave("plots/base_map_laea_stations.png", map_laea, height = 4, width = 6, dpi = 600, units = "in")
 
-map_laea_lon <- bathy_laea %>%
-  ggplot(aes(x = xc, y = yc)) +
-  # Plot bathy
-  geom_raster(aes(fill = depth_d), alpha = 0.8) +
-  scale_fill_grey("Depth (m)", start = 0.9, end = 0.3) +
-  # guides(fill = "none") + 
-  new_scale_fill() +
-  # LME
-  geom_polygon(data = subset(LME, LME_study == "a"), 
-               aes(x = xc, y = yc, group = group, col = LME_study), 
-               col = "#F05223", fill = NA, lwd = 0.35, lty = 1) +
-  # Plot coastlines
-  geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group),
-               fill = "grey30") +
-  # Latitudes 
-  geom_path(data = lat70, aes(x = xc, y = yc), 
-            col = "white", lty = 2, size = 0.4, alpha = 0.75) +
-  geom_path(data = lat80, aes(x = xc, y = yc), 
-            col = "white", lty = 2, size = 0.4, alpha = 0.75) +
-  # Longitudes 
-  geom_path(data = lon0, aes(x = xc, y = yc), 
-            col = "red", lty = 1, size = 0.4, alpha = 0.75) +
-  geom_path(data = lon90, aes(x = xc, y = yc), 
-            col = "red", lty = 1, size = 0.4, alpha = 0.75) +
-  geom_path(data = lon180, aes(x = xc, y = yc), 
-            col = "red", lty = 1, size = 0.4, alpha = 0.75) +
-  geom_path(data = lon90e, aes(x = xc, y = yc), 
-            col = "red", lty = 1, size = 0.4, alpha = 0.75) +
-  # Arctic circle
-  geom_path(data = arctic_circle_laea, aes(x = xc, y = yc), 
-            col = "white", lty = 2, size = 0.4) +
-  coord_fixed(xlim = c(-2500, 1700), ylim = c(-1700, 2200), expand = F) +
-  guides(fill = "none") +
-   # Acoustics
-  geom_point(data = MVBS_laea, aes(x = xc, y = yc), 
-             shape = 20, col = "#a00e00",#"#009E73",
-             alpha = 0.5) +
-  # Trawls
-  geom_point(data = trawl_laea, aes(x = xc, y = yc),
-             shape = 23, fill = "#E69F00", size = 2) +
-  # Plot North Pole
-  geom_point(aes(x = 0, y = 0), shape = 4, size = 1, stroke = 0.7, col = "#F05223") +
-  theme(legend.position = "right", 
-        panel.border = element_rect(fill = NA, size = 1),
-        axis.line = element_blank(),
-        axis.text = element_blank(),
-        axis.ticks = element_blank(), 
-        axis.title = element_blank())
-ggsave("plots/base_map_laea_stations_lon.png",
-       map_laea_lon, height = 4, width = 6, dpi = 600, units = "in")
+# map_laea_lon <- bathy_laea %>%
+#   ggplot(aes(x = xc, y = yc)) +
+#   # Plot bathy
+#   geom_raster(aes(fill = depth_d), alpha = 0.8) +
+#   scale_fill_grey("Depth (m)", start = 0.9, end = 0.3) +
+#   # guides(fill = "none") + 
+#   new_scale_fill() +
+#   # LME
+#   geom_polygon(data = subset(LME, LME_study == "a"), 
+#                aes(x = xc, y = yc, group = group, col = LME_study), 
+#                col = "#F05223", fill = NA, lwd = 0.35, lty = 1) +
+#   # Plot coastlines
+#   geom_polygon(data = coast_10m_laea, aes(x = xc, y = yc, group = group),
+#                fill = "grey30") +
+#   # Graticules 
+#   geom_path(data = latitudes, aes(x = x, y = y, group = lat), col = "grey20", size = 0.2, alpha = 0.9) +
+#   geom_path(data = longitudes, aes(x = x, y = y, group = lon), col = "grey20", size = 0.2, alpha = 0.9) +
+#   geom_path(data = can_usa, aes(x = x, y = y, group = lon), col = "grey50", size = 0.2) +
+#   # Longitudes 
+#   geom_path(data = lon0, aes(x = xc, y = yc), 
+#             col = "red", lty = 1, size = 0.4, alpha = 0.75) +
+#   geom_path(data = lon90, aes(x = xc, y = yc), 
+#             col = "red", lty = 1, size = 0.4, alpha = 0.75) +
+#   geom_path(data = lon180, aes(x = xc, y = yc), 
+#             col = "red", lty = 1, size = 0.4, alpha = 0.75) +
+#   geom_path(data = lon90e, aes(x = xc, y = yc), 
+#             col = "red", lty = 1, size = 0.4, alpha = 0.75) +
+#   # Arctic circle
+#   geom_path(data = arctic_circle_laea, aes(x = xc, y = yc), 
+#             col = "white", lty = 2, size = 0.4) +
+#   coord_fixed(xlim = c(-2500, 1700), ylim = c(-1700, 2200), expand = F) +
+#   guides(fill = "none") +
+#    # Acoustics
+#   geom_point(data = MVBS_laea, aes(x = xc, y = yc), 
+#              shape = 20, col = "#a00e00",#"#009E73",
+#              alpha = 0.5) +
+#   # Trawls
+#   geom_point(data = trawl_laea, aes(x = xc, y = yc),
+#              shape = 23, fill = "#E69F00", size = 2) +
+#   # Plot North Pole
+#   geom_point(aes(x = 0, y = 0), shape = 4, size = 1, stroke = 0.7, col = "#F05223") +
+#   theme(legend.position = "right", 
+#         panel.border = element_rect(fill = NA, size = 1),
+#         axis.line = element_blank(),
+#         axis.text = element_blank(),
+#         axis.ticks = element_blank(), 
+#         axis.title = element_blank())
+# ggsave("plots/base_map_laea_stations_lon.png",
+#        map_laea_lon, height = 4, width = 6, dpi = 600, units = "in")
 ```
 
 ## Figure 2. Boxplot mesopelagic NASC
