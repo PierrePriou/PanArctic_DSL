@@ -1045,7 +1045,13 @@ plot_grid(GAMSA_S_resid %>%
             geom_hline(yintercept = 0, col = "red") +
             labs(x = "year") +
             geom_boxplot(fill = NA), 
-          nrow = 1)
+          GAMSA_S_resid %>%
+            ggplot(aes(x = xc, y = yc, col = sign(resid), size = abs(resid))) +
+            geom_point() +
+            metR::scale_color_divergent() + 
+            coord_fixed() +
+            scale_size(range = c(0.5, 4)),
+          nrow = 2)
 ```
 
 ```{r GAMSAI-residuals-covariates, message=FALSE}
@@ -1066,7 +1072,13 @@ plot_grid(GAMSA_I_resid %>%
             geom_hline(yintercept = 0, col = "red") +
             labs(x = "year") +
             geom_boxplot(fill = NA),
-          nrow = 1)
+          GAMSA_I_resid %>%
+            ggplot(aes(x = xc, y = yc, col = sign(resid), size = abs(resid))) +
+            geom_point() +
+            metR::scale_color_divergent() + 
+            coord_fixed() +
+            scale_size(range = c(0.5, 4)),
+          nrow = 2)
 ```
 
 ### Autotcorrelation
@@ -1077,12 +1089,30 @@ acf(resid(GAMSA_S), lag.max = 20, main = "ACF")
 pacf(resid(GAMSA_S), lag.max = 20, main = "pACF")
 ```
 
+```{r}
+GAMSA_S_resid %>%
+  ggplot(aes(x = xc, y = yc, col = resid)) +
+  geom_point() +
+  metR::scale_color_divergent() + 
+  coord_fixed() +
+  facet_wrap(~ year)
+```
+
+
 ```{r GAMSAI-acf-pacf}
 par(mfrow = c(1, 2))
 acf(resid(GAMSA_I), lag.max = 20, main = "ACF")
 pacf(resid(GAMSA_I), lag.max = 20, main = "pACF")
 ```
 
+```{r}
+GAMSA_I_resid %>%
+  ggplot(aes(x = xc, y = yc, col = resid)) +
+  geom_point() +
+  metR::scale_color_divergent() + 
+  coord_fixed() +
+  facet_wrap(~ year)
+```
 ## Term selection
 
 I turn on the double penalty (`select = TRUE`) and check the covariates that has been shrunk.
@@ -1100,46 +1130,7 @@ GAMSA_S_p <- gam(SA_int ~
 summary(GAMSA_S_p)
 ```
 
-`s(LME)` can be dropped. Refit the model without those terms.
-
-```{r refit-GAMSAS}
-# Model S
-GAMSA_S2 <- gam(SA_int ~ 
-                  s(year, bs = "re") +
-                  # s(LME, bs = "re") +
-                  s(v, LME, bs = "fs", k = 5),
-                data = SA_df, family = "gaussian", method = "ML")
-summary(GAMSA_S2)
-```
-
-Compare models.
-
-```{r summary-GAMSAS}
-# Summary metrics
-GAMSAS_AIC <- AIC(GAMSA_S, GAMSA_S2) %>% 
-  rownames_to_column() %>%
-  rename(model = rowname)
-# Metrics data frame
-data.frame(model = c("GAMSA_S", "GAMSA_S2"),
-           reml = round(c(GAMSA_S$gcv.ubre,
-                          GAMSA_S2$gcv.ubre), 
-                        2), 
-           dev_expl = round(c(
-             (1 - (GAMSA_S$deviance / GAMSA_S$null.deviance)) * 100,
-             (1 - (GAMSA_S2$deviance / GAMSA_S2$null.deviance)) * 100),
-             2),
-           r2 = round(c(summary(GAMSA_S)$r.sq,
-                        summary(GAMSA_S2)$r.sq),
-                      2)) %>%
-  full_join(., GAMSAS_AIC, by = "model") %>%
-  mutate(df = round(df, 3),
-         AIC = round(AIC, 3),
-         dAIC = round(AIC - min(AIC), 2),
-         w_AIC = round(Weights(AIC), 5)) %>%
-  dplyr::select(model, df, dev_expl, r2, reml, AIC, dAIC, w_AIC) %>%
-  arrange(AIC) %>% 
-  datatable(class = "cell-border stribe", rownames = F)
-```
+No terms can be dropped.
 
 ### Model I
 
@@ -1154,57 +1145,18 @@ GAMSA_I_p <- gam(SA_int ~
 summary(GAMSA_I_p)
 ```
 
-I remove `s(LME)` from the model.
-
-```{r refit-GAMSAI}
-# Model I
-GAMSA_I2 <- gam(SA_int ~
-                  s(year, bs = "re") +
-                  # s(LME, bs = "re") +
-                  s(v, by = LME, k = 5, bs = "tp"),
-                data = SA_df, family = "gaussian", method = "ML")
-summary(GAMSA_I2)
-```
-
-Compare models
-
-```{r summary-GAMSAI}
-# Summary metrics
-GAMSAI_AIC <- AIC(GAMSA_I, GAMSA_I2) %>%
-  rownames_to_column() %>%
-  rename(model = rowname)
-# Metrics data frame
-data.frame(model = c("GAMSA_I", "GAMSA_I2"),
-           reml = round(c(GAMSA_I$gcv.ubre,
-                          GAMSA_I2$gcv.ubre),
-                        2),
-           dev_expl = round(c(
-             (1 - (GAMSA_I$deviance / GAMSA_I$null.deviance)) * 100,
-             (1 - (GAMSA_I2$deviance / GAMSA_I2$null.deviance)) * 100),
-             2),
-           r2 = round(c(summary(GAMSA_I)$r.sq,
-                        summary(GAMSA_I2)$r.sq),
-                      2)) %>%
-  full_join(., GAMSAI_AIC, by = "model") %>%
-  mutate(df = round(df, 3),
-         AIC = round(AIC, 3),
-         dAIC = round(AIC - min(AIC), 2),
-         w_AIC = round(Weights(AIC), 5)) %>%
-  dplyr::select(model, df, dev_expl, r2, reml, AIC, dAIC, w_AIC) %>%
-  arrange(AIC) %>%
-  datatable(class = "cell-border stribe", rownames = F)
-```
-
+No terms can be dropped.
 
 ## Final models
 
 ### Model S
+
 Refit model with REML
 
 ```{r fit-GAMSAS3-reml}
 GAMSA_S3 <- gam(SA_int ~ 
                   s(year, bs = "re") +
-                  # s(LME, bs = "re") +
+                  s(LME, bs = "re") +
                   s(v, LME, bs = "fs", k = 5),
                 data = SA_df, family = "gaussian", method = "REML")
 summary(GAMSA_S3)
@@ -1251,6 +1203,7 @@ Check residuals.
 
 ```{r GAMSAI3-residuals-covariates, message=FALSE}
 appraise(GAMSA_I3)
+k.check(GAMSA_I3)
 GAMSA_I3_resid <- bind_cols(SA_df, residuals.gam(GAMSA_I3)) %>%
   rename(resid = "...9")
 plot_grid(GAMSA_I3_resid %>%
@@ -1269,8 +1222,17 @@ plot_grid(GAMSA_I3_resid %>%
             labs(x = "year") +
             geom_boxplot(fill = NA), 
           nrow = 1)
-k.check(GAMSA_I3)
+GAMSA_I3_resid %>%
+  ggplot(aes(x = xc, y = yc, col = resid)) +
+  geom_point() +
+  metR::scale_color_divergent() + 
+  coord_fixed() +
+  facet_wrap(~ year)
+par(mfrow = c(1, 2))
+acf(resid(GAMSA_I3), lag.max = 20, main = "ACF")
+pacf(resid(GAMSA_I3), lag.max = 20, main = "pACF")
 ```
+
 
 ## Model predictions
 
@@ -1285,7 +1247,7 @@ val <- SA_df %>%
             max_v = max(v),
             median_v = median(v))
 # Resolution for predictions
-res = 50
+res = 100
 # LME areas
 LME_area <- levels(SA_df$LME)
 # Empty data frame that we populate with new values

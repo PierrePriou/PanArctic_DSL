@@ -1,7 +1,7 @@
 ---
 title: "PanArctic DSL - Acoustic gridding"
 author: "[Pierre Priou](mailto:pierre.priou@mi.mun.ca)"
-date: "2022/06/09 at 11:17"
+date: "2022/08/17 at 16:13"
 output: 
   html_document:
     keep_md: yes
@@ -105,20 +105,21 @@ Acoustic data were collected continuously at 38 kHz. We selected data when the s
 
 ```r
 # Load and tidy files
-MVBS_raw <- list.files("C:/Users/cfer/PhD/Chapt 2 - Arctic Mesopelagic DSL/data/acoustics/90dB threshold",
+MVBS_raw <- list.files("C:/Users/cfer/PhD/Chapt 2 - Arctic Mesopelagic DSL/data/acoustics/82dB threshold",
 # MVBS_raw <- list.files("D:/Travail/PhD/Chapt 2 - Arctic Mesopelagic DSL/data/acoustics/90dB threshold", 
                        pattern = "*.csv", full.names = TRUE) %>% 
   set_names() %>%
   map_dfr(.f = ~ read_csv(., show_col_types = FALSE), 
           .id = "filename") %>% # read file
-  dplyr::select(-Interval, -Layer, -Dist_S, -Sv_min, -Sv_max) %>%
+  dplyr::select(-Interval, -Layer, -Dist_S,
+                -Sv_min, -Sv_max, -Process_ID) %>%
   rename("layer_depth_min" = "Layer_depth_min",
          "layer_depth_max" = "Layer_depth_max",
          "lat" = "Lat_S",
          "lon" = "Lon_S",
          "frequency" = "Frequency") %>%
   unite(date, Date_S, Time_S, sep = " ", remove = FALSE) %>%
-  mutate(filename = str_remove(filename, pattern = "C:/Users/cfer/PhD/Chapt 2 - Arctic Mesopelagic DSL/data/acoustics/90dB threshold"),
+  mutate(filename = str_remove(filename, pattern = "C:/Users/cfer/PhD/Chapt 2 - Arctic Mesopelagic DSL/data/acoustics/82dB threshold"),
          date = ymd_hm(format(ymd_hms(date, tz = "UTC"), 
                               format = '%Y%m%d %H:%M'), tz = "UTC"),
          Date_S = as.character(ymd(Date_S)),

@@ -560,7 +560,7 @@ for (i in seq(2015, 2017, 1)) {
         # Change projection to EPSG:6931
         spTransform(., CRSobj = crs(arctic_laea)) %>% 
         # Rasterize 
-        rasterize(., arctic_laea, fun = median, na.rm = T) %>% 
+        rasterize(., arctic_laea, fun = mean, na.rm = T) %>% 
         # Remove ID layer
         dropLayer(1) %>% 
         # Convert raster to data frame
@@ -583,7 +583,7 @@ for (i in seq(2015, 2017, 1)) {
     }
     print(paste0("Year ", i, " month ", j, " finished"))
   }
-  print(paste0("Year ", i, "finished"))
+  print(paste0("Year ", i, " finished"))
 }
 # Remove temporary data
 rm(phy_year_tmp, phy_tmp_laea, i, j) 

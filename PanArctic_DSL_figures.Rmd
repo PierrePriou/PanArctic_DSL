@@ -220,9 +220,9 @@ load("data/statistics/GAMSA_results.RData")
 predSA_I <- predSA_I %>%
   mutate(LME = factor(case_when(LME == "BF" ~ "Beaufort Sea",
                                 LME == "BB" ~ "Baffin Bay",
-                                LME == "SV" ~ "North. Barents Sea"),
+                                LME == "SV" ~ "Northern Barents Sea"),
                       levels = c("Beaufort Sea", "Baffin Bay", 
-                                 "North. Barents Sea")))
+                                 "Northern Barents Sea")))
 SA_df <- SA_df %>%
   mutate(LME = factor(case_when(LME == "BF" ~ "Beaufort Sea",
                                 LME == "BB" ~ "Baffin Bay",
@@ -913,14 +913,14 @@ GAMSAI_velo <- predSA_I %>%
                       values = met.brewer("Johnson", n = 6, direction = -1)) +
   scale_fill_manual(name = "LME",
                     values = met.brewer("Johnson", n = 6, direction = -1)) +
-  coord_cartesian(xlim = c(-0.05, 4.55), ylim = c(-2, 32), expand = F) +
+  coord_cartesian(xlim = c(-0.05, 4.05), ylim = c(-2, 37), expand = F) +
   scale_x_continuous(breaks = seq(0, 10, 0.5)) +
   scale_y_continuous(
     expression("S"[A]*" (dB re 1 m"^2*" nmi"^-2*")"),
     position = "left",
     sec.axis = sec_axis(trans = ~10^(./10), 
                         name = expression("s"[A]*" ( m"^2*" nmi"^-2*")"),
-                        breaks = c(1, 5, 10, 50, 100, 500, 1000, 5000, 10000))) +
+                        breaks = c(1, 10, 100, 1000, 10000))) +
   scale_linetype_manual(name = "LME", values = c(2, 2, 1)) +
   labs(x = expression("Mean velocity at 318 m (cm s"^-1*")"),
        y = expression("S"[A]*" (dB re 1 m"^2*" nmi"^-2*")")) +
@@ -932,8 +932,7 @@ GAMSAI_velo <- predSA_I %>%
         legend.position = "top",
         plot.margin = unit(c(0, 0, 0, 0), "in"))
 # Save and display plot
-ggsave("plots/Figure_HGAM_SAI3.png", GAMSAI_velo, 
-       height = 3, width = 6.5, dpi = 600, units = "in")
+ggsave("plots/Figure_HGAM_SAI3.png", GAMSAI_velo, height = 2.5, width = 6.5, dpi = 600, units = "in")
 GAMSAI_velo
 ```
 
