@@ -1,0 +1,301 @@
+---
+title: "PanArctic DSL - mid-water trawl data processing"
+author: "Pierre Priou - pierre.priou@mi.mun.ca"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    code_folding: show
+    toc: true
+    toc_float: true
+    toc_collapsed: true
+---
+
+```{r r-setup, message=FALSE, warning=FALSE} 
+# Load packages
+library(tidyverse) # Tidy code 
+library(lubridate) # Date handling 
+library(marmap) # Retrieve bottom depth 
+
+# Suppress summarise() warning
+options(dplyr.summarise.inform = F)
+# Theme for figures
+theme_set(theme_bw())
+theme_update(panel.grid = element_blank(), 
+             panel.border = element_blank(),
+             axis.line = element_line(), 
+             axis.text = element_text(size = 10), 
+             axis.title = element_text(size = 11),
+             legend.title = element_text(size = 11),
+             strip.text.x = element_text(size = 11, face = "plain", hjust = 0.5),
+             strip.background = element_rect(colour = "transparent", fill = "transparent"),
+             legend.margin = margin(0, 0, 0, 0),
+             legend.box.margin = margin(0, 0, -8, 0),
+             plot.margin = unit(c(0.05, 0.05, 0.05, 0.05), "in"))
+```
+
+# Aim 
+
+This document load and tidy mid-water trawl data from the RV *Helmer Hanssen*, FV *Frosti*, and CCGS *Amundsen*. Because the data is formatted differently between each vessel, I process the data per vessel and then combine the tidy data together. 
+
+# Helmer Hanssen
+
+We deployed a Harstad mid-water trawl with mesh size in the mesopelagic layer from the *Helmer Hanssen* in August 2016 (see Geoffroy et al. 2019 for more information). 
+
+## Data loading
+
+```{r HH-load-data}
+# Load fish length
+HH_length_raw <- read_csv("data/nets/Helmer_Hanssen_2016_fish_length.csv", show_col_types = F) %>%
+  # Standardize species name
+  mutate(fish_species = str_to_lower(fish_species)) %>%
+  separate(fish_species, c("genus", "species"), remove = T) %>%
+  unite(fish_species, genus, species, sep = "_", remove = F) %>%
+  # Fix date
+  unite(date, day, month, year, sep = "/", remove = F) %>%
+  mutate(date = dmy(date),
+         vessel = "Helmer Hanssen",
+         deployment = "NA",
+         tow_type = "MWT", 
+         fish_ID = as.character(fish_numberID)) %>%
+  rename(SL_mm = SL_mm_lab)
+
+# Load abundance
+HH_abund_raw <- read_csv("data/nets/Helmer_Hanssen_2016_fish_macrozooplankton.csv", show_col_types = F) %>%
+  # Standardize species name
+  mutate(fish_species = str_to_lower(fish_species)) %>%
+  separate(fish_species, c("genus", "species"), remove = T) %>%
+  unite(fish_species, genus, species, sep="_", remove = F) %>%
+  # Fix date
+  unite(date, day, month, year, sep="/", remove = F) %>%
+  mutate(date = dmy(date),
+         vessel = "Helmer Hanssen",
+         deployment = "NA",
+         number_fish = as.numeric(number_fish))
+```
+
+## Data tidying 
+
+```{r HH-tidy-data} 
+# Tidy length
+HH_length <- HH_length_raw %>%
+  dplyr::select(date, year, month, vessel, station, deployment, lat, lon, bottom_depth_trawl,
+                max_sampling_depth, tow_type, fish_ID, fish_species, genus, species, SL_mm)
+
+# Tidy abundance
+HH_abund <- HH_abund_raw %>% 
+  # Select fish 
+  filter(nekton == T) %>% # Select relevant variables
+  dplyr::select(date, year, month, vessel, station, deployment, lat, lon, bottom_depth_trawl, 
+                max_sampling_depth, tow_type, fish_species, genus, species, number_fish, W_g)
+```
+
+# Amundsen
+
+Several trawls and nets were deployed to groundtruth the acoustic signal. On the Amundsen a modified Isaac-Kidd Midwater Trawl (IKMT) was deployed from the A-frame at the bow of the ship in 2015 and 2016. Samples were either preserved indivdually or in bulk. For the total abundance individual samples need to be summed to the bulk samples. Length measurements were only taken on individual samples.
+
+## Data loading
+
+```{r AM-load-data}
+# Load length of single fish
+AM_length_raw <- read_csv("data/nets/Amundsen_2014_2019_nets_individuals_length.csv", show_col_types = F) %>%
+  # Fix date
+  unite(date, Sampling_date, Sampling_time, sep = " ", remove = F) %>%
+  mutate(date = ymd_hm(format(mdy_hms(date, tz = "UTC"), format = '%Y%m%d %H:%M')),
+         year = year(date),
+         month = month(date),
+         # Standardize species name
+         family = str_to_lower(family),
+         genus = str_to_lower(genus),
+         species = str_to_lower(species),
+         species = if_else(species == "sp.", "sp", species),
+         genus = if_else(family == "liparidae" & genus == "liparis" & species == "sp", "liparidae", genus),
+         genus = if_else(family == "liparidae" & genus == "-" & species == "sp", "liparidae", genus),
+         genus = if_else(family == "liparidae" & is.na(genus) == T, "liparidae", genus),
+         genus = if_else(family == "myctophidae" & genus == "-" & species == "sp", "myctophid", genus),
+         genus = if_else(family == "myctophidae" & is.na(genus) == T & species == "sp", "myctophid", genus),
+         genus = if_else(family == "myctophidae" & genus == "benthosema" & species == "glaciale", "myctophid", genus),
+         species = if_else(family == "liparidae" & genus == "liparidae" & species == "sp", "uid", species),
+         species = if_else(family == "liparidae" & genus == "liparidae" & is.na(species) == T, "uid", species),
+         species = if_else(family == "myctophidae" & genus == "myctophid" & species == "sp", "uid", species),
+         species = if_else(family == "myctophidae" & genus == "myctophid" & is.na(species) == T, "uid", species),
+         species = if_else(family == "myctophidae" & genus == "myctophid" & species == "glaciale", "uid", species),
+         gear = as.factor(str_to_lower(gear)),
+         tow_type = as.factor(str_to_upper(tow_type)),
+         number_fish_ind = 1,
+         deployment = "NA",
+         fish_ID = "NA",
+         vessel = "Amundsen") %>%
+  unite(fish_species, genus, species, sep = "_", remove = F) %>%
+  unite(fish_ID, Year_Fish_id, Original_ID, sep="_", remove = F) %>%
+  mutate() %>%
+  # 1 date failed to parse because there is one empty row in the data (row 3709) so I removed it
+  filter(is.na(date) == F) %>% 
+  rename(SL_mm = SL_mm_lab)
+
+# Load bulk samples
+AM_bulk_raw <- read_csv("data/nets/Amundsen_2014_2019_nets_bulk_station.csv", show_col_types = F) %>%
+  # Fix date
+  unite(date, Sampling_date, Sampling_time, sep = " ", remove = F) %>%
+  mutate(date = ymd_hm(format(mdy_hms(date, tz = "UTC"), format  ='%Y%m%d %H:%M')),
+         year = year(date),
+         month = month(date),
+         station = as.character(station),
+         # Standardize species name
+         family = str_to_lower(family),
+         genus = str_to_lower(genus),
+         species = str_to_lower(species),
+         species = if_else(species == "sp.", "sp", species),
+         gear = as.factor(str_to_lower(gear)),
+         tow_type = as.factor(str_to_upper(tow_type)),
+         vessel = "Amundsen") %>%
+  unite(fish_species, genus, species, sep = "_", remove = F) %>%
+  # Rename number_fish to allow for merging with individual data
+  rename(number_fish_bulk = number_fish) %>% 
+  # Select relevant variables
+  dplyr::select(date, year, month, vessel, station, lat, lon, bottom_depth_trawl,
+                max_sampling_depth, tow_type, fish_species, genus, species, number_fish_bulk)
+```
+
+## Data tidying 
+
+```{r AM-tidy-data} 
+# Tidy length 
+AM_length <- AM_length_raw %>% 
+  filter(tow_type %in% c("IKMT", "IKRMT") & between(year, 2015, 2017)) %>%
+  dplyr::select(date, year, month, vessel, station, deployment, lat, lon, bottom_depth_trawl,
+                max_sampling_depth, tow_type, fish_ID, fish_species, genus, species, SL_mm)
+
+# Tidy abundance
+AM_abund <- AM_length_raw %>% # Summarise data per station 
+  group_by(date, year, month, vessel, station, deployment, lat, lon, bottom_depth_trawl,
+           max_sampling_depth, tow_type, fish_species, genus, species) %>%
+  summarise(number_fish_ind = sum(number_fish_ind)) %>%
+  ungroup() %>% 
+  # Add bulk data
+  left_join(., AM_bulk_raw,
+            by = c("date", "year", "month", "vessel", "station", "lat", "lon", "bottom_depth_trawl",
+                    "max_sampling_depth", "tow_type", "fish_species", "genus", "species")) %>%
+  # Sum individual and bulk fish 
+  rowwise() %>% 
+  mutate(number_fish = sum(number_fish_ind, number_fish_bulk, na.rm = T)) %>% 
+  # Select IKMT data
+  filter(tow_type %in% c("IKMT", "IKRMT") & between(year, 2015, 2017)) %>% 
+  # Remove unused variables
+  dplyr::select(-number_fish_ind, -number_fish_bulk)
+```
+
+# Frosti
+
+On the FV _Frosti_ a mid-water otter trawl was deployed in 2107 in the Beaufort Sea. 
+
+```{r load-bathy-BF}
+# Bathy data
+BF_bathy <- getNOAA.bathy(lon1 = -142, lon2 = -115, lat1 = 68, lat2 = 73, resolution = 1, 
+                          keep = T, path = "data/bathy/")
+```
+
+## Data loading
+
+The Frosti did not recorded bottom depth of the deployment, so I find it using ETOPO bathymetry.
+
+```{r FI-data-loading} 
+# Load metadata
+FI_metadata <- read_csv("data/nets/Frosti_2017_net_metadata.csv", show_col_types = F) %>%
+  # Fix variables 
+  mutate(date = mdy(Date_UTC),
+         year = year(date), 
+         month = month(date),
+         Fish_Sheet_Station_ID = str_to_lower(Fish_Sheet_Station_ID),
+         station = str_replace(Fish_Sheet_Station_ID, pattern = "-", replacement = ""), 
+         Fish_Sheet_Deployment_ID = str_to_lower(Fish_Sheet_Deployment_ID),
+         deployment = str_replace(Fish_Sheet_Deployment_ID, pattern = "-", replacement = ""), 
+         tow_type = str_to_lower(Gear), 
+         # Match names between metadata and data 
+         tow_type = if_else(tow_type == "mid-water", "mwt", tow_type),
+         tow_type = factor(str_to_upper(tow_type)),
+         max_sampling_depth = as.numeric(Target_depth_m)) %>% 
+  arrange(date) %>%
+  # Calculate mid coordinates for the deployment
+  rowwise() %>%
+  mutate(lat = if_else(is.na(End_Latitude) == T, Start_Latitude, mean(c(Start_Latitude, End_Latitude), na.rm = T)),
+         lon = if_else(is.na(End_Longitude) == T, Start_Longitude, mean(c(Start_Longitude, End_Longitude), na.rm = T)), 
+         # Find bottom depth using bathymetry data 
+         get_depth = get.depth(BF_bathy, x = lon, y = lat, locator = F), 
+         bottom_depth_trawl = as.numeric(abs(get_depth$depth))) %>% 
+  # Select relevant variables 
+  dplyr::select(date, year, month, station, deployment, lat, lon, tow_type, max_sampling_depth, bottom_depth_trawl)
+
+FI_length_raw <- read_csv("data/nets/Frosti_2017_fish_weights_lengths.csv", show_col_types = F) %>%
+  mutate(year = Year, 
+         tow_type = str_to_lower(Gear),
+         # Match names between metadata and data
+         tow_type = if_else(tow_type == "wa2", "w2a", tow_type),
+         tow_type = factor(str_to_upper(tow_type)),
+         station = str_to_lower(Station),
+         station = str_replace(station, pattern = "-", replacement = ""),
+         deployment = str_to_lower(Deployment),
+         deployment = str_replace(deployment, pattern = "-", replacement = ""),
+         fish_ID = as.character(Fish_ID), family = str_to_lower(Family),
+         genus = str_to_lower(Genus),
+         genus = if_else(family == "liparidae" & is.na(genus) == T, "liparidae", genus),
+         species = str_to_lower(Species), 
+         species = if_else(family == "liparidae" & genus == "liparidae" & is.na(species) == T, "uid", species),
+         number_fish = if_else(is.na(Number_in_bag) == T, 1, Number_in_bag),
+         W_g = Weight_g, 
+         SL_mm = as.numeric(Standard_Length_mm_lab),
+         vessel = "Frosti") %>% 
+  unite(fish_species, genus, species, sep = "_", remove = F) %>% 
+  arrange(year)
+```
+
+## Tidy data
+
+```{r FI-tidy-data}
+# Tidy length
+FI_length <- FI_length_raw %>%
+  # Add metadata
+  left_join(., FI_metadata, by = c("year", "tow_type", "station", "deployment")) %>%
+  # Select data
+  filter(tow_type == "MWT" & year == 2017) %>%
+  # Select variables of interest
+  dplyr::select(date, year, month, vessel, station, deployment, lat, lon, bottom_depth_trawl, 
+                max_sampling_depth, tow_type, fish_ID, fish_species, genus, species, SL_mm) 
+
+# Tidy abundance
+FI_abund <- FI_length_raw %>%
+  # Add metadata
+  left_join(., FI_metadata, by = c("year", "tow_type", "station", "deployment")) %>%
+  # Select data
+  filter(tow_type == "MWT" & year == 2017) %>%
+  # Calculate abundance per station
+  group_by(date, year, month, vessel, station, deployment, lat, lon, bottom_depth_trawl, 
+                max_sampling_depth, tow_type, fish_species, genus, species) %>%
+  summarise(number_fish = sum(number_fish)) %>%
+  ungroup()
+```
+
+# Combine data
+
+Now I combine data from all ships in a single file. I select tows that were performed below 200 m sampling depth.
+
+```{r combine-trawls} 
+# Length 
+length_station <- bind_rows(HH_length, AM_length, FI_length) %>%
+  filter(max_sampling_depth >= 200)
+
+# Abundance
+abund_station <- bind_rows(HH_abund, AM_abund, FI_abund) %>% 
+  filter(max_sampling_depth >= 200)
+```
+
+I save the data as `.csv` and `.RData` files.
+
+```{r save-data}
+# Save .csv
+write_csv(length_station, file = "data/nets/fish_length_station.csv")
+write_csv(abund_station, file = "data/nets/fish_abundance_station.csv")
+
+# Save .Rdata
+save(length_station, file = "data/nets/fish_length_station.RData")
+save(abund_station, file = "data/nets/fish_abundance_station.RData")
+```
