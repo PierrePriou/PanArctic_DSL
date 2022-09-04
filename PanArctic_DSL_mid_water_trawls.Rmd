@@ -14,7 +14,8 @@ output:
 # Load packages
 library(tidyverse) # Tidy code 
 library(lubridate) # Date handling 
-library(marmap) # Retrieve bottom depth 
+library(marmap)    # Retrieve bottom depth 
+library(sf)        # Spatial data
 
 # Suppress summarise() warning
 options(dplyr.summarise.inform = F)
@@ -35,13 +36,23 @@ theme_update(panel.grid = element_blank(),
 
 # Aim 
 
-This document load and tidy mid-water trawl data from the RV *Helmer Hanssen*, FV *Frosti*, and CCGS *Amundsen*. Because the data is formatted differently between each vessel, I process the data per vessel and then combine the tidy data together. 
+This document load and tidy mid-water trawl data from the RV *Helmer Hanssen*, FV *Frosti*, and CCGS *Amundsen*. Because the data is formatted differently between each vessel, I process the data per vessel and then combine the tidy data together.
 
-# Helmer Hanssen
+I use the Large Marine Ecosystems (LME) boundaries to define the regions of interest.
+
+```{r load-LME-areas}
+LME_sf <- read_sf("data/arctic_regions/LME/LME_2013_polygon.shp") %>%
+    st_transform(crs = st_crs(4326))
+```
+
+
+# Data processing
+
+## Helmer Hanssen
 
 We deployed a Harstad mid-water trawl with mesh size in the mesopelagic layer from the *Helmer Hanssen* in August 2016 (see Geoffroy et al. 2019 for more information). 
 
-## Data loading
+### Data loading
 
 ```{r HH-load-data}
 # Load fish length
@@ -73,7 +84,7 @@ HH_abund_raw <- read_csv("data/nets/Helmer_Hanssen_2016_fish_macrozooplankton.cs
          number_fish = as.numeric(number_fish))
 ```
 
-## Data tidying 
+### Data tidying 
 
 ```{r HH-tidy-data} 
 # Tidy length
@@ -89,11 +100,11 @@ HH_abund <- HH_abund_raw %>%
                 max_sampling_depth, tow_type, fish_species, genus, species, number_fish, W_g)
 ```
 
-# Amundsen
+## Amundsen
 
 Several trawls and nets were deployed to groundtruth the acoustic signal. On the Amundsen a modified Isaac-Kidd Midwater Trawl (IKMT) was deployed from the A-frame at the bow of the ship in 2015 and 2016. Samples were either preserved indivdually or in bulk. For the total abundance individual samples need to be summed to the bulk samples. Length measurements were only taken on individual samples.
 
-## Data loading
+### Data loading
 
 ```{r AM-load-data}
 # Load length of single fish
@@ -156,7 +167,7 @@ AM_bulk_raw <- read_csv("data/nets/Amundsen_2014_2019_nets_bulk_station.csv", sh
                 max_sampling_depth, tow_type, fish_species, genus, species, number_fish_bulk)
 ```
 
-## Data tidying 
+### Data tidying 
 
 ```{r AM-tidy-data} 
 # Tidy length 
@@ -184,7 +195,7 @@ AM_abund <- AM_length_raw %>% # Summarise data per station
   dplyr::select(-number_fish_ind, -number_fish_bulk)
 ```
 
-# Frosti
+## Frosti
 
 On the FV _Frosti_ a mid-water otter trawl was deployed in 2107 in the Beaufort Sea. 
 
@@ -194,7 +205,7 @@ BF_bathy <- getNOAA.bathy(lon1 = -142, lon2 = -115, lat1 = 68, lat2 = 73, resolu
                           keep = T, path = "data/bathy/")
 ```
 
-## Data loading
+### Data loading
 
 The Frosti did not recorded bottom depth of the deployment, so I find it using ETOPO bathymetry.
 
@@ -248,7 +259,7 @@ FI_length_raw <- read_csv("data/nets/Frosti_2017_fish_weights_lengths.csv", show
   arrange(year)
 ```
 
-## Tidy data
+### Tidy data
 
 ```{r FI-tidy-data}
 # Tidy length
@@ -274,18 +285,55 @@ FI_abund <- FI_length_raw %>%
   ungroup()
 ```
 
-# Combine data
+## Combine and save data
 
-Now I combine data from all ships in a single file. I select tows that were performed below 200 m sampling depth.
+Now I combine data from all ships in a single file. I select tows that were performed below 200 m sampling depth and find in which LME data are from. **I excluded one IKMT station (G703 in 2016) from Baffin Bay, because the net hit the bottom and was destroyed. The catch contained some myctophid and benthic species (skates, eelpouts...).**
 
 ```{r combine-trawls} 
 # Length 
 length_station <- bind_rows(HH_length, AM_length, FI_length) %>%
-  filter(max_sampling_depth >= 200)
+  filter(max_sampling_depth >= 200 & station != "G703" & fish_species != "gonatus_fabricii") %>%
+  # Remove data from 
+  # Combine liparidae together
+  mutate(fish_species = if_else(genus == "liparis", "liparidae_uid", fish_species)) %>%
+  # Convert tibble to sf
+  st_as_sf(coords = c("lon", "lat"), crs = st_crs(4326), remove = F) %>%
+  # Append LME 
+  st_join(., LME_sf, join = st_within) %>% 
+  st_drop_geometry() %>%
+  # Remove unused variables
+  dplyr::select(-Id, -ET_ID) %>%
+  # Change LME names for ease of use and net type
+  mutate(LME = case_when(LME == "Baffin Bay LME" ~ "BB",
+                         LME == "Barents Sea LME" ~ "SV",
+                         LME == "Beaufort Sea LME" ~ "BF"),
+         net = case_when(vessel == "Amundsen" & year == 2015 ~ "IKMT",
+                         vessel == "Amundsen" & year == 2016 ~ "mod. IKMT",
+                         vessel == "Helmer Hanssen" ~ "Harstad",
+                         vessel == "Frosti" ~ "DWG")) %>%
+  # Remove data with no length
+  filter(is.na(SL_mm) == F)
 
 # Abundance
 abund_station <- bind_rows(HH_abund, AM_abund, FI_abund) %>% 
-  filter(max_sampling_depth >= 200)
+  filter(max_sampling_depth >= 200 & station != "G703" & fish_species != "gonatus_fabricii") %>%
+  # Combine liparidae together
+  mutate(fish_species = if_else(genus == "liparis", "liparidae_uid", fish_species)) %>%
+  # Convert tibble to sf
+  st_as_sf(coords = c("lon", "lat"), crs = st_crs(4326), remove = F) %>%
+  # Append LME 
+  st_join(., LME_sf, join = st_within) %>% 
+  st_drop_geometry() %>%
+  # Remove unused variables
+  dplyr::select(-Id, -ET_ID) %>%
+  # Change LME names for ease of use
+  mutate(LME = case_when(LME == "Baffin Bay LME" ~ "BB",
+                         LME == "Barents Sea LME" ~ "SV",
+                         LME == "Beaufort Sea LME" ~ "BF"),
+         net = case_when(vessel == "Amundsen" & year == 2015 ~ "IKMT",
+                         vessel == "Amundsen" & year == 2016 ~ "mod. IKMT",
+                         vessel == "Helmer Hanssen" ~ "Harstad",
+                         vessel == "Frosti" ~ "DWG"))
 ```
 
 I save the data as `.csv` and `.RData` files.
@@ -299,3 +347,65 @@ write_csv(abund_station, file = "data/nets/fish_abundance_station.csv")
 save(length_station, file = "data/nets/fish_length_station.RData")
 save(abund_station, file = "data/nets/fish_abundance_station.RData")
 ```
+
+# Data exploration
+
+Plot fish length per net type
+
+```{r boxplot-length-data, fig.width=6.5, fig.height=3.5}
+length_boxplot <- length_station %>%
+  # Vernacular name and length in cm
+  mutate(fish = case_when(fish_species == "anarhichas_lupus" ~ "Atlantic\nwolfish",
+                          fish_species == "arctozenus_risso" ~ "Spotted\nbarra-\ncudina",
+                          fish_species == "boreogadus_saida" ~ "Polar\ncod",
+                          fish_species == "gadus_morhua" ~ "Atlantic\ncod",
+                          fish_species == "icelus_bicornis" ~ "Twohorn\nsculpin",
+                          fish_species == "leptoclinus_maculatus" ~ "Daubed\nshanny",
+                          fish_species == "liparidae_uid" ~ "Snailfish",
+                          fish_species == "melanogrammus_aeglefinnus" ~ "Haddock",
+                          fish_species == "myctophid_uid" ~ "Lantern-\nfish",
+                          fish_species == "reinhardtius_hippoglossoides" ~ "Green-\nland\nhalibut",
+                          fish_species == "sebastes_sp" ~ "Redfish"),
+         SL_cm = SL_mm / 10) %>%
+  # Plot
+  ggplot() +
+  geom_hline(yintercept = 10, lty = 2) +
+  geom_boxplot(aes(x = fish, y = SL_cm, col = net), position = position_dodge(preserve = "single"), fill = NA) + 
+  scale_y_continuous("Standard length (cm)", breaks = seq(0, 30, 5)) +
+  scale_color_discrete("Trawl type") +
+  theme(axis.title.x = element_blank(), 
+        legend.position = "top", 
+        axis.text = element_text(size = 9),
+        axis.title = element_text(size = 9),
+        legend.title = element_text(size = 9),
+        legend.margin = margin(0, 0, 0, 0),
+        legend.box.margin = margin(0, 0, -8, 0),
+        panel.grid = element_blank(), 
+        plot.margin = unit(c(0, 0, 0, 0), "in"))
+# Save and display
+ggsave("plots/fish_length_boxplot.png", length_boxplot, height = 3.5, width = 6.5, dpi = 600, units = "in")
+length_boxplot
+```
+
+Calculate mean length per fish species.
+
+```{r mean-length-species}
+test <- length_station %>%
+  # Vernacular name and length in cm
+  mutate(fish = case_when(fish_species == "anarhichas_lupus" ~ "Atlantic wolfish",
+                          fish_species == "arctozenus_risso" ~ "Spotted barrancudina",
+                          fish_species == "boreogadus_saida" ~ "Polar cod",
+                          fish_species == "gadus_morhua" ~ "Atlantic cod",
+                          fish_species == "icelus_bicornis" ~ "Twohorn sculpin",
+                          fish_species == "leptoclinus_maculatus" ~ "Daubed shanny",
+                          fish_species == "liparidae_uid" ~ "Snailfish",
+                          fish_species == "melanogrammus_aeglefinnus" ~ "Haddock",
+                          fish_species == "myctophid_uid" ~ "Lanternfish",
+                          fish_species == "reinhardtius_hippoglossoides" ~ "Greennland halibut",
+                          fish_species == "sebastes_sp" ~ "Redfish"),
+         SL_cm = SL_mm / 10) %>%
+  group_by(fish) %>% 
+  summarise(mean_SL_cm = round(mean(SL_mm / 10), 1),
+            sd_SL_cm = round(sd(SL_cm / 10), 1))
+```
+
