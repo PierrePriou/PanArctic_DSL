@@ -369,7 +369,7 @@ length_boxplot <- length_station %>%
          SL_cm = SL_mm / 10) %>%
   # Plot
   ggplot() +
-  geom_hline(yintercept = 10, lty = 2) +
+  # geom_hline(yintercept = 10, lty = 2) +
   geom_boxplot(aes(x = fish, y = SL_cm, col = net), position = position_dodge(preserve = "single"), fill = NA) + 
   scale_y_continuous("Standard length (cm)", breaks = seq(0, 30, 5)) +
   scale_color_discrete("Trawl type") +
@@ -390,7 +390,7 @@ length_boxplot
 Calculate mean length per fish species.
 
 ```{r mean-length-species}
-test <- length_station %>%
+length_station %>%
   # Vernacular name and length in cm
   mutate(fish = case_when(fish_species == "anarhichas_lupus" ~ "Atlantic wolfish",
                           fish_species == "arctozenus_risso" ~ "Spotted barrancudina",

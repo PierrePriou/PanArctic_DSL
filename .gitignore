@@ -17,6 +17,7 @@ vignettes/*.pdf
 .Renviron
 data/
 plots/
+documents/
 /PanArctic_DSL_statistics_files/figure-html
 /PanArctic_DSL_remote_sensing_files/figure-html
 /PanArctic_DSL_figures_files/figure-html
